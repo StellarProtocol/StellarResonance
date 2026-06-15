@@ -1,0 +1,8 @@
+# .NET
+bin/
+obj/
+*.user
+# tooling
+.superpowers/
+.vs/
+.idea/

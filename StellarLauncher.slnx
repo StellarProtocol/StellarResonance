@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/StellarLauncher.App/StellarLauncher.App.csproj" />
+    <Project Path="src/StellarLauncher.Core/StellarLauncher.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/StellarLauncher.Core.Tests/StellarLauncher.Core.Tests.csproj" />
+  </Folder>
+</Solution>

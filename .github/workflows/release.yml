@@ -1,0 +1,130 @@
+name: release
+# Builds the launcher for Windows + Linux and publishes to the MinIO `stellar` bucket
+# so the launcher's self-update check (stellar/launcher.json) can see new versions.
+# Runs on hosted runners — the launcher has NO game-interop dependency, so unlike the
+# framework's release workflow this is fully automatable.
+#
+# Fixed object names (no version in the filename) mean only the CURRENT version is ever
+# kept in the bucket — each release overwrites the previous binaries + launcher.json.
+#
+# IMPORTANT: bump `LauncherVersion` in HomeViewModel.cs to match the `version` input
+# before running, or the published build will think it is already up to date.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Launcher version, e.g. 1.0.0 (must match LauncherVersion in code)"
+        required: true
+      channel:
+        description: "Release channel"
+        type: choice
+        options: [stable, testing]
+        default: stable
+
+permissions:
+  contents: write   # create/delete GitHub Releases + tags
+  actions: write    # delete old workflow runs (keep storage at current-only)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish win-x64 (self-contained, single file)
+        run: >
+          dotnet publish src/StellarLauncher.App -c Release -r win-x64
+          --self-contained true -p:PublishSingleFile=true -o publish/win-x64
+
+      - name: Publish linux-x64 (self-contained, single file)
+        run: >
+          dotnet publish src/StellarLauncher.App -c Release -r linux-x64
+          --self-contained true -p:PublishSingleFile=true -o publish/linux-x64
+
+      - name: Zip artifacts
+        run: |
+          (cd publish/win-x64   && zip -rq ../../StellarLauncher-win-x64.zip   .)
+          (cd publish/linux-x64 && zip -rq ../../StellarLauncher-linux-x64.zip .)
+
+      - name: Derive channel paths + checksums
+        run: |
+          if [ "${{ inputs.channel }}" = "testing" ]; then
+            echo "SUBDIR=launcher/testing" >> "$GITHUB_ENV"
+            echo "MANIFEST=launcher-testing.json" >> "$GITHUB_ENV"
+          else
+            echo "SUBDIR=launcher" >> "$GITHUB_ENV"
+            echo "MANIFEST=launcher.json" >> "$GITHUB_ENV"
+          fi
+          echo "WIN_SHA=$(sha256sum StellarLauncher-win-x64.zip | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          echo "LINUX_SHA=$(sha256sum StellarLauncher-linux-x64.zip | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+      - name: Generate launcher.json (per-OS checksums for self-replace)
+        run: |
+          cat > launcher.json <<EOF
+          {
+            "version": "${{ inputs.version }}",
+            "date": "$(date -u +%Y-%m-%d)",
+            "channel": "${{ inputs.channel }}",
+            "windowsUrl": "https://minio.revette.io/stellar/$SUBDIR/StellarLauncher-win-x64.zip",
+            "windowsSha256": "$WIN_SHA",
+            "linuxUrl": "https://minio.revette.io/stellar/$SUBDIR/StellarLauncher-linux-x64.zip",
+            "linuxSha256": "$LINUX_SHA",
+            "notes": "Stellar Launcher ${{ inputs.version }} (${{ inputs.channel }})"
+          }
+          EOF
+          cat launcher.json
+
+      - name: Upload to MinIO (stellar bucket — fixed names, current-only)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: sa-east-1
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+        run: |
+          aws s3 cp StellarLauncher-win-x64.zip \
+            "s3://stellar/$SUBDIR/StellarLauncher-win-x64.zip" \
+            --endpoint-url https://minio.revette.io
+          aws s3 cp StellarLauncher-linux-x64.zip \
+            "s3://stellar/$SUBDIR/StellarLauncher-linux-x64.zip" \
+            --endpoint-url https://minio.revette.io
+          aws s3 cp launcher.json \
+            "s3://stellar/$MANIFEST" \
+            --endpoint-url https://minio.revette.io
+
+      # ---- GitHub Release: new-user download page (STABLE channel only), CURRENT VERSION ONLY ----
+      - name: Publish GitHub Release (replace current)
+        if: ${{ inputs.channel == 'stable' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER="${{ inputs.version }}"; TAG="v$VER"
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$TAG" \
+            StellarLauncher-win-x64.zip StellarLauncher-linux-x64.zip \
+            --title "Stellar Launcher $VER" \
+            --notes "Download the zip for your OS, extract, and run. Existing installs auto-update."
+
+      - name: Prune old GitHub Releases (keep only current)
+        if: ${{ inputs.channel == 'stable' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ inputs.version }}"
+          gh release list --limit 200 --json tagName -q '.[].tagName' \
+            | grep -vx "$TAG" \
+            | while read -r old; do echo "deleting old release $old"; gh release delete "$old" --cleanup-tag --yes || true; done
+
+      - name: Prune old workflow runs (keep only this run)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list --workflow=release.yml --limit 200 \
+            --json databaseId -q '.[].databaseId' \
+            | grep -vx "${{ github.run_id }}" \
+            | while read -r id; do echo "deleting old run $id"; gh run delete "$id" || true; done

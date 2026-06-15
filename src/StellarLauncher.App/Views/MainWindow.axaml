@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:StellarLauncher.App.ViewModels"
+        xmlns:views="using:StellarLauncher.App.Views"
+        x:Class="StellarLauncher.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Width="880" Height="560" Title="Stellar Launcher"
+        Icon="/Assets/stellar.png"
+        Background="#080a12">
+  <Window.Styles>
+    <Style Selector="Path.glow">
+      <Style.Animations>
+        <Animation Duration="0:0:1.8" IterationCount="INFINITE" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+          <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.30"/></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.95"/></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+  </Window.Styles>
+  <Grid ColumnDefinitions="74,*">
+    <StackPanel Grid.Column="0" Background="#0a0d18" Spacing="14"
+                HorizontalAlignment="Stretch">
+      <!-- Stellar mark: glowing cyan 4-point sparkle (animated pulse), matching the in-game logo -->
+      <Panel Width="48" Height="48" Margin="0,18,0,18" HorizontalAlignment="Center">
+        <Viewbox Width="48" Height="48">
+          <Path Classes="glow" Fill="#46d6ff"
+                Data="M12,1 C12.7,6.6 17.4,11.3 23,12 C17.4,12.7 12.7,17.4 12,23 C11.3,17.4 6.6,12.7 1,12 C6.6,11.3 11.3,6.6 12,1 Z">
+            <Path.Effect><BlurEffect Radius="7"/></Path.Effect>
+          </Path>
+        </Viewbox>
+        <Viewbox Width="30" Height="30" HorizontalAlignment="Center" VerticalAlignment="Center">
+          <Path Fill="#d6f3ff"
+                Data="M12,1 C12.7,6.6 17.4,11.3 23,12 C17.4,12.7 12.7,17.4 12,23 C11.3,17.4 6.6,12.7 1,12 C6.6,11.3 11.3,6.6 12,1 Z"/>
+        </Viewbox>
+      </Panel>
+      <Button Command="{Binding ShowHomeCommand}" Content="⌂" FontSize="18"
+              HorizontalAlignment="Center" Background="Transparent" Foreground="#cfd6f0"/>
+      <Button Command="{Binding ShowPluginsCommand}" Content="🧩" FontSize="18"
+              HorizontalAlignment="Center" Background="Transparent" Foreground="#8a93b2"/>
+      <Button Command="{Binding ShowSettingsCommand}" Content="⚙" FontSize="18"
+              HorizontalAlignment="Center" Background="Transparent" Foreground="#8a93b2"/>
+    </StackPanel>
+
+    <ContentControl Grid.Column="1" Content="{Binding Current}">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:HomeViewModel"><views:HomeView/></DataTemplate>
+        <DataTemplate DataType="vm:PluginsViewModel"><views:PluginsView/></DataTemplate>
+        <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView/></DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+  </Grid>
+</Window>

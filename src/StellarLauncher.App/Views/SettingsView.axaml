@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StellarLauncher.App.ViewModels"
+             x:Class="StellarLauncher.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <StackPanel Margin="28" Spacing="14">
+    <TextBlock Text="Settings" Foreground="White" FontSize="20" FontWeight="Bold"/>
+
+    <TextBlock Text="Game (game_mini directory)" Foreground="#8a93b2"/>
+    <Grid ColumnDefinitions="*,Auto,Auto">
+      <TextBox Grid.Column="0" Text="{Binding GameMiniDir}"
+               PlaceholderText="auto-detected — or Detect / Browse / paste …/release_x/game_mini"/>
+      <Button Grid.Column="1" Content="Detect" Command="{Binding DetectCommand}" Margin="8,0,0,0"
+              Foreground="#cfe0ff" Background="#1c2740" BorderBrush="#2f4570" BorderThickness="1" FontWeight="SemiBold"/>
+      <Button Grid.Column="2" Content="Browse…" Click="BrowseGame" Margin="8,0,0,0"/>
+    </Grid>
+    <TextBlock Text="{Binding DetectStatus}" Foreground="#7ee0a0" FontSize="11" IsVisible="{Binding DetectStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+    <TextBlock Text="Linux: Wine/Proton runner" Foreground="#8a93b2"/>
+    <Grid ColumnDefinitions="*,Auto">
+      <TextBox Grid.Column="0" Text="{Binding Runner}" PlaceholderText="/path/to/proton"/>
+      <Button Grid.Column="1" Content="Browse…" Click="BrowseRunner" Margin="8,0,0,0"/>
+    </Grid>
+
+    <TextBlock Text="Linux: WINEPREFIX" Foreground="#8a93b2"/>
+    <Grid ColumnDefinitions="*,Auto">
+      <TextBox Grid.Column="0" Text="{Binding WinePrefix}" PlaceholderText="/path/to/prefix"/>
+      <Button Grid.Column="1" Content="Browse…" Click="BrowsePrefix" Margin="8,0,0,0"/>
+    </Grid>
+
+    <TextBlock Text="Update channel" Foreground="#8a93b2"/>
+    <ToggleSwitch IsChecked="{Binding TestingChannel}" OnContent="Testing (pre-release)" OffContent="Stable"/>
+
+    <Button Content="Save" Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,6,0,0"/>
+  </StackPanel>
+</UserControl>
