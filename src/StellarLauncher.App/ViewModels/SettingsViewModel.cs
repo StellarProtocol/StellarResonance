@@ -78,6 +78,22 @@ public partial class SettingsViewModel : ObservableObject
         _settings.Save(cfg);
     }
 
+    // Toggles persist immediately — no separate Save click needed (ctor sets backing fields, so
+    // these don't fire during init). The text fields (paths) still persist via Save.
+    partial void OnEsyncChanged(bool value) => PersistToggles();
+    partial void OnFsyncChanged(bool value) => PersistToggles();
+    partial void OnFpsOverlayChanged(bool value) => PersistToggles();
+    partial void OnDxvkNvapiChanged(bool value) => PersistToggles();
+    partial void OnTestingChannelChanged(bool value) => PersistToggles();
+
+    private void PersistToggles()
+    {
+        var cfg = _settings.Load();   // preserve on-disk paths; only update the toggles + channel
+        cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay; cfg.DxvkNvapi = DxvkNvapi;
+        cfg.Channel = TestingChannel ? "testing" : "stable";
+        _settings.Save(cfg);
+    }
+
     public void DetectFrom(string gameRoot)
     {
         var found = _locator.FindGameMini(gameRoot);

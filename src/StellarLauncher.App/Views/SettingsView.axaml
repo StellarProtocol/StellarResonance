@@ -29,7 +29,8 @@
     </Grid>
 
     <StackPanel IsVisible="{Binding IsLinux}" Spacing="8">
-      <TextBlock Text="Linux: launch tweaks" Foreground="#8a93b2" Margin="0,4,0,0"/>
+      <TextBlock Text="Linux: launch tweaks  (saved automatically — relaunch the game to apply)"
+                 Foreground="#8a93b2" Margin="0,4,0,0"/>
       <CheckBox IsChecked="{Binding DxvkNvapi}" Content="Auto Install/Update DXVK-NVAPI on Prefix"
                 ToolTip.Tip="Installs/updates jp7677/dxvk-nvapi into the prefix before launch, and adds the nvapi DLL overrides (NVIDIA features under DXVK)."/>
       <CheckBox IsChecked="{Binding Esync}" Content="Enable Esync"

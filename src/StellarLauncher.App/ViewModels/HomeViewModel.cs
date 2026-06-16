@@ -266,7 +266,7 @@ public partial class HomeViewModel : ObservableObject
             await Task.Delay(2500);
             StatusLine = proc.HasExited && proc.ExitCode != 0
                 ? $"launch failed (runner exited {proc.ExitCode}) — check Runner / WINEPREFIX in Settings"
-                : "game launching…";
+                : "game running";
         }
         catch (Exception ex) { StatusLine = $"launch failed: {ex.Message}"; }
     }
