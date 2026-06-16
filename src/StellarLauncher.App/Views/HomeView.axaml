@@ -59,10 +59,10 @@
                     ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}">
             <ComboBox.ItemTemplate>
               <DataTemplate x:DataType="model:VersionManifest">
-                <TextBlock>
-                  <Run Text="{Binding Version, StringFormat='v{0}'}"/>
-                  <Run Text="{Binding Date}" Foreground="#697297"/>
-                </TextBlock>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Version, StringFormat='v{0}'}"/>
+                  <TextBlock Text="{Binding Date}" Foreground="#697297"/>
+                </StackPanel>
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>
