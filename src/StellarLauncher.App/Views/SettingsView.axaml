@@ -19,17 +19,19 @@
     </Grid>
     <TextBlock Text="{Binding DetectStatus}" Foreground="#7ee0a0" FontSize="11" IsVisible="{Binding DetectStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
-    <TextBlock Text="Linux: Wine/Proton runner" Foreground="#8a93b2"/>
-    <Grid ColumnDefinitions="*,Auto">
-      <TextBox Grid.Column="0" Text="{Binding Runner}" PlaceholderText="/path/to/proton"/>
-      <Button Grid.Column="1" Content="Browse…" Click="BrowseRunner" Margin="8,0,0,0"/>
-    </Grid>
+    <StackPanel IsVisible="{Binding IsLinux}" Spacing="14">
+      <TextBlock Text="Linux: Wine/Proton runner" Foreground="#8a93b2"/>
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBox Grid.Column="0" Text="{Binding Runner}" PlaceholderText="/path/to/proton"/>
+        <Button Grid.Column="1" Content="Browse…" Click="BrowseRunner" Margin="8,0,0,0"/>
+      </Grid>
 
-    <TextBlock Text="Linux: WINEPREFIX" Foreground="#8a93b2"/>
-    <Grid ColumnDefinitions="*,Auto">
-      <TextBox Grid.Column="0" Text="{Binding WinePrefix}" PlaceholderText="/path/to/prefix"/>
-      <Button Grid.Column="1" Content="Browse…" Click="BrowsePrefix" Margin="8,0,0,0"/>
-    </Grid>
+      <TextBlock Text="Linux: WINEPREFIX" Foreground="#8a93b2"/>
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBox Grid.Column="0" Text="{Binding WinePrefix}" PlaceholderText="/path/to/prefix"/>
+        <Button Grid.Column="1" Content="Browse…" Click="BrowsePrefix" Margin="8,0,0,0"/>
+      </Grid>
+    </StackPanel>
 
     <StackPanel IsVisible="{Binding IsLinux}" Spacing="8">
       <TextBlock Text="Linux: launch tweaks  (saved automatically — relaunch the game to apply)"

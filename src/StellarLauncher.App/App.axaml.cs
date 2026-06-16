@@ -67,11 +67,19 @@ public partial class App : Application
 
         if (platform.IsWindows)
         {
-            roots.Add(@"C:\");
-            roots.Add(@"C:\Program Files");
-            roots.Add(@"C:\Program Files (x86)");
-            roots.Add(@"D:\");
-            roots.Add(@"D:\Games");
+            // Scan every ready fixed/removable drive — the install may live on any drive
+            // (e.g. E:\Star\StarLauncher\…), not just C:/D:. For each, probe the root plus the
+            // usual install parents so GameDetector's Star\StarLauncher\game suffix can resolve.
+            foreach (var drive in EnumerateWindowsDriveRoots(fs))
+            {
+                roots.Add(drive);
+                roots.Add(fs.Path.Combine(drive, "Program Files"));
+                roots.Add(fs.Path.Combine(drive, "Program Files (x86)"));
+                roots.Add(fs.Path.Combine(drive, "Games"));
+            }
+            // Exact install path straight from the official launcher's uninstall registry entry —
+            // covers installs in arbitrary subfolders the drive scan above wouldn't reach.
+            roots.AddRange(ReadWindowsRegistryInstallRoots(fs));
         }
         else
         {
@@ -91,6 +99,60 @@ public partial class App : Application
             }
             roots.Add(home);
         }
+        return roots;
+    }
+
+    // Root directories of every ready fixed/removable drive (C:\, D:\, E:\, …). Windows only.
+    private static IEnumerable<string> EnumerateWindowsDriveRoots(IFileSystem fs)
+    {
+        IDriveInfo[] drives;
+        try { drives = fs.DriveInfo.GetDrives(); }
+        catch { yield break; }   // never let a flaky drive abort detection
+
+        foreach (var d in drives)
+        {
+            bool ready;
+            try { ready = d.IsReady && (d.DriveType == System.IO.DriveType.Fixed
+                                        || d.DriveType == System.IO.DriveType.Removable); }
+            catch { continue; }
+            if (ready) yield return d.Name;   // e.g. "E:\"
+        }
+    }
+
+    // Install locations from the official launcher's "Uninstall" registry entries, derived back to
+    // the scan root so GameDetector's Star\StarLauncher\game suffix resolves. Windows only.
+    private static IReadOnlyList<string> ReadWindowsRegistryInstallRoots(IFileSystem fs)
+    {
+        var roots = new List<string>();
+        if (!OperatingSystem.IsWindows()) return roots;
+        try
+        {
+            var hives = new (Microsoft.Win32.RegistryKey Hive, string Sub)[]
+            {
+                (Microsoft.Win32.Registry.LocalMachine, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+                (Microsoft.Win32.Registry.LocalMachine, @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+                (Microsoft.Win32.Registry.CurrentUser,  @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+            };
+            foreach (var (hive, sub) in hives)
+            {
+                using var uninstall = hive.OpenSubKey(sub);
+                if (uninstall is null) continue;
+                foreach (var name in uninstall.GetSubKeyNames())
+                {
+                    using var entry = uninstall.OpenSubKey(name);
+                    var loc = (entry?.GetValue("InstallLocation") as string)?.Trim();
+                    if (string.IsNullOrEmpty(loc)) continue;
+                    // InstallLocation points at the StarLauncher folder itself. The detector's
+                    // LauncherSuffix re-appends StarLauncher\game, so hand it the parent dir —
+                    // matching just the StarLauncher tail keeps this robust to whatever sits above.
+                    loc = loc.TrimEnd('\\', '/');
+                    if (!loc.EndsWith("StarLauncher", StringComparison.OrdinalIgnoreCase)) continue;
+                    var parent = fs.Path.GetDirectoryName(loc);   // dir containing StarLauncher\
+                    if (!string.IsNullOrEmpty(parent)) roots.Add(parent!);
+                }
+            }
+        }
+        catch { /* registry unavailable or access denied — fall back to the drive scan */ }
         return roots;
     }
 

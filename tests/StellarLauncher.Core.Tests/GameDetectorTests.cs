@@ -34,6 +34,21 @@ public class GameDetectorTests
     }
 
     [Fact]
+    public void Detects_via_StarLauncher_parent_root_without_a_Star_folder()
+    {
+        // Registry-derived root: the parent of the StarLauncher dir, with no "Star" folder above it.
+        var fs = new MockFileSystem();
+        fs.AddDirectory("/custom/StarLauncher/game/release_2.11/game_mini");
+        var detector = new GameDetector(fs, new GameLocator(fs), () => new[] { "/custom" });
+
+        var found = detector.Detect();
+
+        Assert.Contains(
+            fs.Path.Combine("/custom", "StarLauncher", "game", "release_2.11", "game_mini"),
+            found);
+    }
+
+    [Fact]
     public void Returns_empty_when_nothing_matches()
     {
         var fs = new MockFileSystem();

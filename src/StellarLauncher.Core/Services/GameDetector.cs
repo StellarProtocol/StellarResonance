@@ -15,6 +15,9 @@ public sealed class GameDetector : IGameDetector
     private static readonly string[] WineSuffix = { "drive_c", "Star", "StarLauncher", "game" };
     // Native Windows: <root>/Star/StarLauncher/game/release_*/game_mini
     private static readonly string[] NativeSuffix = { "Star", "StarLauncher", "game" };
+    // Registry-derived: <root> is the parent of the StarLauncher install dir (the "Star" folder
+    // isn't guaranteed above it), so probe <root>/StarLauncher/game/release_*/game_mini directly.
+    private static readonly string[] LauncherSuffix = { "StarLauncher", "game" };
 
     private readonly IFileSystem _fs;
     private readonly IGameLocator _locator;
@@ -69,7 +72,7 @@ public sealed class GameDetector : IGameDetector
         var found = new List<string>();
         foreach (var root in _searchRoots())
         {
-            foreach (var suffix in new[] { WineSuffix, NativeSuffix })
+            foreach (var suffix in new[] { WineSuffix, NativeSuffix, LauncherSuffix })
             {
                 var parts = new List<string>(suffix.Length + 1) { root };
                 parts.AddRange(suffix);
