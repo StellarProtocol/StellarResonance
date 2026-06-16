@@ -17,6 +17,8 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _detectStatus = "";
     [ObservableProperty] private bool _testingChannel;
 
+    public string LauncherVersionLabel => $"Launcher v{HomeViewModel.LauncherVersion}";
+
     // Linux launch tweaks
     public bool IsLinux { get; }
     [ObservableProperty] private bool _esync;

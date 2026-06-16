@@ -23,6 +23,9 @@ public partial class HomeViewModel : ObservableObject
             .InformationalVersion.Split('+', 2)[0]
         ?? "0.0.0";
 
+    /// <summary>Display label for the launcher's own version (e.g. "Launcher v1.2.4").</summary>
+    public string LauncherVersionLabel => $"Launcher v{LauncherVersion}";
+
     private readonly ISettingsStore _settings;
     private readonly IGameLocator _locator;
     private readonly IDoorstopToggle _doorstop;
