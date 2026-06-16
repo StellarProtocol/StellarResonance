@@ -147,6 +147,19 @@ public partial class HomeViewModel : ObservableObject
     private async Task RefreshAsync()
     {
         _cfg = _settings.Load();
+
+        // Auto-detect on first run (or if the saved path no longer exists) and persist it, so the
+        // game is usable straight away — no manual trip through Settings → Save required.
+        if (string.IsNullOrWhiteSpace(_cfg.GameMiniDir) || !Directory.Exists(_cfg.GameMiniDir))
+        {
+            var found = _detector.Detect();
+            if (found.Count > 0)
+            {
+                _cfg.GameMiniDir = found[0];
+                _settings.Save(_cfg);
+            }
+        }
+
         Modded = _cfg.Modded;
 
         GameStatus = GameMini is { } g && Directory.Exists(g) ? g : "Not found — set it in Settings";
