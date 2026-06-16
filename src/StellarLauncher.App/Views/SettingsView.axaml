@@ -41,7 +41,7 @@
       <CheckBox IsChecked="{Binding Fsync}" Content="Enable Fsync"
                 ToolTip.Tip="WINEFSYNC — futex-based sync; faster than esync on supported kernels. Harmlessly ignored if unsupported."/>
       <CheckBox IsChecked="{Binding FpsOverlay}" Content="Show FPS"
-                ToolTip.Tip="Shows an FPS counter via DXVK's built-in HUD (DXVK_HUD=fps). Ships with Proton/DXVK — no install needed. Same as Heroic's Show FPS."/>
+                ToolTip.Tip="FPS counter via DXVK's built-in HUD (no install). Also enables the in-game Stellar Perf overlay's live numbers."/>
     </StackPanel>
 
     <TextBlock Text="Update channel" Foreground="#8a93b2"/>

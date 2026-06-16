@@ -35,9 +35,11 @@ public sealed class GameLauncher : IGameLauncher
         // esync/fsync (Wine vars; Proton enables both by default so we only flip the NO_* knobs off).
         psi.Environment["WINEESYNC"] = r.Esync ? "1" : "0";
         psi.Environment["WINEFSYNC"] = r.Fsync ? "1" : "0";
-        // FPS counter via DXVK's built-in HUD — ships with Proton/DXVK, no install needed
-        // (this is what Heroic's "Show FPS" does). Covers D3D9/10/11.
-        if (r.FpsOverlay) psi.Environment["DXVK_HUD"] = "fps";
+        if (r.FpsOverlay)
+        {
+            psi.Environment["DXVK_HUD"] = "fps";        // DXVK's built-in FPS counter (ships with Proton, no install)
+            psi.Environment["STELLAR_PERFHUD"] = "1";   // also make the framework's Stellar Perf overlay sample (else it reads 0)
+        }
 
         var isProton = Path.GetFileName(r.Runner).Contains("proton", StringComparison.OrdinalIgnoreCase);
         if (isProton)
