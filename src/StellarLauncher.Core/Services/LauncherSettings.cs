@@ -16,5 +16,6 @@ public sealed class LauncherSettings
     public bool Esync { get; set; } = true;            // WINEESYNC / PROTON_NO_ESYNC
     public bool Fsync { get; set; } = true;            // WINEFSYNC / PROTON_NO_FSYNC
     public bool FpsOverlay { get; set; } = false;      // DXVK_HUD=fps (DXVK built-in FPS counter, no install)
+    public bool StellarPerf { get; set; } = false;     // STELLAR_PERFHUD=1 (framework's in-game perf overlay)
     public bool DxvkNvapi { get; set; } = true;        // auto install/update DXVK-NVAPI into the prefix
 }

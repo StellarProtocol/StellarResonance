@@ -41,7 +41,9 @@
       <CheckBox IsChecked="{Binding Fsync}" Content="Enable Fsync"
                 ToolTip.Tip="WINEFSYNC — futex-based sync; faster than esync on supported kernels. Harmlessly ignored if unsupported."/>
       <CheckBox IsChecked="{Binding FpsOverlay}" Content="Show FPS"
-                ToolTip.Tip="FPS counter via DXVK's built-in HUD (no install). Also enables the in-game Stellar Perf overlay's live numbers."/>
+                ToolTip.Tip="FPS counter via DXVK's built-in HUD (DXVK_HUD=fps). Ships with Proton — no install needed."/>
+      <CheckBox IsChecked="{Binding StellarPerf}" Content="Stellar Perf overlay (advanced)"
+                ToolTip.Tip="Enables the framework's in-game Stellar Perf overlay sampling (STELLAR_PERFHUD) — frame &amp; CPU times for debugging. Has a small overhead."/>
     </StackPanel>
 
     <TextBlock Text="Update channel" Foreground="#8a93b2"/>

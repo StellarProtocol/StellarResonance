@@ -24,6 +24,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _esync;
     [ObservableProperty] private bool _fsync;
     [ObservableProperty] private bool _fpsOverlay;
+    [ObservableProperty] private bool _stellarPerf;
     [ObservableProperty] private bool _dxvkNvapi;
 
     public SettingsViewModel(ISettingsStore settings, IGameLocator locator, IGameDetector detector, IPlatformInfo platform)
@@ -33,7 +34,8 @@ public partial class SettingsViewModel : ObservableObject
         var cfg = settings.Load();
         _gameMiniDir = cfg.GameMiniDir; _runner = cfg.Runner; _winePrefix = cfg.WinePrefix;
         _testingChannel = ChannelManifests.IsTesting(cfg.Channel);
-        _esync = cfg.Esync; _fsync = cfg.Fsync; _fpsOverlay = cfg.FpsOverlay; _dxvkNvapi = cfg.DxvkNvapi;
+        _esync = cfg.Esync; _fsync = cfg.Fsync; _fpsOverlay = cfg.FpsOverlay;
+        _stellarPerf = cfg.StellarPerf; _dxvkNvapi = cfg.DxvkNvapi;
         if (string.IsNullOrWhiteSpace(_gameMiniDir)) RunDetect();   // auto-detect on first open
     }
 
@@ -76,7 +78,8 @@ public partial class SettingsViewModel : ObservableObject
         var cfg = _settings.Load();
         cfg.GameMiniDir = GameMiniDir; cfg.Runner = Runner; cfg.WinePrefix = WinePrefix;
         cfg.Channel = TestingChannel ? "testing" : "stable";
-        cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay; cfg.DxvkNvapi = DxvkNvapi;
+        cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay;
+        cfg.StellarPerf = StellarPerf; cfg.DxvkNvapi = DxvkNvapi;
         _settings.Save(cfg);
     }
 
@@ -85,13 +88,15 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnEsyncChanged(bool value) => PersistToggles();
     partial void OnFsyncChanged(bool value) => PersistToggles();
     partial void OnFpsOverlayChanged(bool value) => PersistToggles();
+    partial void OnStellarPerfChanged(bool value) => PersistToggles();
     partial void OnDxvkNvapiChanged(bool value) => PersistToggles();
     partial void OnTestingChannelChanged(bool value) => PersistToggles();
 
     private void PersistToggles()
     {
         var cfg = _settings.Load();   // preserve on-disk paths; only update the toggles + channel
-        cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay; cfg.DxvkNvapi = DxvkNvapi;
+        cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay;
+        cfg.StellarPerf = StellarPerf; cfg.DxvkNvapi = DxvkNvapi;
         cfg.Channel = TestingChannel ? "testing" : "stable";
         _settings.Save(cfg);
     }

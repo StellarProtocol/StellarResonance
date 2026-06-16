@@ -8,11 +8,13 @@ namespace StellarLauncher.Core.Services;
 /// <param name="UmuRun">Linux only: path to umu-run, preferred for launching with Proton.</param>
 /// <param name="Esync">Linux: enable esync (WINEESYNC / Proton default).</param>
 /// <param name="Fsync">Linux: enable fsync (WINEFSYNC / Proton default).</param>
-/// <param name="FpsOverlay">Linux: show the MangoHud FPS overlay.</param>
+/// <param name="FpsOverlay">Linux: show the DXVK built-in FPS counter (DXVK_HUD=fps).</param>
+/// <param name="StellarPerf">Linux: enable the framework's Stellar Perf overlay sampling (STELLAR_PERFHUD).</param>
 /// <param name="DxvkNvapi">Linux: add nvapi DLL overrides so the prefix's DXVK-NVAPI is used.</param>
 public sealed record LaunchRequest(
     string StarLauncherExe, string? Runner = null, string? WinePrefix = null, string? UmuRun = null,
-    bool Esync = false, bool Fsync = false, bool FpsOverlay = false, bool DxvkNvapi = false);
+    bool Esync = false, bool Fsync = false, bool FpsOverlay = false, bool DxvkNvapi = false,
+    bool StellarPerf = false);
 
 public interface IGameLauncher
 {

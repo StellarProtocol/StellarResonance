@@ -260,7 +260,8 @@ public partial class HomeViewModel : ObservableObject
 
             var exe = StarLauncherExe(GameMini);
             var request = new LaunchRequest(exe, cfg.Runner, cfg.WinePrefix, _detector.DetectUmu(),
-                Esync: cfg.Esync, Fsync: cfg.Fsync, FpsOverlay: cfg.FpsOverlay, DxvkNvapi: cfg.DxvkNvapi);
+                Esync: cfg.Esync, Fsync: cfg.Fsync, FpsOverlay: cfg.FpsOverlay, DxvkNvapi: cfg.DxvkNvapi,
+                StellarPerf: cfg.StellarPerf);
             StatusLine = "launching…";
             var proc = _launcher.Launch(request);
             if (proc is null) { StatusLine = "launch failed: process did not start"; return; }

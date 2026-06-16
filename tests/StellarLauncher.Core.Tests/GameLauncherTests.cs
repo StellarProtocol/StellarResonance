@@ -56,13 +56,27 @@ public class GameLauncherTests
         var psi = Linux().BuildStartInfo(new LaunchRequest(
             StarLauncherExe: "/p/drive_c/Star/StarLauncher/StarLauncher.exe",
             Runner: "/usr/bin/wine", WinePrefix: "/p",
-            Esync: true, Fsync: true, FpsOverlay: true, DxvkNvapi: true));
+            Esync: true, Fsync: true, FpsOverlay: true, DxvkNvapi: true, StellarPerf: true));
         Assert.Equal("1", psi.Environment["WINEESYNC"]);
         Assert.Equal("1", psi.Environment["WINEFSYNC"]);
-        Assert.Equal("fps", psi.Environment["DXVK_HUD"]);        // DXVK built-in FPS counter (no install)
-        Assert.Equal("1", psi.Environment["STELLAR_PERFHUD"]);   // framework Stellar Perf overlay also samples
+        Assert.Equal("fps", psi.Environment["DXVK_HUD"]);        // Show FPS → DXVK counter
+        Assert.Equal("1", psi.Environment["STELLAR_PERFHUD"]);   // Stellar Perf → framework overlay
         Assert.Contains("nvapi,nvapi64=n,b", psi.Environment["WINEDLLOVERRIDES"]);
         Assert.Contains("winhttp=n,b", psi.Environment["WINEDLLOVERRIDES"]);
+    }
+
+    [Fact]
+    public void Linux_fps_counter_and_perf_overlay_are_independent()
+    {
+        var fpsOnly = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/x.exe", Runner: "/usr/bin/wine", WinePrefix: "/p", FpsOverlay: true));
+        Assert.Equal("fps", fpsOnly.Environment["DXVK_HUD"]);
+        Assert.False(fpsOnly.Environment.ContainsKey("STELLAR_PERFHUD"));
+
+        var perfOnly = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/x.exe", Runner: "/usr/bin/wine", WinePrefix: "/p", StellarPerf: true));
+        Assert.Equal("1", perfOnly.Environment["STELLAR_PERFHUD"]);
+        Assert.False(perfOnly.Environment.ContainsKey("DXVK_HUD"));
     }
 
     [Fact]

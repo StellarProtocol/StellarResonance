@@ -35,11 +35,8 @@ public sealed class GameLauncher : IGameLauncher
         // esync/fsync (Wine vars; Proton enables both by default so we only flip the NO_* knobs off).
         psi.Environment["WINEESYNC"] = r.Esync ? "1" : "0";
         psi.Environment["WINEFSYNC"] = r.Fsync ? "1" : "0";
-        if (r.FpsOverlay)
-        {
-            psi.Environment["DXVK_HUD"] = "fps";        // DXVK's built-in FPS counter (ships with Proton, no install)
-            psi.Environment["STELLAR_PERFHUD"] = "1";   // also make the framework's Stellar Perf overlay sample (else it reads 0)
-        }
+        if (r.FpsOverlay) psi.Environment["DXVK_HUD"] = "fps";       // DXVK's built-in FPS counter (no install)
+        if (r.StellarPerf) psi.Environment["STELLAR_PERFHUD"] = "1"; // framework's Stellar Perf overlay sampling
 
         var isProton = Path.GetFileName(r.Runner).Contains("proton", StringComparison.OrdinalIgnoreCase);
         if (isProton)
