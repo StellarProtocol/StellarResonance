@@ -59,6 +59,7 @@ public class GameLauncherTests
             Esync: true, Fsync: true, FpsOverlay: true, DxvkNvapi: true));
         Assert.Equal("1", psi.Environment["WINEESYNC"]);
         Assert.Equal("1", psi.Environment["WINEFSYNC"]);
+        Assert.Equal("1", psi.Environment["STELLAR_PERFHUD"]);   // framework's native FPS/perf overlay
         Assert.Equal("1", psi.Environment["MANGOHUD"]);
         Assert.Contains("nvapi,nvapi64=n,b", psi.Environment["WINEDLLOVERRIDES"]);
         Assert.Contains("winhttp=n,b", psi.Environment["WINEDLLOVERRIDES"]);
@@ -73,6 +74,7 @@ public class GameLauncherTests
         Assert.Equal("0", wine.Environment["WINEESYNC"]);
         Assert.Equal("0", wine.Environment["WINEFSYNC"]);
         Assert.False(wine.Environment.ContainsKey("MANGOHUD"));            // overlay off → unset
+        Assert.False(wine.Environment.ContainsKey("STELLAR_PERFHUD"));     // overlay off → unset
         Assert.Equal("winhttp=n,b", wine.Environment["WINEDLLOVERRIDES"]); // nvapi off → not appended
 
         var proton = Linux().BuildStartInfo(new LaunchRequest(

@@ -36,8 +36,8 @@
                 ToolTip.Tip="WINEESYNC — eventfd-based sync; lowers CPU overhead. Enabled by default."/>
       <CheckBox IsChecked="{Binding Fsync}" Content="Enable Fsync"
                 ToolTip.Tip="WINEFSYNC — futex-based sync; faster than esync on supported kernels. Harmlessly ignored if unsupported."/>
-      <CheckBox IsChecked="{Binding FpsOverlay}" Content="Show FPS overlay (MangoHud)"
-                ToolTip.Tip="Sets MANGOHUD=1 at launch to show an FPS/perf overlay. Requires MangoHud installed."/>
+      <CheckBox IsChecked="{Binding FpsOverlay}" Content="Show FPS / perf overlay"
+                ToolTip.Tip="Enables the framework's built-in Stellar Perf overlay (FPS, frame &amp; CPU times) — no extra install. Also enables MangoHud if you have it installed."/>
     </StackPanel>
 
     <TextBlock Text="Update channel" Foreground="#8a93b2"/>
