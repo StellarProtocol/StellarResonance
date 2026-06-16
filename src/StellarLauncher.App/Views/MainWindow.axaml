@@ -37,13 +37,13 @@
       <Panel Width="48" Height="48" Margin="0,18,0,18" HorizontalAlignment="Center">
         <Viewbox Width="48" Height="48">
           <Path Classes="glow" Fill="#46d6ff"
-                Data="M12,1 C12.7,6.6 17.4,11.3 23,12 C17.4,12.7 12.7,17.4 12,23 C11.3,17.4 6.6,12.7 1,12 C6.6,11.3 11.3,6.6 12,1 Z">
+                Data="M12,1 L13.9,10.1 L23,12 L13.9,13.9 L12,23 L10.1,13.9 L1,12 L10.1,10.1 Z">
             <Path.Effect><BlurEffect Radius="7"/></Path.Effect>
           </Path>
         </Viewbox>
         <Viewbox Width="30" Height="30" HorizontalAlignment="Center" VerticalAlignment="Center">
           <Path Fill="#d6f3ff"
-                Data="M12,1 C12.7,6.6 17.4,11.3 23,12 C17.4,12.7 12.7,17.4 12,23 C11.3,17.4 6.6,12.7 1,12 C6.6,11.3 11.3,6.6 12,1 Z"/>
+                Data="M12,1 L13.9,10.1 L23,12 L13.9,13.9 L12,23 L10.1,13.9 L1,12 L10.1,10.1 Z"/>
         </Viewbox>
       </Panel>
       <Button Classes="nav" Command="{Binding ShowHomeCommand}" ToolTip.Tip="Home">

@@ -7,11 +7,10 @@ Outputs into src/StellarLauncher.App/Assets/:
   stellar.ico         (multi-size, Windows .exe ApplicationIcon)
   stellar.icns        (macOS .app bundle icon, PNG-based, hand-rolled)
 
-stellar.png leaves a generous margin so its Gaussian halo never clips against
-the canvas edges — good for large app-store presentation. But window managers
-scale that down to ~22px for the title bar, where the margin + soft halo wash
-out into a faint cross. stellar-window.png is a SEPARATE, tighter, higher-
-contrast sparkle that stays legible as a 4-point star at title-bar size.
+stellar.png leaves a generous margin (good for large app-store presentation).
+stellar-window.png is the SAME slim brand sparkle, just framed tighter (larger
+TIP, less dead margin) so it doesn't shrink to a faint mark when a window
+manager scales it to ~22px for the title bar. Same shape and glow as the logo.
 """
 from __future__ import annotations
 
@@ -65,12 +64,14 @@ def render() -> Image.Image:
     return img
 
 def render_window() -> Image.Image:
-    """Tight, chunky sparkle for the window/taskbar icon — fills ~94% of the canvas with fatter
-    arms and a crisp body so it still reads as a 4-point star when scaled to ~22px."""
+    """Window/taskbar icon — the SAME slim, elegant sparkle as the brand logo (logo.png /
+    stellar.png): thin concave arms (INNER ratio 0.24) and the soft azure glow. The only
+    difference from stellar.png is a larger TIP so it fills more of the canvas (less dead
+    margin), keeping the brand look but not shrinking to a faint mark in a ~22px title bar."""
     s = 256
+    tip = 0.44
+    inner = tip * 0.24   # slim arms, matching the logo — NOT a fat/chunky star
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    tip = 0.47           # near-full canvas; only a thin glow margin
-    inner = tip * 0.55   # fat waist so the arms don't thin out to a "+" when downscaled
 
     def layer(color, t, i, blur):
         mask = Image.new("L", (s, s), 0)
@@ -81,12 +82,14 @@ def render_window() -> Image.Image:
         out.putalpha(mask)
         return out
 
-    glow = layer((35, 135, 235), tip, inner, 0.028)
-    for _ in range(3):
-        img = Image.alpha_composite(img, glow)
-    img = Image.alpha_composite(img, layer((80, 180, 250), tip * 0.97, inner * 0.92, 0.010))
-    img = Image.alpha_composite(img, layer((175, 222, 255), tip * 0.95, inner * 0.85, 0.003))
-    img = Image.alpha_composite(img, layer((245, 251, 255), tip * 0.72, inner * 0.60, 0.0))
+    halo = layer((20, 110, 210), tip, inner, 0.045)
+    for _ in range(4):
+        img = Image.alpha_composite(img, halo)
+    inner_glow = layer((45, 150, 235), tip * 0.92, inner, 0.015)
+    for _ in range(2):
+        img = Image.alpha_composite(img, inner_glow)
+    img = Image.alpha_composite(img, layer((120, 200, 250), tip * 0.90, inner * 0.78, 0.004))
+    img = Image.alpha_composite(img, layer((225, 245, 255), tip * 0.64, inner * 0.46, 0.0))
     return img
 
 def write_icns(master: Image.Image, path: Path) -> None:
