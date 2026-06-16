@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.IO.Abstractions;
 using System.Net.Http;
 using Avalonia;
@@ -30,6 +31,8 @@ public partial class App : Application
         var version = new VersionService(http);
         var launcherUpdates = new LauncherUpdateService(http);   // reuse the existing HttpClient
         var selfUpdater = new LauncherSelfUpdater(fs);
+        if (Environment.ProcessPath is { } procPath)
+            selfUpdater.CleanupStaleUpdate(Path.GetDirectoryName(procPath)!, Path.GetFileName(procPath));
         var detector = new GameDetector(fs, locator,
             () => BuildSearchRoots(fs, platform),
             () => BuildRunnerCandidates(fs, platform),

@@ -68,9 +68,14 @@ public partial class PluginsViewModel : ObservableObject
         try
         {
             item.Action = "downloading…";
-            using var stream = await _http.GetStreamAsync(item.Entry.DllUrl);
             using var buffer = new MemoryStream();
-            await stream.CopyToAsync(buffer);
+            long lastTick = -1;
+            var progress = new Progress<DownloadProgress>(p =>
+            {
+                long tick = p.Fraction is { } f ? (long)(f * 100) : p.BytesRead >> 20;
+                if (tick != lastTick) { lastTick = tick; item.Action = DownloadStatus.Line("downloading…", p); }
+            });
+            await _http.DownloadToAsync(new Uri(item.Entry.DllUrl), buffer, progress);
             buffer.Position = 0;
             var fileName = Path.GetFileName(new Uri(item.Entry.DllUrl).LocalPath);
             await _installer.InstallAsync(buffer, item.Entry.Sha256, gameMini,

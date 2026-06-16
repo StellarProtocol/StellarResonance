@@ -63,30 +63,74 @@ public sealed class LauncherSelfUpdater : ILauncherSelfUpdater
         }
         else
         {
-            CopyDir(stagingDir, installDir);
+            SwapInPlace(stagingDir, installDir, exeName);
             var exe = _fs.Path.Combine(installDir, exeName);
-            if (!OperatingSystem.IsWindows())
-            {
-                try
-                {
-                    File.SetUnixFileMode(exe,
-                        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                        UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                        UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-                }
-                catch { /* best effort */ }
-            }
             Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false });
             Environment.Exit(0);
         }
     }
 
-    private void CopyDir(string from, string to)
+    /// <summary>
+    /// Replaces <paramref name="installDir"/> with the contents of <paramref name="stagingDir"/>, swapping
+    /// the running executable by rename. Overwriting a live ELF in place fails with ETXTBSY ("text file
+    /// busy"); renaming it aside while it executes is allowed (the inode stays live). The new binary is
+    /// fully written as *.new first, so the old binary survives intact if anything before the swap fails.
+    /// Does NOT restart — extracted from <see cref="ApplyAndRestart"/> so it can be tested.
+    /// </summary>
+    public void SwapInPlace(string stagingDir, string installDir, string exeName)
+    {
+        var exe = _fs.Path.Combine(installDir, exeName);
+        var newExe = exe + ".new";
+        var oldExe = exe + ".old";
+
+        // Everything EXCEPT the running executable can be copied straight into place.
+        CopyDir(stagingDir, installDir, skip: exeName);
+
+        _fs.File.Copy(_fs.Path.Combine(stagingDir, exeName), newExe, overwrite: true);
+        if (_fs.File.Exists(oldExe)) { try { _fs.File.Delete(oldExe); } catch { /* best effort */ } }
+        if (_fs.File.Exists(exe)) _fs.File.Move(exe, oldExe);
+        _fs.File.Move(newExe, exe);
+
+        MakeExecutable(exe);
+        // Keep the desktop-integration helpers runnable after an in-place update.
+        foreach (var script in new[] { "install.sh", "uninstall.sh" })
+        {
+            var p = _fs.Path.Combine(installDir, script);
+            if (_fs.File.Exists(p)) MakeExecutable(p);
+        }
+    }
+
+    public void CleanupStaleUpdate(string installDir, string exeName)
+    {
+        // The renamed-aside binary from a prior update can only be removed once the old process
+        // (which still held it open) has exited — i.e. on the next startup, here.
+        foreach (var leftover in new[] { exeName + ".old", exeName + ".new" })
+        {
+            var p = _fs.Path.Combine(installDir, leftover);
+            try { if (_fs.File.Exists(p)) _fs.File.Delete(p); } catch { /* best effort */ }
+        }
+    }
+
+    private static void MakeExecutable(string path)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        try
+        {
+            File.SetUnixFileMode(path,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        }
+        catch { /* best effort */ }
+    }
+
+    private void CopyDir(string from, string to, string? skip = null)
     {
         foreach (var dir in _fs.Directory.GetDirectories(from, "*", SearchOption.AllDirectories))
             _fs.Directory.CreateDirectory(dir.Replace(from, to));
         foreach (var file in _fs.Directory.GetFiles(from, "*", SearchOption.AllDirectories))
         {
+            if (skip is not null && _fs.Path.GetFileName(file) == skip) continue;
             var target = file.Replace(from, to);
             _fs.Directory.CreateDirectory(_fs.Path.GetDirectoryName(target)!);
             _fs.File.Copy(file, target, overwrite: true);
