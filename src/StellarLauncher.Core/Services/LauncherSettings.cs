@@ -15,6 +15,6 @@ public sealed class LauncherSettings
     // Linux launch tweaks (applied when launching through the Wine/Proton runner).
     public bool Esync { get; set; } = true;            // WINEESYNC / PROTON_NO_ESYNC
     public bool Fsync { get; set; } = true;            // WINEFSYNC / PROTON_NO_FSYNC
-    public bool FpsOverlay { get; set; } = false;      // STELLAR_PERFHUD (built-in overlay) + MangoHud if present
+    public bool FpsOverlay { get; set; } = false;      // DXVK_HUD=fps (DXVK built-in FPS counter, no install)
     public bool DxvkNvapi { get; set; } = true;        // auto install/update DXVK-NVAPI into the prefix
 }
