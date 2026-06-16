@@ -21,7 +21,7 @@ sealed class Program
             .With(new X11PlatformOptions { WmClass = "stellar-launcher" })
 #if DEBUG
             .WithDeveloperTools()
+            .LogToTrace()   // Avalonia diagnostic logging — debug builds only; Release stays silent
 #endif
-            .WithInterFont()
-            .LogToTrace();
+            .WithInterFont();
 }
