@@ -21,9 +21,18 @@ public sealed class BepInExConfig : IBepInExConfig
     public void ApplyMode(string gameMiniDir, bool debug)
     {
         var path = _fs.Path.Combine(gameMiniDir, "BepInEx", "config", "BepInEx.cfg");
-        if (!_fs.File.Exists(path)) return;   // generated on first BepInEx run — nothing to tune yet
-
         var consoleAndFlush = debug ? "true" : "false";
+
+        // First launch: BepInEx hasn't generated its cfg yet. Without one, prod settings can't apply
+        // and BepInEx opens its default console window (most visible on Windows) before we ever get a
+        // chance to tune it. Pre-seed the logging keys so console-off applies from the very first run;
+        // BepInEx merges the rest of its defaults on top.
+        if (!_fs.File.Exists(path))
+        {
+            Seed(path, consoleAndFlush);
+            return;
+        }
+
         var lines = _fs.File.ReadAllLines(path);
         string? section = null;
         var changed = false;
@@ -41,6 +50,26 @@ public sealed class BepInExConfig : IBepInExConfig
             else if (t.StartsWith("Enabled") && section == "[Logging.Console]") { lines[i] = SetValue(lines[i], consoleAndFlush); changed = true; }
         }
         if (changed) _fs.File.WriteAllLines(path, lines);
+    }
+
+    // Write a minimal BepInEx.cfg with just the logging keys we manage, set for the chosen mode.
+    // BepInEx fills in every other default on first read and rewrites the full file.
+    private void Seed(string path, string consoleAndFlush)
+    {
+        var dir = _fs.Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(dir)) _fs.Directory.CreateDirectory(dir);
+        _fs.File.WriteAllLines(path, new[]
+        {
+            "[Logging]",
+            "UnityLogListening = false",
+            "",
+            "[Logging.Console]",
+            $"Enabled = {consoleAndFlush}",
+            "",
+            "[Logging.Disk]",
+            "Enabled = true",
+            $"InstantFlushing = {consoleAndFlush}",
+        });
     }
 
     // Replace the value after '=' while preserving the key name + spacing.

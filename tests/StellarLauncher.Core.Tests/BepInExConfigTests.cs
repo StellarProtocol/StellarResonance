@@ -50,10 +50,30 @@ public class BepInExConfigTests
     }
 
     [Fact]
-    public void Missing_cfg_is_a_no_op()
+    public void Missing_cfg_is_seeded_with_console_off_in_prod()
+    {
+        // Fresh install: BepInEx hasn't generated its cfg yet. Prod must seed console-off so the
+        // first launch doesn't pop a console window before we can tune an existing file.
+        var fs = new MockFileSystem();
+        new BepInExConfig(fs).ApplyMode("/gm", debug: false);
+
+        var lines = fs.File.ReadAllLines("/gm/BepInEx/config/BepInEx.cfg");
+        Assert.Equal("false", ValueOf(lines, "[Logging.Console]", "Enabled"));
+        Assert.Contains("UnityLogListening = false", lines);
+        Assert.Contains("InstantFlushing = false", lines);
+        Assert.Equal("true", ValueOf(lines, "[Logging.Disk]", "Enabled"));
+    }
+
+    [Fact]
+    public void Missing_cfg_is_seeded_with_console_on_in_debug()
     {
         var fs = new MockFileSystem();
-        new BepInExConfig(fs).ApplyMode("/gm", debug: false);   // must not throw
+        new BepInExConfig(fs).ApplyMode("/gm", debug: true);
+
+        var lines = fs.File.ReadAllLines("/gm/BepInEx/config/BepInEx.cfg");
+        Assert.Equal("true", ValueOf(lines, "[Logging.Console]", "Enabled"));
+        Assert.Contains("InstantFlushing = true", lines);
+        Assert.Contains("UnityLogListening = false", lines);   // always off (perf)
     }
 
     private static string ValueOf(string[] lines, string section, string key)
