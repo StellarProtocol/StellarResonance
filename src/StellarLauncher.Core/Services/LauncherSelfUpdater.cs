@@ -43,10 +43,15 @@ public sealed class LauncherSelfUpdater : ILauncherSelfUpdater
         }
     }
 
-    public string BuildWindowsSwapScript(string stagingDir, string installDir, string exeName) =>
+    public string BuildWindowsSwapScript(string stagingDir, string installDir, string exeName, int pid) =>
         "@echo off\r\n" +
-        "timeout /t 2 /nobreak >NUL\r\n" +
-        $"robocopy \"{stagingDir}\" \"{installDir}\" /E /NFL /NDL /NJH /NJS /NP >NUL\r\n" +
+        // Wait for the OLD launcher to fully exit before copying. A single-file .NET exe is memory-mapped
+        // and stays locked until the process is gone; a fixed sleep raced that lock — robocopy then skipped
+        // the still-locked exe and `start` relaunched the OLD binary. Poll the PID instead (like Unix).
+        ":waitloop\r\n" +
+        $"tasklist /FI \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL && (timeout /t 1 /nobreak >NUL & goto waitloop)\r\n" +
+        // Bounded retries (10×1s) absorb any brief residual handle release, then overwrite in place.
+        $"robocopy \"{stagingDir}\" \"{installDir}\" /E /R:10 /W:1 /NFL /NDL /NJH /NJS /NP >NUL\r\n" +
         $"start \"\" \"{_fs.Path.Combine(installDir, exeName)}\"\r\n" +
         "del \"%~f0\"\r\n";
 
@@ -72,7 +77,7 @@ public sealed class LauncherSelfUpdater : ILauncherSelfUpdater
     {
         if (isWindows)
         {
-            var script = BuildWindowsSwapScript(stagingDir, installDir, exeName);
+            var script = BuildWindowsSwapScript(stagingDir, installDir, exeName, Environment.ProcessId);
             var scriptPath = _fs.Path.Combine(_fs.Path.GetTempPath(), "stellar-launcher-update.cmd");
             _fs.File.WriteAllText(scriptPath, script);
             Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"{scriptPath}\"")

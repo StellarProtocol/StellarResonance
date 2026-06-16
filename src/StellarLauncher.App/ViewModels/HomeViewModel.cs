@@ -292,10 +292,33 @@ public partial class HomeViewModel : ObservableObject
         catch (Exception ex) { StatusLine = $"launch failed: {ex.Message}"; }
     }
 
-    // game_mini → release_x → game → StarLauncher : StarLauncher.exe is three parents up.
+    // Resolve the executable to launch, supporting both install layouts:
+    //  • Official StarLauncher: game_mini → release_x → game → StarLauncher\StarLauncher.exe (3 parents up).
+    //  • Flat (e.g. Steam "…\Blue Protocol Star Resonance"): the dir IS the install — no StarLauncher.exe.
+    //    The Unity player exe is "<X>.exe" beside the "<X>_Data" folder (StarSEA_STEAM_Data → StarSEA_STEAM.exe);
+    //    the doorstop proxy (winhttp.dll) already lives here, so launching that exe directly loads the mod.
     private static string StarLauncherExe(string gameMini)
     {
-        var starLauncherDir = Directory.GetParent(gameMini)!.Parent!.Parent!.FullName;
-        return Path.Combine(starLauncherDir, "StarLauncher.exe");
+        var starLauncherDir = Directory.GetParent(gameMini)?.Parent?.Parent?.FullName;
+        if (starLauncherDir is not null)
+        {
+            var official = Path.Combine(starLauncherDir, "StarLauncher.exe");
+            if (File.Exists(official)) return official;
+        }
+
+        if (Directory.Exists(gameMini))
+        {
+            var dataDir = Directory.EnumerateDirectories(gameMini, "*_Data").FirstOrDefault();
+            if (dataDir is not null)
+            {
+                var stem = Path.GetFileName(dataDir);
+                stem = stem[..^"_Data".Length];
+                var gameExe = Path.Combine(gameMini, stem + ".exe");
+                if (File.Exists(gameExe)) return gameExe;
+            }
+        }
+
+        // Nothing resolved — return the official path so any error names a sensible target.
+        return Path.Combine(starLauncherDir ?? gameMini, "StarLauncher.exe");
     }
 }

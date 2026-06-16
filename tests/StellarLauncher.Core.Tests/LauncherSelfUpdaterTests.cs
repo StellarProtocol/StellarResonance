@@ -75,7 +75,11 @@ public class LauncherSelfUpdaterTests
     public void Windows_swap_script_copies_and_relaunches()
     {
         var s = new LauncherSelfUpdater(new MockFileSystem())
-            .BuildWindowsSwapScript(@"C:\staging", @"C:\app", "StellarLauncher.App.exe");
+            .BuildWindowsSwapScript(@"C:\staging", @"C:\app", "StellarLauncher.App.exe", 4242);
+        // Must wait for the OLD process to exit before copying, else robocopy skips the locked exe
+        // and `start` relaunches the old version (the bug this fixes).
+        Assert.Contains("PID eq 4242", s);
+        Assert.Contains("goto waitloop", s);
         Assert.Contains("robocopy", s);
         Assert.Contains(@"C:\staging", s);
         Assert.Contains(@"C:\app", s);
