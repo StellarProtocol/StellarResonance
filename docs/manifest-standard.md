@@ -72,7 +72,8 @@ runs on** so the launcher can gate it against the installed/selected framework.
         {
           "version": "2.1.0",
           "date": "2026-06-09",
-          "dllUrl": "https://minio.revette.io/stellar/plugins/party-overlay/PartyOverlay-2.1.0.dll",
+          "dll": "Stellar.PartyOverlay.dll",
+          "dllUrl": "https://minio.revette.io/stellar/plugins/party-overlay/Stellar.PartyOverlay-2.1.0.dll",
           "sha256": "<hex sha256 of the dll>",
           "minModSystemVersion": "1.4.0",
           "maxModSystemVersion": null,
@@ -86,7 +87,11 @@ runs on** so the launcher can gate it against the installed/selected framework.
 ```
 
 - `versions[]` — newest first; `versions[0]` is the default selection.
-- `dllUrl` — version-specific object name.
+- `dll` — the **canonical** on-disk filename (the plugin's assembly name, e.g. `Stellar.PartyOverlay.dll`).
+  The launcher installs the download under this name (not the version-suffixed `dllUrl` name) so it
+  overwrites any prior copy and the framework — which loads every `*.dll` under `stellar/plugins` by
+  assembly name — loads exactly one. The launcher also uses it to detect/adopt existing installs.
+- `dllUrl` — version-specific object name (keeps old versions downloadable).
 - `minModSystemVersion` — **required**. The lowest framework version this plugin build runs on.
 - `maxModSystemVersion` — optional (`null` = no upper bound). Set it when a later framework release
   breaks the plugin, so the launcher steers users to a newer plugin build instead.

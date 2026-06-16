@@ -26,11 +26,12 @@ public partial class PluginItemViewModel : ObservableObject
 
     public ObservableCollection<PluginVersion> Versions { get; } = new();
 
-    public PluginItemViewModel(PluginEntry entry, string? installedVersion, string? installedFramework, PluginsViewModel parent)
+    public PluginItemViewModel(PluginEntry entry, bool installed, string? installedVersion,
+                               string? installedFramework, PluginsViewModel parent)
     {
         Entry = entry; _parent = parent; _framework = installedFramework;
+        _installed = installed;                 // may be true with a null version (adopted, unmanaged install)
         _installedVersion = installedVersion;
-        _installed = installedVersion is not null;
         foreach (var v in entry.Versions) Versions.Add(v);
         SelectedVersion = Versions.FirstOrDefault();   // newest first
     }
@@ -41,6 +42,15 @@ public partial class PluginItemViewModel : ObservableObject
 
     // Selected version's changelog (may be null); the view guards visibility.
     public Changelog? SelectedChangelog => SelectedVersion?.Changelog;
+
+    // Canonical on-disk DLL filename for the selected version (for install/detect/remove).
+    public string? CanonicalDll => SelectedVersion is { } v
+        ? (v.Dll ?? System.IO.Path.GetFileName(new System.Uri(v.DllUrl).LocalPath))
+        : null;
+
+    public string InstalledBadge => InstalledVersion is { } iv ? $"INSTALLED v{iv}" : "INSTALLED";
+    partial void OnInstalledChanged(bool value) => OnPropertyChanged(nameof(InstalledBadge));
+    partial void OnInstalledVersionChanged(string? value) => OnPropertyChanged(nameof(InstalledBadge));
 
     partial void OnSelectedVersionChanged(PluginVersion? value)
     {
@@ -67,11 +77,13 @@ public partial class PluginItemViewModel : ObservableObject
         }
 
         CompatNote = "";
-        if (_installedVersion is null)
+        if (!Installed)
             InstallLabel = $"Install v{value.Version}";
-        else if (VersionService.IsNewer(value.Version, _installedVersion))
+        else if (InstalledVersion is null)
+            InstallLabel = $"Reinstall v{value.Version}";   // present but unmanaged (no version marker) → adopt
+        else if (VersionService.IsNewer(value.Version, InstalledVersion))
             InstallLabel = $"Update to v{value.Version}";
-        else if (VersionService.IsNewer(_installedVersion, value.Version))
+        else if (VersionService.IsNewer(InstalledVersion, value.Version))
             { InstallLabel = $"Downgrade to v{value.Version}"; IsDowngrade = true; }
         else
             InstallLabel = $"Reinstall v{value.Version}";

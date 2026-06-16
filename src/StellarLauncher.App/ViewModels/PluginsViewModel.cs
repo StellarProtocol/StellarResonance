@@ -57,8 +57,12 @@ public partial class PluginsViewModel : ObservableObject
             Plugins.Clear();
             foreach (var e in entries.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
             {
-                var installedVersion = gameMini is null ? null : _installer.InstalledVersion(gameMini, e.Id);
-                Plugins.Add(new PluginItemViewModel(e, installedVersion, framework, this));
+                // Installed if the plugin's DLL is present anywhere under stellar/plugins (adopts
+                // old-launcher installs); the version is known only when our marker is present.
+                var dll = CanonicalDll(e);
+                var installed = gameMini is not null && dll is not null && _installer.FindInstalledDll(gameMini, dll) is not null;
+                var version = gameMini is null ? null : _installer.InstalledVersion(gameMini, e.Id);
+                Plugins.Add(new PluginItemViewModel(e, installed, version, framework, this));
             }
             Status = Plugins.Count == 0 ? "No plugins found." : $"{Plugins.Count} plugins available.";
         }
@@ -83,7 +87,9 @@ public partial class PluginsViewModel : ObservableObject
             });
             await _http.DownloadToAsync(new Uri(v.DllUrl), buffer, progress);
             buffer.Position = 0;
-            var fileName = Path.GetFileName(new Uri(v.DllUrl).LocalPath);
+            // Install under the canonical assembly filename (not the version-suffixed bucket name),
+            // so it matches/overwrites any existing copy and the framework loads exactly one.
+            var fileName = v.Dll ?? Path.GetFileName(new Uri(v.DllUrl).LocalPath);
             await _installer.InstallAsync(buffer, v.Sha256, gameMini, item.Entry.Id, fileName, v.Version);
             item.MarkInstalled(v.Version);
             item.Action = $"installed v{v.Version}";
@@ -95,9 +101,17 @@ public partial class PluginsViewModel : ObservableObject
     {
         var gameMini = _settings.Load().GameMiniDir;
         if (gameMini is null) { Status = "set the game path in Settings first."; return Task.CompletedTask; }
-        try { _installer.Remove(gameMini, item.Entry.Id); item.MarkRemoved(); item.Action = "removed"; }
+        try { _installer.Remove(gameMini, item.Entry.Id, item.CanonicalDll); item.MarkRemoved(); item.Action = "removed"; }
         catch (Exception ex) { item.Action = $"failed: {ex.Message}"; }
         return Task.CompletedTask;
+    }
+
+    // Canonical DLL filename for a plugin (from its newest version), for install/detect/remove.
+    private static string? CanonicalDll(StellarLauncher.Core.Model.PluginEntry e)
+    {
+        if (e.Versions.Count == 0) return null;
+        var v = e.Versions[0];
+        return v.Dll ?? Path.GetFileName(new Uri(v.DllUrl).LocalPath);
     }
 
     [RelayCommand]

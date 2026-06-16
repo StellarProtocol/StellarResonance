@@ -59,6 +59,37 @@ public class PluginInstallerTests
     }
 
     [Fact]
+    public void FindInstalledDll_detects_an_old_launcher_install_without_marker()
+    {
+        var fs = new MockFileSystem();
+        // Old-launcher layout: PascalCase folder, the DLL, NO .plugin-version marker.
+        fs.AddFile("/game_mini/stellar/plugins/CombatMeter/Stellar.CombatMeter.dll", new MockFileData("old"));
+        var installer = new PluginInstaller(fs);
+
+        Assert.NotNull(installer.FindInstalledDll("/game_mini", "Stellar.CombatMeter.dll"));
+        Assert.Null(installer.InstalledVersion("/game_mini", "combatmeter"));   // unmanaged → no version
+        Assert.Null(installer.FindInstalledDll("/game_mini", "Stellar.Nope.dll"));
+    }
+
+    [Fact]
+    public async Task Install_dedupes_an_existing_copy_in_another_folder()
+    {
+        var fs = new MockFileSystem();
+        // Pre-existing copy from a previous launcher in a different folder.
+        fs.AddFile("/game_mini/stellar/plugins/CombatMeter/Stellar.CombatMeter.dll", new MockFileData("old"));
+        var (bytes, sha) = Dll("new-bytes");
+        var installer = new PluginInstaller(fs);
+
+        await installer.InstallAsync(new MemoryStream(bytes), sha, "/game_mini",
+            "combatmeter", "Stellar.CombatMeter.dll", "1.1.0");
+
+        // New canonical copy exists; the old duplicate was removed so the framework loads only one.
+        Assert.True(fs.File.Exists("/game_mini/stellar/plugins/combatmeter/Stellar.CombatMeter.dll"));
+        Assert.False(fs.File.Exists("/game_mini/stellar/plugins/CombatMeter/Stellar.CombatMeter.dll"));
+        Assert.Equal("1.1.0", installer.InstalledVersion("/game_mini", "combatmeter"));
+    }
+
+    [Fact]
     public async Task Remove_deletes_the_plugin_folder()
     {
         var (bytes, sha) = Dll();

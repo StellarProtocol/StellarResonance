@@ -46,7 +46,7 @@
                     <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="Bold"/>
                     <TextBlock Text="{Binding Author}" Foreground="#566083" FontSize="11" VerticalAlignment="Center"/>
                     <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1" IsVisible="{Binding Installed}">
-                      <TextBlock Text="{Binding InstalledVersion, StringFormat='INSTALLED v{0}'}"
+                      <TextBlock Text="{Binding InstalledBadge}"
                                  Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
                     </Border>
                   </StackPanel>

@@ -9,6 +9,7 @@ namespace StellarLauncher.Core.Model;
 public sealed record PluginVersion(
     [property: JsonPropertyName("version")]             string Version,
     [property: JsonPropertyName("date")]                string? Date,
+    [property: JsonPropertyName("dll")]                 string? Dll,      // canonical on-disk filename (assembly name)
     [property: JsonPropertyName("dllUrl")]              string DllUrl,
     [property: JsonPropertyName("sha256")]              string Sha256,
     [property: JsonPropertyName("minModSystemVersion")] string MinModSystemVersion,
