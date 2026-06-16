@@ -49,6 +49,10 @@
     <TextBlock Text="Update channel" Foreground="#8a93b2"/>
     <ToggleSwitch IsChecked="{Binding TestingChannel}" OnContent="Testing (pre-release)" OffContent="Stable"/>
 
+    <TextBlock Text="Game logging" Foreground="#8a93b2" Margin="0,4,0,0"/>
+    <CheckBox IsChecked="{Binding DebugLogging}" Content="Debug logging (game console + crash-flush)"
+              ToolTip.Tip="Off (default) = prod: no BepInEx console, buffered disk logging — fastest. On = console window + instant-flush logging for crash triage. Applied to BepInEx.cfg on launch."/>
+
     <Button Content="Save" Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,6,0,0"/>
   </StackPanel>
 </UserControl>

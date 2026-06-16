@@ -43,7 +43,8 @@ public partial class App : Application
         var pluginsVm = new PluginsViewModel(pluginRegistry, pluginInstaller, installer, settings, http);
 
         var dxvkNvapi = new DxvkNvapiInstaller(http);
-        var home = new HomeViewModel(settings, locator, doorstop, installer, launcher, version, platform, launcherUpdates, detector, selfUpdater, dxvkNvapi);
+        var bepinex = new BepInExConfig(fs);
+        var home = new HomeViewModel(settings, locator, doorstop, installer, launcher, version, platform, launcherUpdates, detector, selfUpdater, dxvkNvapi, bepinex);
         var setVm = new SettingsViewModel(settings, locator, detector, platform);
         var main = new MainWindowViewModel(home, setVm, pluginsVm);
 

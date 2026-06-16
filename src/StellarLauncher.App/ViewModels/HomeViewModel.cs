@@ -37,6 +37,7 @@ public partial class HomeViewModel : ObservableObject
     private readonly IGameDetector _detector;
     private readonly ILauncherSelfUpdater _selfUpdater;
     private readonly IDxvkNvapiInstaller _dxvkNvapi;
+    private readonly IBepInExConfig _bepinex;
 
     [ObservableProperty] private string _gameStatus = "Detecting…";
     [ObservableProperty] private string _frameworkStatus = "—";
@@ -67,12 +68,12 @@ public partial class HomeViewModel : ObservableObject
     public HomeViewModel(ISettingsStore settings, IGameLocator locator, IDoorstopToggle doorstop,
         IInstaller installer, IGameLauncher launcher, IVersionService version, IPlatformInfo platform,
         ILauncherUpdateService launcherUpdates, IGameDetector detector, ILauncherSelfUpdater selfUpdater,
-        IDxvkNvapiInstaller dxvkNvapi)
+        IDxvkNvapiInstaller dxvkNvapi, IBepInExConfig bepinex)
     {
         _settings = settings; _locator = locator; _doorstop = doorstop;
         _installer = installer; _launcher = launcher; _version = version; _platform = platform;
         _launcherUpdates = launcherUpdates; _detector = detector;
-        _selfUpdater = selfUpdater; _dxvkNvapi = dxvkNvapi;
+        _selfUpdater = selfUpdater; _dxvkNvapi = dxvkNvapi; _bepinex = bepinex;
         _ = RefreshAsync();
         _ = CheckLauncherUpdateAsync();
     }
@@ -250,6 +251,9 @@ public partial class HomeViewModel : ObservableObject
         try
         {
             var cfg = _settings.Load();   // pick up the latest Settings (esync/fsync/overlay/dxvk-nvapi)
+
+            // Tune the game's BepInEx logging for prod (fast) vs debug (console + crash-flush).
+            _bepinex.ApplyMode(GameMini, cfg.DebugLogging);
 
             // Linux: ensure DXVK-NVAPI is in the prefix before launch (best-effort).
             if (!_platform.IsWindows && cfg.DxvkNvapi && !string.IsNullOrWhiteSpace(cfg.WinePrefix))

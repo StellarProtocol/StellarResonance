@@ -16,6 +16,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string? _winePrefix;
     [ObservableProperty] private string _detectStatus = "";
     [ObservableProperty] private bool _testingChannel;
+    [ObservableProperty] private bool _debugLogging;   // off = prod (fast); on = game console + crash-flush logging
 
     public string LauncherVersionLabel => $"Launcher v{HomeViewModel.LauncherVersion}";
 
@@ -34,6 +35,7 @@ public partial class SettingsViewModel : ObservableObject
         var cfg = settings.Load();
         _gameMiniDir = cfg.GameMiniDir; _runner = cfg.Runner; _winePrefix = cfg.WinePrefix;
         _testingChannel = ChannelManifests.IsTesting(cfg.Channel);
+        _debugLogging = cfg.DebugLogging;
         _esync = cfg.Esync; _fsync = cfg.Fsync; _fpsOverlay = cfg.FpsOverlay;
         _stellarPerf = cfg.StellarPerf; _dxvkNvapi = cfg.DxvkNvapi;
         if (string.IsNullOrWhiteSpace(_gameMiniDir)) RunDetect();   // auto-detect on first open
@@ -78,6 +80,7 @@ public partial class SettingsViewModel : ObservableObject
         var cfg = _settings.Load();
         cfg.GameMiniDir = GameMiniDir; cfg.Runner = Runner; cfg.WinePrefix = WinePrefix;
         cfg.Channel = TestingChannel ? "testing" : "stable";
+        cfg.DebugLogging = DebugLogging;
         cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay;
         cfg.StellarPerf = StellarPerf; cfg.DxvkNvapi = DxvkNvapi;
         _settings.Save(cfg);
@@ -91,6 +94,7 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnStellarPerfChanged(bool value) => PersistToggles();
     partial void OnDxvkNvapiChanged(bool value) => PersistToggles();
     partial void OnTestingChannelChanged(bool value) => PersistToggles();
+    partial void OnDebugLoggingChanged(bool value) => PersistToggles();
 
     private void PersistToggles()
     {
@@ -98,6 +102,7 @@ public partial class SettingsViewModel : ObservableObject
         cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay;
         cfg.StellarPerf = StellarPerf; cfg.DxvkNvapi = DxvkNvapi;
         cfg.Channel = TestingChannel ? "testing" : "stable";
+        cfg.DebugLogging = DebugLogging;
         _settings.Save(cfg);
     }
 

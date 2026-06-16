@@ -11,6 +11,7 @@ public sealed class LauncherSettings
     public bool Modded { get; set; } = true;
     public List<string> ExtraPluginRepos { get; set; } = new();
     public string Channel { get; set; } = "stable";   // "stable" | "testing"
+    public bool DebugLogging { get; set; } = false;    // off = prod BepInEx.cfg (no console, buffered); on = console + crash-flush
 
     // Linux launch tweaks (applied when launching through the Wine/Proton runner).
     public bool Esync { get; set; } = true;            // WINEESYNC / PROTON_NO_ESYNC
