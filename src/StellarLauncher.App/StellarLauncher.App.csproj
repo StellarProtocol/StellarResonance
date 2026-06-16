@@ -6,6 +6,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/stellar.ico</ApplicationIcon>   <!-- Windows .exe icon -->
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Local/dev default; the release workflow overrides with -p:Version=<release version>,
+         which the launcher reads back at runtime (HomeViewModel.LauncherVersion). -->
+    <Version>0.0.0-dev</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -7,8 +7,9 @@ name: release
 # Fixed object names (no version in the filename) mean only the CURRENT version is ever
 # kept in the bucket — each release overwrites the previous binaries + launcher.json.
 #
-# IMPORTANT: bump `LauncherVersion` in HomeViewModel.cs to match the `version` input
-# before running, or the published build will think it is already up to date.
+# The `version` input is the SINGLE source of truth: it's stamped into the binary via
+# -p:Version (HomeViewModel.LauncherVersion reads it back) AND written into launcher.json,
+# so the two can never disagree. No code edit is needed before a release.
 on:
   workflow_dispatch:
     inputs:
@@ -39,12 +40,22 @@ jobs:
       - name: Publish win-x64 (self-contained, single file)
         run: >
           dotnet publish src/StellarLauncher.App -c Release -r win-x64
-          --self-contained true -p:PublishSingleFile=true -o publish/win-x64
+          --self-contained true -p:PublishSingleFile=true -p:Version=${{ inputs.version }}
+          -o publish/win-x64
 
       - name: Publish linux-x64 (self-contained, single file)
         run: >
           dotnet publish src/StellarLauncher.App -c Release -r linux-x64
-          --self-contained true -p:PublishSingleFile=true -o publish/linux-x64
+          --self-contained true -p:PublishSingleFile=true -p:Version=${{ inputs.version }}
+          -o publish/linux-x64
+
+      - name: Bundle Linux desktop integration (icon + .desktop + install.sh)
+        run: |
+          cp packaging/linux/install.sh   publish/linux-x64/install.sh
+          cp packaging/linux/uninstall.sh publish/linux-x64/uninstall.sh
+          cp packaging/linux/stellar-launcher.desktop publish/linux-x64/stellar-launcher.desktop
+          cp src/StellarLauncher.App/Assets/stellar.png publish/linux-x64/stellar-launcher.png
+          chmod +x publish/linux-x64/install.sh publish/linux-x64/uninstall.sh
 
       - name: Zip artifacts
         run: |

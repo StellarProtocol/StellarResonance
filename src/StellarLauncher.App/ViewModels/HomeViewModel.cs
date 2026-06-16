@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -12,7 +13,14 @@ namespace StellarLauncher.App.ViewModels;
 
 public partial class HomeViewModel : ObservableObject
 {
-    public const string LauncherVersion = "1.0.0";
+    // Stamped at publish time via -p:Version (see release.yml); the dispatch input is the
+    // single source of truth. Strips the "+gitsha" build-metadata suffix. Local dev builds
+    // report the csproj default (0.0.0-dev) — correct, since a local build isn't a release.
+    public static readonly string LauncherVersion =
+        typeof(HomeViewModel).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion.Split('+', 2)[0]
+        ?? "0.0.0";
 
     private readonly ISettingsStore _settings;
     private readonly IGameLocator _locator;

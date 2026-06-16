@@ -45,6 +45,10 @@ keeps itself up to date automatically.
    ./StellarLauncher.App
    ```
 
+   Optionally run **`./install.sh`** to add a desktop entry — this puts "Stellar Launcher" in your
+   application menu/dock with its icon (Linux executables can't embed an icon like a Windows `.exe`,
+   so a bare binary file shows a generic icon in the file manager). Undo with `./uninstall.sh`.
+
 3. In the launcher: detect the game (or point it at your Wine/Proton prefix's
    `…/drive_c/Star/StarLauncher/game/release_<ver>/game_mini/`), **Install** the framework, then **Launch**.
    Set `WINEDLLOVERRIDES=winhttp=n,b` in your game launcher's per-game env vars if you launch the game

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Stellar Launcher
+GenericName=Mod Framework Launcher
+Comment=Detect, install, and launch the StellarResonance mod framework
+# The Exec value below is rewritten to the absolute binary path by install.sh.
+Exec=__EXEC__
+Icon=stellar-launcher
+Terminal=false
+Categories=Game;
+# Must match X11PlatformOptions.WmClass in Program.cs so the running window
+# inherits this entry's icon in the taskbar/dock.
+StartupWMClass=stellar-launcher
+StartupNotify=true
