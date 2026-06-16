@@ -13,11 +13,13 @@ public sealed class VersionService : IVersionService
     private readonly HttpClient _http;
     public VersionService(HttpClient http) => _http = http;
 
-    public async Task<VersionManifest> FetchAsync(Uri manifestUrl, CancellationToken ct = default)
+    public async Task<FrameworkManifest> FetchAsync(Uri manifestUrl, CancellationToken ct = default)
     {
-        var manifest = await _http.GetFromJsonAsync<VersionManifest>(
-            manifestUrl, VersionManifest.JsonOptions, ct);
-        return manifest ?? throw new InvalidOperationException("empty version manifest");
+        var manifest = await _http.GetFromJsonAsync<FrameworkManifest>(
+            manifestUrl, FrameworkManifest.JsonOptions, ct);
+        if (manifest?.Versions is null || manifest.Versions.Count == 0)
+            throw new InvalidOperationException("empty version manifest");
+        return manifest;
     }
 
     /// <summary>True when <paramref name="remote"/> is a strictly higher semver than <paramref name="installed"/>.</summary>
@@ -28,5 +30,17 @@ public sealed class VersionService : IVersionService
     public static bool LauncherSupported(string minLauncher, string launcherVersion)
         => Parse(launcherVersion) >= Parse(minLauncher);
 
-    private static Version Parse(string v) => Version.Parse(v.TrimStart('v'));
+    /// <summary>
+    /// True when a plugin build that requires framework in [min, max] can run on the installed framework.
+    /// <paramref name="maxModSystem"/> null means no upper bound. See docs/manifest-standard.md.
+    /// </summary>
+    public static bool IsModSystemCompatible(string installedFramework, string minModSystem, string? maxModSystem)
+    {
+        var f = Parse(installedFramework);
+        if (f < Parse(minModSystem)) return false;
+        if (!string.IsNullOrWhiteSpace(maxModSystem) && f > Parse(maxModSystem)) return false;
+        return true;
+    }
+
+    private static Version Parse(string v) => Version.Parse(v.TrimStart('v', 'V'));
 }

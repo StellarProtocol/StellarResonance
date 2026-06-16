@@ -1,6 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StellarLauncher.App.ViewModels"
+             xmlns:model="using:StellarLauncher.Core.Model"
+             xmlns:sys="using:System"
              x:Class="StellarLauncher.App.Views.PluginsView"
              x:DataType="vm:PluginsViewModel">
   <Grid RowDefinitions="Auto,Auto,*">
@@ -38,26 +40,80 @@
           <DataTemplate x:DataType="vm:PluginItemViewModel">
             <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"
                     CornerRadius="12" Padding="15,13" Margin="0,0,0,10">
-              <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Grid.Column="0" Spacing="3">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                <StackPanel Grid.Column="0" Spacing="5">
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="Bold"/>
-                    <TextBlock Text="{Binding Version, StringFormat='v{0}'}" Foreground="#566083"
-                               FontSize="11" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Author}" Foreground="#566083" FontSize="11" VerticalAlignment="Center"/>
                     <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1" IsVisible="{Binding Installed}">
-                      <TextBlock Text="INSTALLED" Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
+                      <TextBlock Text="{Binding InstalledVersion, StringFormat='INSTALLED v{0}'}"
+                                 Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
                     </Border>
                   </StackPanel>
                   <TextBlock Text="{Binding Description}" Foreground="#c5cce0" FontSize="12" TextWrapping="Wrap"/>
+                  <!-- selected version's changelog preview -->
+                  <ItemsControl ItemsSource="{Binding SelectedChangelog.Added}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="sys:String">
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,1,0,0">
+                          <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1">
+                            <TextBlock Text="ADDED" Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
+                          </Border>
+                          <TextBlock Text="{Binding}" Foreground="#aab3d0" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <ItemsControl ItemsSource="{Binding SelectedChangelog.Fixed}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="sys:String">
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,1,0,0">
+                          <Border Background="#235b8cff" CornerRadius="5" Padding="6,1">
+                            <TextBlock Text="FIXED" Foreground="#9ec2ff" FontSize="9" FontWeight="Bold"/>
+                          </Border>
+                          <TextBlock Text="{Binding}" Foreground="#aab3d0" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="{Binding CompatNote}" Foreground="#ff9a9a" FontSize="11"
+                             IsVisible="{Binding CompatNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                   <TextBlock Text="{Binding Action}" Foreground="#7ee0a0" FontSize="11"
                              IsVisible="{Binding Action, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 </StackPanel>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                  <Button Content="Install" Command="{Binding InstallCommand}" IsVisible="{Binding !Installed}"
-                          Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="16,6" CornerRadius="8"/>
-                  <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding Installed}"
-                          Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
-                          Padding="14,6" CornerRadius="8"/>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6" MinWidth="172">
+                  <ComboBox HorizontalAlignment="Stretch"
+                            ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="model:PluginVersion">
+                        <TextBlock>
+                          <Run Text="{Binding Version, StringFormat='v{0}'}"/>
+                          <Run Text="{Binding Date}" Foreground="#697297"/>
+                        </TextBlock>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <!-- action row -->
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"
+                              IsVisible="{Binding !ConfirmVisible}">
+                    <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
+                            IsEnabled="{Binding Compatible}"
+                            Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="14,6" CornerRadius="8"/>
+                    <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding Installed}"
+                            Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
+                            Padding="12,6" CornerRadius="8"/>
+                  </StackPanel>
+                  <!-- inline confirm -->
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"
+                              IsVisible="{Binding ConfirmVisible}">
+                    <TextBlock Text="⚠" Foreground="#ffcf6b" VerticalAlignment="Center" IsVisible="{Binding IsDowngrade}"/>
+                    <Button Content="Cancel" Command="{Binding CancelInstallCommand}"
+                            Foreground="#cfd6f0" Background="Transparent" BorderBrush="#2f4570" BorderThickness="1"
+                            Padding="12,6" CornerRadius="8"/>
+                    <Button Content="Confirm" Command="{Binding ConfirmInstallCommand}"
+                            Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="12,6" CornerRadius="8"/>
+                  </StackPanel>
                 </StackPanel>
               </Grid>
             </Border>

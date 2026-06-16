@@ -17,6 +17,7 @@ public partial class PluginsViewModel : ObservableObject
 
     private readonly IPluginRegistryService _registry;
     private readonly IPluginInstaller _installer;
+    private readonly IInstaller _frameworkInstaller;   // to read the installed framework version (compat)
     private readonly ISettingsStore _settings;
     private readonly HttpClient _http;
 
@@ -27,9 +28,10 @@ public partial class PluginsViewModel : ObservableObject
     public ObservableCollection<string> Repos { get; } = new();
 
     public PluginsViewModel(IPluginRegistryService registry, IPluginInstaller installer,
-        ISettingsStore settings, HttpClient http)
+        IInstaller frameworkInstaller, ISettingsStore settings, HttpClient http)
     {
-        _registry = registry; _installer = installer; _settings = settings; _http = http;
+        _registry = registry; _installer = installer; _frameworkInstaller = frameworkInstaller;
+        _settings = settings; _http = http;
         _ = ReloadAsync();
     }
 
@@ -47,14 +49,16 @@ public partial class PluginsViewModel : ObservableObject
             if (Uri.TryCreate(repo, UriKind.Absolute, out var u)) urls.Add(u);
         }
 
+        var framework = gameMini is null ? null : _frameworkInstaller.ReadInstalledVersion(gameMini);
+
         try
         {
             var entries = await _registry.FetchAllAsync(urls);
             Plugins.Clear();
             foreach (var e in entries.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
             {
-                var installed = gameMini is not null && _installer.IsInstalled(gameMini, e.Id);
-                Plugins.Add(new PluginItemViewModel(e, installed, this));
+                var installedVersion = gameMini is null ? null : _installer.InstalledVersion(gameMini, e.Id);
+                Plugins.Add(new PluginItemViewModel(e, installedVersion, framework, this));
             }
             Status = Plugins.Count == 0 ? "No plugins found." : $"{Plugins.Count} plugins available.";
         }
@@ -65,6 +69,8 @@ public partial class PluginsViewModel : ObservableObject
     {
         var gameMini = _settings.Load().GameMiniDir;
         if (gameMini is null) { Status = "set the game path in Settings first."; return; }
+        var v = item.SelectedVersion;
+        if (v is null) { item.Action = "no version selected"; return; }
         try
         {
             item.Action = "downloading…";
@@ -75,13 +81,12 @@ public partial class PluginsViewModel : ObservableObject
                 long tick = p.Fraction is { } f ? (long)(f * 100) : p.BytesRead >> 20;
                 if (tick != lastTick) { lastTick = tick; item.Action = DownloadStatus.Line("downloading…", p); }
             });
-            await _http.DownloadToAsync(new Uri(item.Entry.DllUrl), buffer, progress);
+            await _http.DownloadToAsync(new Uri(v.DllUrl), buffer, progress);
             buffer.Position = 0;
-            var fileName = Path.GetFileName(new Uri(item.Entry.DllUrl).LocalPath);
-            await _installer.InstallAsync(buffer, item.Entry.Sha256, gameMini,
-                item.Entry.Id, fileName, item.Entry.Version);
-            item.Installed = true;
-            item.Action = $"installed v{item.Entry.Version}";
+            var fileName = Path.GetFileName(new Uri(v.DllUrl).LocalPath);
+            await _installer.InstallAsync(buffer, v.Sha256, gameMini, item.Entry.Id, fileName, v.Version);
+            item.MarkInstalled(v.Version);
+            item.Action = $"installed v{v.Version}";
         }
         catch (Exception ex) { item.Action = $"failed: {ex.Message}"; }
     }
@@ -90,7 +95,7 @@ public partial class PluginsViewModel : ObservableObject
     {
         var gameMini = _settings.Load().GameMiniDir;
         if (gameMini is null) { Status = "set the game path in Settings first."; return Task.CompletedTask; }
-        try { _installer.Remove(gameMini, item.Entry.Id); item.Installed = false; item.Action = "removed"; }
+        try { _installer.Remove(gameMini, item.Entry.Id); item.MarkRemoved(); item.Action = "removed"; }
         catch (Exception ex) { item.Action = $"failed: {ex.Message}"; }
         return Task.CompletedTask;
     }

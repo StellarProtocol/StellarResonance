@@ -25,17 +25,17 @@ public class PluginRegistryServiceTests
 
     private const string Curated = """
     { "plugins": [
-      { "id":"combatmeter","name":"CombatMeter","description":"DPS meter","version":"1.0.0",
-        "dllUrl":"https://minio.revette.io/stellar/plugins/combatmeter.dll","sha256":"aaa","author":"Stellar" },
-      { "id":"playerhud","name":"PlayerHUD","description":"HUD","version":"1.0.0",
-        "dllUrl":"https://minio.revette.io/stellar/plugins/playerhud.dll","sha256":"bbb","author":"Stellar" }
+      { "id":"combatmeter","name":"CombatMeter","description":"DPS meter","author":"Stellar",
+        "versions":[ {"version":"1.0.0","dllUrl":"https://minio.revette.io/stellar/plugins/combatmeter-1.0.0.dll","sha256":"aaa","minModSystemVersion":"1.0.0"} ] },
+      { "id":"playerhud","name":"PlayerHUD","description":"HUD","author":"Stellar",
+        "versions":[ {"version":"1.0.0","dllUrl":"https://minio.revette.io/stellar/plugins/playerhud-1.0.0.dll","sha256":"bbb","minModSystemVersion":"1.0.0"} ] }
     ] }
     """;
 
     private const string ThirdParty = """
     { "plugins": [
-      { "id":"combatmeter","name":"CombatMeter PRO","description":"override","version":"2.0.0",
-        "dllUrl":"https://example.com/cm.dll","sha256":"ccc","author":"someone" }
+      { "id":"combatmeter","name":"CombatMeter PRO","description":"override","author":"someone",
+        "versions":[ {"version":"2.0.0","dllUrl":"https://example.com/cm-2.0.0.dll","sha256":"ccc","minModSystemVersion":"1.2.0"} ] }
     ] }
     """;
 
@@ -58,9 +58,32 @@ public class PluginRegistryServiceTests
         });
 
         var byId = plugins.ToDictionary(p => p.Id);
-        Assert.Equal(2, plugins.Count);                       // combatmeter (overridden) + playerhud
-        Assert.Equal("2.0.0", byId["combatmeter"].Version);   // 3rd-party overrode curated
+        Assert.Equal(2, plugins.Count);                                  // combatmeter (overridden) + playerhud
+        Assert.Equal("2.0.0", byId["combatmeter"].Versions[0].Version);  // 3rd-party overrode curated
         Assert.Equal("CombatMeter PRO", byId["combatmeter"].Name);
+        Assert.Equal("1.2.0", byId["combatmeter"].Versions[0].MinModSystemVersion);
         Assert.True(byId.ContainsKey("playerhud"));
+    }
+
+    [Fact]
+    public async Task Skips_entries_with_no_versions()
+    {
+        // A legacy/malformed entry with no versions[] must be ignored, not crash the list.
+        const string mixed = """
+        { "plugins": [
+          { "id":"legacy","name":"Legacy","description":"old flat shape","author":"x" },
+          { "id":"good","name":"Good","description":"ok","author":"x",
+            "versions":[ {"version":"1.0.0","dllUrl":"https://e/g-1.0.0.dll","sha256":"d","minModSystemVersion":"1.0.0"} ] }
+        ] }
+        """;
+        var svc = new PluginRegistryService(new HttpClient(new MapHandler(new()
+        {
+            ["https://minio.revette.io/stellar/plugins.json"] = mixed,
+        })));
+
+        var plugins = await svc.FetchAllAsync(new[] { new Uri("https://minio.revette.io/stellar/plugins.json") });
+
+        Assert.Single(plugins);
+        Assert.Equal("good", plugins[0].Id);
     }
 }

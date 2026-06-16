@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -43,10 +44,20 @@ public partial class HomeViewModel : ObservableObject
     [ObservableProperty] private bool _isLauncherDownloading;   // drives the banner progress bar
     [ObservableProperty] private bool _isFrameworkDownloading;  // drives the footer progress bar
     [ObservableProperty] private double _downloadPercent;       // 0..100; shared (one download at a time)
-    public ObservableCollection<VersionManifest> Changelog { get; } = new();
+
+    // Framework version picker.
+    [ObservableProperty] private VersionManifest? _selectedVersion;   // bound to the ComboBox
+    [ObservableProperty] private bool _hasVersions;
+    [ObservableProperty] private string _installAction = "Install";   // button label, reflects the selection
+    [ObservableProperty] private bool _isDowngrade;
+    [ObservableProperty] private bool _canChangeFramework;            // selection installable (launcher supported)
+    [ObservableProperty] private bool _confirmVisible;                // inline "review then confirm" step
+    public ObservableCollection<VersionManifest> Versions { get; } = new();   // all releases, newest first
+    public ObservableCollection<VersionManifest> Changelog { get; } = new();  // the SELECTED version's changelog
 
     private LauncherSettings _cfg = new();
-    private VersionManifest? _remote;
+    private FrameworkManifest? _manifest;
+    private string? _installedFramework;
     private LauncherManifest? _remoteLauncher;
 
     public HomeViewModel(ISettingsStore settings, IGameLocator locator, IDoorstopToggle doorstop,
@@ -134,38 +145,81 @@ public partial class HomeViewModel : ObservableObject
 
         GameStatus = GameMini is { } g && Directory.Exists(g) ? g : "Not found — set it in Settings";
 
-        var installed = GameMini is null ? null : _installer.ReadInstalledVersion(GameMini);
-        FrameworkStatus = installed is null ? "Not installed" : $"v{installed} installed";
+        _installedFramework = GameMini is null ? null : _installer.ReadInstalledVersion(GameMini);
+        FrameworkStatus = _installedFramework is null ? "Not installed" : $"v{_installedFramework} installed";
 
         try
         {
-            _remote = await _version.FetchAsync(ChannelManifests.FrameworkVersion(_cfg.Channel));
-            Changelog.Clear();
-            Changelog.Add(_remote);
-            UpdateAvailable = installed is null || VersionService.IsNewer(_remote.Version, installed);
+            _manifest = await _version.FetchAsync(ChannelManifests.FrameworkVersion(_cfg.Channel));
+            Versions.Clear();
+            foreach (var v in _manifest.Versions) Versions.Add(v);
+            HasVersions = Versions.Count > 0;
+            // Default to the channel's latest; this fires OnSelectedVersionChanged to refresh the panel.
+            SelectedVersion = Versions.FirstOrDefault(v => v.Version == _manifest.Latest) ?? Versions.FirstOrDefault();
+            UpdateAvailable = HasVersions &&
+                (_installedFramework is null || VersionService.IsNewer(_manifest.Latest, _installedFramework));
         }
         catch (Exception ex) { StatusLine = $"offline — {ex.Message}"; }
     }
 
-    [RelayCommand]
-    private async Task InstallOrUpdateAsync()
+    // Keep the changelog panel, button label, and downgrade/compat state in sync with the dropdown.
+    partial void OnSelectedVersionChanged(VersionManifest? value)
     {
-        if (GameMini is null || _remote is null) { StatusLine = "set the game path first"; return; }
-        if (!VersionService.LauncherSupported(_remote.MinLauncherVersion, LauncherVersion))
+        ConfirmVisible = false;
+        Changelog.Clear();
+        if (value is null) { CanChangeFramework = false; InstallAction = "Install"; IsDowngrade = false; return; }
+        Changelog.Add(value);
+
+        CanChangeFramework = VersionService.LauncherSupported(value.MinLauncherVersion, LauncherVersion);
+        if (!CanChangeFramework) { InstallAction = "Update launcher first"; IsDowngrade = false; return; }
+
+        if (_installedFramework is null)
+        {
+            InstallAction = $"Install v{value.Version}"; IsDowngrade = false;
+        }
+        else if (VersionService.IsNewer(value.Version, _installedFramework))
+        {
+            InstallAction = $"Update to v{value.Version}"; IsDowngrade = false;
+        }
+        else if (VersionService.IsNewer(_installedFramework, value.Version))
+        {
+            InstallAction = $"Downgrade to v{value.Version}"; IsDowngrade = true;
+        }
+        else
+        {
+            InstallAction = $"Reinstall v{value.Version}"; IsDowngrade = false;
+        }
+    }
+
+    // Step 1: reveal the inline confirm bar (the changelog above is the "review").
+    [RelayCommand]
+    private void RequestFrameworkChange() { if (CanChangeFramework) ConfirmVisible = true; }
+
+    [RelayCommand]
+    private void CancelFrameworkChange() => ConfirmVisible = false;
+
+    // Step 2: actually download + install the selected version.
+    [RelayCommand]
+    private async Task ConfirmFrameworkChangeAsync()
+    {
+        ConfirmVisible = false;
+        if (GameMini is null || SelectedVersion is null) { StatusLine = "set the game path first"; return; }
+        var target = SelectedVersion;
+        if (!VersionService.LauncherSupported(target.MinLauncherVersion, LauncherVersion))
         { StatusLine = "update the launcher first"; return; }
 
         try
         {
             using var http = new System.Net.Http.HttpClient();
             using var buffered = new MemoryStream();
-            var progress = MakeProgress("downloading…", t => StatusLine = t);
+            var progress = MakeProgress($"downloading v{target.Version}…", t => StatusLine = t);
             IsFrameworkDownloading = true;
-            try { await http.DownloadToAsync(new Uri(_remote.BundleUrl), buffered, progress); }
+            try { await http.DownloadToAsync(new Uri(target.BundleUrl), buffered, progress); }
             finally { IsFrameworkDownloading = false; }
             buffered.Position = 0;
-            StatusLine = "installing…";
-            await _installer.InstallAsync(buffered, _remote.Sha256, GameMini, _remote.Version);
-            StatusLine = $"installed v{_remote.Version}";
+            StatusLine = $"installing v{target.Version}…";
+            await _installer.InstallAsync(buffered, target.Sha256, GameMini, target.Version);
+            StatusLine = $"installed v{target.Version}";
             await RefreshAsync();
         }
         catch (Exception ex) { StatusLine = $"install failed: {ex.Message}"; }

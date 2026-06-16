@@ -8,5 +8,5 @@ namespace StellarLauncher.Core.Services;
 
 public interface IVersionService
 {
-    Task<VersionManifest> FetchAsync(Uri manifestUrl, CancellationToken ct = default);
+    Task<FrameworkManifest> FetchAsync(Uri manifestUrl, CancellationToken ct = default);
 }

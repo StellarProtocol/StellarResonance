@@ -47,66 +47,123 @@
       </StackPanel>
     </Border>
 
-    <ScrollViewer Grid.Row="2" Margin="28,18,28,0">
-      <ItemsControl ItemsSource="{Binding Changelog}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="model:VersionManifest">
-            <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"
-                    CornerRadius="12" Padding="15,13" Margin="0,0,0,12">
-              <StackPanel Spacing="8">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                  <TextBlock Text="{Binding Version, StringFormat='v{0}'}"
-                             Foreground="White" FontWeight="Bold"/>
-                  <TextBlock Text="{Binding Date}" Foreground="#566083" FontSize="11"
-                             VerticalAlignment="Center"/>
+    <DockPanel Grid.Row="2" Margin="28,18,28,0">
+      <!-- Framework version picker + review-then-confirm -->
+      <Border DockPanel.Dock="Top" IsVisible="{Binding HasVersions}"
+              Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"
+              CornerRadius="12" Padding="14,10" Margin="0,0,0,12">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto" VerticalAlignment="Center">
+          <TextBlock Grid.Column="0" Text="Framework version" Foreground="#9aa3bf" FontSize="12"
+                     VerticalAlignment="Center" Margin="0,0,10,0"/>
+          <ComboBox Grid.Column="1" MinWidth="170" VerticalAlignment="Center"
+                    ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="model:VersionManifest">
+                <TextBlock>
+                  <Run Text="{Binding Version, StringFormat='v{0}'}"/>
+                  <Run Text="{Binding Date}" Foreground="#697297"/>
+                </TextBlock>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <!-- action button (hidden while confirming) -->
+          <Button Grid.Column="3" Content="{Binding InstallAction}" Command="{Binding RequestFrameworkChangeCommand}"
+                  IsEnabled="{Binding CanChangeFramework}" IsVisible="{Binding !ConfirmVisible}"
+                  Foreground="#cfe0ff" Background="#1c2740" BorderBrush="#2f4570" BorderThickness="1"
+                  FontWeight="SemiBold" Padding="16,8" CornerRadius="10"/>
+          <!-- inline confirm -->
+          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ConfirmVisible}">
+            <TextBlock Text="⚠ downgrade" Foreground="#ffcf6b" FontSize="11" VerticalAlignment="Center"
+                       IsVisible="{Binding IsDowngrade}"/>
+            <Button Content="Cancel" Command="{Binding CancelFrameworkChangeCommand}"
+                    Foreground="#cfd6f0" Background="Transparent" BorderBrush="#2f4570" BorderThickness="1"
+                    Padding="12,8" CornerRadius="10"/>
+            <Button Content="Confirm" Command="{Binding ConfirmFrameworkChangeCommand}"
+                    Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="14,8" CornerRadius="10"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Changelog}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="model:VersionManifest">
+              <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"
+                      CornerRadius="12" Padding="15,13" Margin="0,0,0,12">
+                <StackPanel Spacing="8">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="{Binding Version, StringFormat='v{0}'}"
+                               Foreground="White" FontWeight="Bold"/>
+                    <TextBlock Text="{Binding Date}" Foreground="#566083" FontSize="11"
+                               VerticalAlignment="Center"/>
+                  </StackPanel>
+                  <ItemsControl ItemsSource="{Binding Changelog.Added}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="sys:String">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1">
+                            <TextBlock Text="ADDED" Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
+                          </Border>
+                          <TextBlock Text="{Binding}" Foreground="#c5cce0" FontSize="12" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <ItemsControl ItemsSource="{Binding Changelog.Changed}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="sys:String">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Border Background="#23ffcf6b" CornerRadius="5" Padding="6,1">
+                            <TextBlock Text="CHANGED" Foreground="#ffcf6b" FontSize="9" FontWeight="Bold"/>
+                          </Border>
+                          <TextBlock Text="{Binding}" Foreground="#c5cce0" FontSize="12" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <ItemsControl ItemsSource="{Binding Changelog.Fixed}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="sys:String">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Border Background="#235b8cff" CornerRadius="5" Padding="6,1">
+                            <TextBlock Text="FIXED" Foreground="#9ec2ff" FontSize="9" FontWeight="Bold"/>
+                          </Border>
+                          <TextBlock Text="{Binding}" Foreground="#c5cce0" FontSize="12" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <ItemsControl ItemsSource="{Binding Changelog.Removed}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="sys:String">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Border Background="#23ff6b6b" CornerRadius="5" Padding="6,1">
+                            <TextBlock Text="REMOVED" Foreground="#ff9a9a" FontSize="9" FontWeight="Bold"/>
+                          </Border>
+                          <TextBlock Text="{Binding}" Foreground="#c5cce0" FontSize="12" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
                 </StackPanel>
-                <ItemsControl ItemsSource="{Binding Changelog.Added}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="sys:String">
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1">
-                          <TextBlock Text="ADDED" Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
-                        </Border>
-                        <TextBlock Text="{Binding}" Foreground="#c5cce0" FontSize="12"/>
-                      </StackPanel>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <ItemsControl ItemsSource="{Binding Changelog.Fixed}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="sys:String">
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Border Background="#235b8cff" CornerRadius="5" Padding="6,1">
-                          <TextBlock Text="FIXED" Foreground="#9ec2ff" FontSize="9" FontWeight="Bold"/>
-                        </Border>
-                        <TextBlock Text="{Binding}" Foreground="#c5cce0" FontSize="12"/>
-                      </StackPanel>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-            </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-    </ScrollViewer>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </DockPanel>
 
     <Border Grid.Row="3" Background="#0a0d18" BorderBrush="#222a44" BorderThickness="0,1,0,0">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="24,0">
+      <Grid ColumnDefinitions="*,Auto,Auto" Margin="24,0">
         <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="5" Margin="0,0,16,0">
           <TextBlock Text="{Binding StatusLine}" Foreground="#8a93b2" FontSize="12"/>
           <ProgressBar IsVisible="{Binding IsFrameworkDownloading}" Value="{Binding DownloadPercent}"
                        Minimum="0" Maximum="100" Height="4" Foreground="#5b8cff" Background="#1c2740"/>
         </StackPanel>
-        <Button Grid.Column="1" Command="{Binding InstallOrUpdateCommand}"
-                Content="⬇  Install / Update" IsVisible="{Binding UpdateAvailable}"
-                Foreground="#cfe0ff" Background="#1c2740" BorderBrush="#2f4570" BorderThickness="1"
-                FontWeight="SemiBold" Padding="16,12" CornerRadius="12"
-                VerticalAlignment="Center" Margin="0,0,12,0"/>
-        <ToggleSwitch Grid.Column="2" IsChecked="{Binding Modded}"
+        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Modded}"
                       OnContent="Modded" OffContent="Vanilla"
                       VerticalAlignment="Center" Margin="0,0,16,0"/>
-        <Button Grid.Column="3" Command="{Binding LaunchCommand}" Content="▶  LAUNCH"
+        <Button Grid.Column="2" Command="{Binding LaunchCommand}" Content="▶  LAUNCH"
                 Foreground="White" FontWeight="Bold" Padding="38,14" CornerRadius="12"
                 VerticalAlignment="Center">
           <Button.Background>

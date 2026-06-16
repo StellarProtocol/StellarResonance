@@ -40,7 +40,7 @@ public partial class App : Application
 
         var pluginRegistry = new PluginRegistryService(http);
         var pluginInstaller = new PluginInstaller(fs);
-        var pluginsVm = new PluginsViewModel(pluginRegistry, pluginInstaller, settings, http);
+        var pluginsVm = new PluginsViewModel(pluginRegistry, pluginInstaller, installer, settings, http);
 
         var home = new HomeViewModel(settings, locator, doorstop, installer, launcher, version, platform, launcherUpdates, detector, selfUpdater);
         var setVm = new SettingsViewModel(settings, locator, detector);

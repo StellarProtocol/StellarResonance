@@ -18,17 +18,34 @@ public class VersionServiceTests
     }
 
     [Fact]
-    public async Task Fetches_and_parses_manifest()
+    public async Task Fetches_and_parses_version_history()
     {
         var json = """
-        {"version":"1.2.0","date":"2026-06-08","bundleUrl":"u","sha256":"s",
-         "minLauncherVersion":"1.0.0",
-         "changelog":{"added":[],"changed":[],"fixed":[],"removed":[]}}
+        {"latest":"1.2.0","channel":"stable","versions":[
+          {"version":"1.2.0","date":"2026-06-08","bundleUrl":"u2","sha256":"s2",
+           "minLauncherVersion":"1.0.0",
+           "changelog":{"added":["a"],"changed":[],"fixed":[],"removed":[]}},
+          {"version":"1.1.0","date":"2026-06-01","bundleUrl":"u1","sha256":"s1",
+           "minLauncherVersion":"1.0.0",
+           "changelog":{"added":[],"changed":[],"fixed":["f"],"removed":[]}}
+        ]}
         """;
         var svc = new VersionService(new HttpClient(new StubHandler(json)));
         var m = await svc.FetchAsync(new Uri("https://x/version.json"));
-        Assert.Equal("1.2.0", m.Version);
+        Assert.Equal("1.2.0", m.Latest);
+        Assert.Equal(2, m.Versions.Count);
+        Assert.Equal("1.2.0", m.Versions[0].Version);
+        Assert.Equal("u1", m.Versions[1].BundleUrl);
     }
+
+    [Theory]
+    [InlineData("1.4.0", "1.4.0", null, true)]   // exactly at min, no max
+    [InlineData("1.5.0", "1.4.0", null, true)]   // above min, no max
+    [InlineData("1.3.0", "1.4.0", null, false)]  // below min -> needs newer framework
+    [InlineData("1.4.0", "1.2.0", "1.4.0", true)]  // within [min,max]
+    [InlineData("1.5.0", "1.2.0", "1.4.0", false)] // above max -> framework too new for this plugin build
+    public void IsModSystemCompatible(string framework, string min, string? max, bool expected)
+        => Assert.Equal(expected, VersionService.IsModSystemCompatible(framework, min, max));
 
     [Theory]
     [InlineData("1.1.0", "1.0.0", true)]

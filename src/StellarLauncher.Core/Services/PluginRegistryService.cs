@@ -24,7 +24,11 @@ public sealed class PluginRegistryService : IPluginRegistryService
             {
                 var registry = await _http.GetFromJsonAsync<PluginRegistry>(url, PluginRegistry.JsonOptions, ct);
                 if (registry?.Plugins is null) continue;
-                foreach (var plugin in registry.Plugins) byId[plugin.Id] = plugin;  // later registries override
+                foreach (var plugin in registry.Plugins)
+                {
+                    if (plugin.Versions is null || plugin.Versions.Count == 0) continue;  // skip malformed/legacy entries
+                    byId[plugin.Id] = plugin;                                             // later registries override
+                }
             }
             catch { /* unreachable or invalid registry — skip it */ }
         }
