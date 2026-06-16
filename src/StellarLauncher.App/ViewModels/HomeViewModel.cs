@@ -40,8 +40,9 @@ public partial class HomeViewModel : ObservableObject
     [ObservableProperty] private bool _updateAvailable;
     [ObservableProperty] private bool _launcherUpdateAvailable;
     [ObservableProperty] private string _launcherUpdateText = "";
-    [ObservableProperty] private bool _isDownloading;
-    [ObservableProperty] private double _downloadPercent;   // 0..100; bound to the ProgressBar
+    [ObservableProperty] private bool _isLauncherDownloading;   // drives the banner progress bar
+    [ObservableProperty] private bool _isFrameworkDownloading;  // drives the footer progress bar
+    [ObservableProperty] private double _downloadPercent;       // 0..100; shared (one download at a time)
     public ObservableCollection<VersionManifest> Changelog { get; } = new();
 
     private LauncherSettings _cfg = new();
@@ -89,8 +90,9 @@ public partial class HomeViewModel : ObservableObject
             using var http = new System.Net.Http.HttpClient();
             using var buffered = new MemoryStream();
             var progress = MakeProgress("downloading launcher…", t => LauncherUpdateText = t);
+            IsLauncherDownloading = true;
             try { await http.DownloadToAsync(new Uri(url), buffered, progress); }
-            finally { IsDownloading = false; }
+            finally { IsLauncherDownloading = false; }
             buffered.Position = 0;
 
             var staging = Path.Combine(Path.GetTempPath(), "stellar-launcher-update");
@@ -111,7 +113,6 @@ public partial class HomeViewModel : ObservableObject
     // the whole-percent — or, for unknown-length downloads, the whole-MB — ticks over, to avoid UI churn).
     private IProgress<DownloadProgress> MakeProgress(string verb, Action<string> setText)
     {
-        IsDownloading = true;
         DownloadPercent = 0;
         long lastTick = -1;
         return new Progress<DownloadProgress>(p =>
@@ -158,8 +159,9 @@ public partial class HomeViewModel : ObservableObject
             using var http = new System.Net.Http.HttpClient();
             using var buffered = new MemoryStream();
             var progress = MakeProgress("downloading…", t => StatusLine = t);
+            IsFrameworkDownloading = true;
             try { await http.DownloadToAsync(new Uri(_remote.BundleUrl), buffered, progress); }
-            finally { IsDownloading = false; }
+            finally { IsFrameworkDownloading = false; }
             buffered.Position = 0;
             StatusLine = "installing…";
             await _installer.InstallAsync(buffered, _remote.Sha256, GameMini, _remote.Version);

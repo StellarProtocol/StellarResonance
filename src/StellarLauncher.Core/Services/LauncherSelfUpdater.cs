@@ -50,6 +50,24 @@ public sealed class LauncherSelfUpdater : ILauncherSelfUpdater
         $"start \"\" \"{_fs.Path.Combine(installDir, exeName)}\"\r\n" +
         "del \"%~f0\"\r\n";
 
+    /// <summary>
+    /// POSIX equivalent of the Windows swap script. The running process must NOT copy over its own files:
+    /// the executable can't be reopened for writing (ETXTBSY) and overwriting an in-use mmap'd library
+    /// (libSkiaSharp.so) invalidates its pages and SIGBUSes the live process mid-copy. So an external shell
+    /// waits for the launcher (<paramref name="pid"/>) to exit, then copies staging→install and relaunches.
+    /// </summary>
+    public string BuildUnixSwapScript(string stagingDir, string installDir, string exeName, int pid)
+    {
+        var exe = _fs.Path.Combine(installDir, exeName);
+        return
+            "#!/bin/sh\n" +
+            $"while kill -0 {pid} 2>/dev/null; do sleep 0.1; done\n" +   // wait for the old launcher to exit
+            $"cp -a \"{stagingDir}/.\" \"{installDir}/\"\n" +            // now safe — nothing is mapped
+            $"chmod +x \"{exe}\" \"{installDir}/install.sh\" \"{installDir}/uninstall.sh\" 2>/dev/null || true\n" +
+            $"\"{exe}\" &\n" +                                           // relaunch (detaches when we exit)
+            "rm -f \"$0\"\n";
+    }
+
     public void ApplyAndRestart(string stagingDir, string installDir, string exeName, bool isWindows)
     {
         if (isWindows)
@@ -63,77 +81,23 @@ public sealed class LauncherSelfUpdater : ILauncherSelfUpdater
         }
         else
         {
-            SwapInPlace(stagingDir, installDir, exeName);
-            var exe = _fs.Path.Combine(installDir, exeName);
-            Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false });
+            var script = BuildUnixSwapScript(stagingDir, installDir, exeName, Environment.ProcessId);
+            var scriptPath = _fs.Path.Combine(_fs.Path.GetTempPath(), "stellar-launcher-update.sh");
+            _fs.File.WriteAllText(scriptPath, script);
+            // Detach via setsid where available so the swapper survives this process exiting.
+            Process.Start(new ProcessStartInfo("/bin/sh", $"-c \"setsid /bin/sh '{scriptPath}' >/dev/null 2>&1 </dev/null || /bin/sh '{scriptPath}'\"")
+                { UseShellExecute = false });
             Environment.Exit(0);
-        }
-    }
-
-    /// <summary>
-    /// Replaces <paramref name="installDir"/> with the contents of <paramref name="stagingDir"/>, swapping
-    /// the running executable by rename. Overwriting a live ELF in place fails with ETXTBSY ("text file
-    /// busy"); renaming it aside while it executes is allowed (the inode stays live). The new binary is
-    /// fully written as *.new first, so the old binary survives intact if anything before the swap fails.
-    /// Does NOT restart — extracted from <see cref="ApplyAndRestart"/> so it can be tested.
-    /// </summary>
-    public void SwapInPlace(string stagingDir, string installDir, string exeName)
-    {
-        var exe = _fs.Path.Combine(installDir, exeName);
-        var newExe = exe + ".new";
-        var oldExe = exe + ".old";
-
-        // Everything EXCEPT the running executable can be copied straight into place.
-        CopyDir(stagingDir, installDir, skip: exeName);
-
-        _fs.File.Copy(_fs.Path.Combine(stagingDir, exeName), newExe, overwrite: true);
-        if (_fs.File.Exists(oldExe)) { try { _fs.File.Delete(oldExe); } catch { /* best effort */ } }
-        if (_fs.File.Exists(exe)) _fs.File.Move(exe, oldExe);
-        _fs.File.Move(newExe, exe);
-
-        MakeExecutable(exe);
-        // Keep the desktop-integration helpers runnable after an in-place update.
-        foreach (var script in new[] { "install.sh", "uninstall.sh" })
-        {
-            var p = _fs.Path.Combine(installDir, script);
-            if (_fs.File.Exists(p)) MakeExecutable(p);
         }
     }
 
     public void CleanupStaleUpdate(string installDir, string exeName)
     {
-        // The renamed-aside binary from a prior update can only be removed once the old process
-        // (which still held it open) has exited — i.e. on the next startup, here.
+        // Remove partial binaries left by an interrupted update (older builds renamed the exe aside).
         foreach (var leftover in new[] { exeName + ".old", exeName + ".new" })
         {
             var p = _fs.Path.Combine(installDir, leftover);
             try { if (_fs.File.Exists(p)) _fs.File.Delete(p); } catch { /* best effort */ }
-        }
-    }
-
-    private static void MakeExecutable(string path)
-    {
-        if (OperatingSystem.IsWindows()) return;
-        try
-        {
-            File.SetUnixFileMode(path,
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-        }
-        catch { /* best effort */ }
-    }
-
-    private void CopyDir(string from, string to, string? skip = null)
-    {
-        foreach (var dir in _fs.Directory.GetDirectories(from, "*", SearchOption.AllDirectories))
-            _fs.Directory.CreateDirectory(dir.Replace(from, to));
-        foreach (var file in _fs.Directory.GetFiles(from, "*", SearchOption.AllDirectories))
-        {
-            if (skip is not null && _fs.Path.GetFileName(file) == skip) continue;
-            var target = file.Replace(from, to);
-            _fs.Directory.CreateDirectory(_fs.Path.GetDirectoryName(target)!);
-            _fs.File.Copy(file, target, overwrite: true);
         }
     }
 }

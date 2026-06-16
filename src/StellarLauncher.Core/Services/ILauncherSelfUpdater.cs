@@ -8,6 +8,7 @@ public interface ILauncherSelfUpdater
 {
     Task StageAsync(Stream zip, string expectedSha256, string stagingDir, CancellationToken ct = default);
     string BuildWindowsSwapScript(string stagingDir, string installDir, string exeName);
+    string BuildUnixSwapScript(string stagingDir, string installDir, string exeName, int pid);
     void ApplyAndRestart(string stagingDir, string installDir, string exeName, bool isWindows);
 
     /// <summary>Remove leftover *.old/*.new binaries from a previous self-update. Call at startup.</summary>

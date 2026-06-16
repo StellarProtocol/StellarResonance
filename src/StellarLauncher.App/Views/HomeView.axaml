@@ -13,11 +13,11 @@
           <TextBlock Grid.Column="0" Text="{Binding LauncherUpdateText}" Foreground="#9affd0"
                      FontSize="12" VerticalAlignment="Center"/>
           <Button Grid.Column="1" Command="{Binding UpdateLauncherCommand}" Content="Update &amp; Restart"
-                  IsEnabled="{Binding !IsDownloading}"
+                  IsEnabled="{Binding !IsLauncherDownloading}"
                   Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold"
                   Padding="14,6" CornerRadius="8"/>
         </Grid>
-        <ProgressBar IsVisible="{Binding IsDownloading}" Value="{Binding DownloadPercent}"
+        <ProgressBar IsVisible="{Binding IsLauncherDownloading}" Value="{Binding DownloadPercent}"
                      Minimum="0" Maximum="100" Height="4" Foreground="#54e3a0" Background="#1d3a2a"/>
       </StackPanel>
     </Border>
@@ -95,7 +95,7 @@
       <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="24,0">
         <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="5" Margin="0,0,16,0">
           <TextBlock Text="{Binding StatusLine}" Foreground="#8a93b2" FontSize="12"/>
-          <ProgressBar IsVisible="{Binding IsDownloading}" Value="{Binding DownloadPercent}"
+          <ProgressBar IsVisible="{Binding IsFrameworkDownloading}" Value="{Binding DownloadPercent}"
                        Minimum="0" Maximum="100" Height="4" Foreground="#5b8cff" Background="#1c2740"/>
         </StackPanel>
         <Button Grid.Column="1" Command="{Binding InstallOrUpdateCommand}"

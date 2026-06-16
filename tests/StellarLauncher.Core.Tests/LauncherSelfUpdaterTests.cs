@@ -44,24 +44,16 @@ public class LauncherSelfUpdaterTests
     }
 
     [Fact]
-    public void SwapInPlace_replaces_running_exe_and_copies_other_files()
+    public void Unix_swap_script_waits_for_exit_then_copies_and_relaunches()
     {
-        var fs = new MockFileSystem();
-        fs.AddFile("/staging/StellarLauncher.App", new MockFileData("new-binary"));
-        fs.AddFile("/staging/libSkiaSharp.so", new MockFileData("new-lib"));
-        fs.AddFile("/staging/install.sh", new MockFileData("#!/bin/sh"));
-        // The currently-installed (running) binary + an existing lib.
-        fs.AddFile("/app/StellarLauncher.App", new MockFileData("old-binary"));
-        fs.AddFile("/app/libSkiaSharp.so", new MockFileData("old-lib"));
-
-        new LauncherSelfUpdater(fs).SwapInPlace("/staging", "/app", "StellarLauncher.App");
-
-        Assert.Equal("new-binary", fs.File.ReadAllText("/app/StellarLauncher.App"));
-        Assert.Equal("new-lib", fs.File.ReadAllText("/app/libSkiaSharp.so"));
-        Assert.Equal("#!/bin/sh", fs.File.ReadAllText("/app/install.sh"));
-        // The old binary is renamed aside (it can only be removed on next startup), not left as the live one.
-        Assert.Equal("old-binary", fs.File.ReadAllText("/app/StellarLauncher.App.old"));
-        Assert.False(fs.File.Exists("/app/StellarLauncher.App.new"));
+        var s = new LauncherSelfUpdater(new MockFileSystem())
+            .BuildUnixSwapScript("/staging", "/app", "StellarLauncher.App", 4242);
+        // Must wait for the OLD process to exit before touching files (avoids ETXTBSY / SIGBUS on mmap'd libs).
+        Assert.Contains("kill -0 4242", s);
+        Assert.Contains("cp -a \"/staging/.\" \"/app/\"", s);
+        Assert.Contains("chmod +x \"/app/StellarLauncher.App\"", s);
+        Assert.Contains("\"/app/StellarLauncher.App\" &", s);  // relaunch
+        Assert.Contains("rm -f", s);                            // self-delete
     }
 
     [Fact]
