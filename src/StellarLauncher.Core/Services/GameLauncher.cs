@@ -25,9 +25,24 @@ public sealed class GameLauncher : IGameLauncher
             throw new InvalidOperationException("Linux launch needs a Runner + WINEPREFIX (set them in Settings)");
 
         var psi = new ProcessStartInfo { UseShellExecute = false };
-        psi.Environment["WINEDLLOVERRIDES"] = "winhttp=n,b";   // load the BepInEx doorstop proxy
+
+        // load the BepInEx doorstop proxy; with DXVK-NVAPI on, also prefer the prefix's nvapi
+        // (native, then builtin — safe whether or not the DLLs are actually installed).
+        var overrides = "winhttp=n,b";
+        if (r.DxvkNvapi) overrides += ";nvapi,nvapi64=n,b";
+        psi.Environment["WINEDLLOVERRIDES"] = overrides;
+
+        // esync/fsync (Wine vars; Proton enables both by default so we only flip the NO_* knobs off).
+        psi.Environment["WINEESYNC"] = r.Esync ? "1" : "0";
+        psi.Environment["WINEFSYNC"] = r.Fsync ? "1" : "0";
+        if (r.FpsOverlay) psi.Environment["MANGOHUD"] = "1";
 
         var isProton = Path.GetFileName(r.Runner).Contains("proton", StringComparison.OrdinalIgnoreCase);
+        if (isProton)
+        {
+            if (!r.Esync) psi.Environment["PROTON_NO_ESYNC"] = "1";
+            if (!r.Fsync) psi.Environment["PROTON_NO_FSYNC"] = "1";
+        }
 
         if (isProton && !string.IsNullOrEmpty(r.UmuRun))
         {

@@ -42,8 +42,9 @@ public partial class App : Application
         var pluginInstaller = new PluginInstaller(fs);
         var pluginsVm = new PluginsViewModel(pluginRegistry, pluginInstaller, installer, settings, http);
 
-        var home = new HomeViewModel(settings, locator, doorstop, installer, launcher, version, platform, launcherUpdates, detector, selfUpdater);
-        var setVm = new SettingsViewModel(settings, locator, detector);
+        var dxvkNvapi = new DxvkNvapiInstaller(http);
+        var home = new HomeViewModel(settings, locator, doorstop, installer, launcher, version, platform, launcherUpdates, detector, selfUpdater, dxvkNvapi);
+        var setVm = new SettingsViewModel(settings, locator, detector, platform);
         var main = new MainWindowViewModel(home, setVm, pluginsVm);
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

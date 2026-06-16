@@ -28,6 +28,18 @@
       <Button Grid.Column="1" Content="Browse…" Click="BrowsePrefix" Margin="8,0,0,0"/>
     </Grid>
 
+    <StackPanel IsVisible="{Binding IsLinux}" Spacing="8">
+      <TextBlock Text="Linux: launch tweaks" Foreground="#8a93b2" Margin="0,4,0,0"/>
+      <CheckBox IsChecked="{Binding DxvkNvapi}" Content="Auto Install/Update DXVK-NVAPI on Prefix"
+                ToolTip.Tip="Installs/updates jp7677/dxvk-nvapi into the prefix before launch, and adds the nvapi DLL overrides (NVIDIA features under DXVK)."/>
+      <CheckBox IsChecked="{Binding Esync}" Content="Enable Esync"
+                ToolTip.Tip="WINEESYNC — eventfd-based sync; lowers CPU overhead. Enabled by default."/>
+      <CheckBox IsChecked="{Binding Fsync}" Content="Enable Fsync"
+                ToolTip.Tip="WINEFSYNC — futex-based sync; faster than esync on supported kernels. Harmlessly ignored if unsupported."/>
+      <CheckBox IsChecked="{Binding FpsOverlay}" Content="Show FPS overlay (MangoHud)"
+                ToolTip.Tip="Sets MANGOHUD=1 at launch to show an FPS/perf overlay. Requires MangoHud installed."/>
+    </StackPanel>
+
     <TextBlock Text="Update channel" Foreground="#8a93b2"/>
     <ToggleSwitch IsChecked="{Binding TestingChannel}" OnContent="Testing (pre-release)" OffContent="Stable"/>
 

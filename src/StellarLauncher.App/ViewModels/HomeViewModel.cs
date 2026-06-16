@@ -33,6 +33,7 @@ public partial class HomeViewModel : ObservableObject
     private readonly ILauncherUpdateService _launcherUpdates;
     private readonly IGameDetector _detector;
     private readonly ILauncherSelfUpdater _selfUpdater;
+    private readonly IDxvkNvapiInstaller _dxvkNvapi;
 
     [ObservableProperty] private string _gameStatus = "Detecting…";
     [ObservableProperty] private string _frameworkStatus = "—";
@@ -62,12 +63,13 @@ public partial class HomeViewModel : ObservableObject
 
     public HomeViewModel(ISettingsStore settings, IGameLocator locator, IDoorstopToggle doorstop,
         IInstaller installer, IGameLauncher launcher, IVersionService version, IPlatformInfo platform,
-        ILauncherUpdateService launcherUpdates, IGameDetector detector, ILauncherSelfUpdater selfUpdater)
+        ILauncherUpdateService launcherUpdates, IGameDetector detector, ILauncherSelfUpdater selfUpdater,
+        IDxvkNvapiInstaller dxvkNvapi)
     {
         _settings = settings; _locator = locator; _doorstop = doorstop;
         _installer = installer; _launcher = launcher; _version = version; _platform = platform;
         _launcherUpdates = launcherUpdates; _detector = detector;
-        _selfUpdater = selfUpdater;
+        _selfUpdater = selfUpdater; _dxvkNvapi = dxvkNvapi;
         _ = RefreshAsync();
         _ = CheckLauncherUpdateAsync();
     }
@@ -244,8 +246,18 @@ public partial class HomeViewModel : ObservableObject
         if (GameMini is null) { StatusLine = "set the game path first"; return; }
         try
         {
+            var cfg = _settings.Load();   // pick up the latest Settings (esync/fsync/overlay/dxvk-nvapi)
+
+            // Linux: ensure DXVK-NVAPI is in the prefix before launch (best-effort).
+            if (!_platform.IsWindows && cfg.DxvkNvapi && !string.IsNullOrWhiteSpace(cfg.WinePrefix))
+            {
+                try { StatusLine = "checking DXVK-NVAPI…"; StatusLine = await _dxvkNvapi.EnsureAsync(cfg.WinePrefix!); }
+                catch (Exception ex) { StatusLine = $"DXVK-NVAPI skipped: {ex.Message}"; }
+            }
+
             var exe = StarLauncherExe(GameMini);
-            var request = new LaunchRequest(exe, _cfg.Runner, _cfg.WinePrefix, _detector.DetectUmu());
+            var request = new LaunchRequest(exe, cfg.Runner, cfg.WinePrefix, _detector.DetectUmu(),
+                Esync: cfg.Esync, Fsync: cfg.Fsync, FpsOverlay: cfg.FpsOverlay, DxvkNvapi: cfg.DxvkNvapi);
             StatusLine = "launching…";
             var proc = _launcher.Launch(request);
             if (proc is null) { StatusLine = "launch failed: process did not start"; return; }

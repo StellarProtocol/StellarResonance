@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.Core.Platform;
 using StellarLauncher.Core.Services;
 
 namespace StellarLauncher.App.ViewModels;
@@ -16,12 +17,21 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _detectStatus = "";
     [ObservableProperty] private bool _testingChannel;
 
-    public SettingsViewModel(ISettingsStore settings, IGameLocator locator, IGameDetector detector)
+    // Linux launch tweaks
+    public bool IsLinux { get; }
+    [ObservableProperty] private bool _esync;
+    [ObservableProperty] private bool _fsync;
+    [ObservableProperty] private bool _fpsOverlay;
+    [ObservableProperty] private bool _dxvkNvapi;
+
+    public SettingsViewModel(ISettingsStore settings, IGameLocator locator, IGameDetector detector, IPlatformInfo platform)
     {
         _settings = settings; _locator = locator; _detector = detector;
+        IsLinux = !platform.IsWindows;
         var cfg = settings.Load();
         _gameMiniDir = cfg.GameMiniDir; _runner = cfg.Runner; _winePrefix = cfg.WinePrefix;
         _testingChannel = ChannelManifests.IsTesting(cfg.Channel);
+        _esync = cfg.Esync; _fsync = cfg.Fsync; _fpsOverlay = cfg.FpsOverlay; _dxvkNvapi = cfg.DxvkNvapi;
         if (string.IsNullOrWhiteSpace(_gameMiniDir)) RunDetect();   // auto-detect on first open
     }
 
@@ -64,6 +74,7 @@ public partial class SettingsViewModel : ObservableObject
         var cfg = _settings.Load();
         cfg.GameMiniDir = GameMiniDir; cfg.Runner = Runner; cfg.WinePrefix = WinePrefix;
         cfg.Channel = TestingChannel ? "testing" : "stable";
+        cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay; cfg.DxvkNvapi = DxvkNvapi;
         _settings.Save(cfg);
     }
 
