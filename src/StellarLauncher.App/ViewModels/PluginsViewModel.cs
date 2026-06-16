@@ -55,14 +55,18 @@ public partial class PluginsViewModel : ObservableObject
         {
             var entries = await _registry.FetchAllAsync(urls);
             Plugins.Clear();
-            foreach (var e in entries.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
+            foreach (var e in entries.OrderBy(p => p.Name ?? "", StringComparer.OrdinalIgnoreCase))
             {
-                // Installed if the plugin's DLL is present anywhere under stellar/plugins (adopts
-                // old-launcher installs); the version is known only when our marker is present.
-                var dll = CanonicalDll(e);
-                var installed = gameMini is not null && dll is not null && _installer.FindInstalledDll(gameMini, dll) is not null;
-                var version = gameMini is null ? null : _installer.InstalledVersion(gameMini, e.Id);
-                Plugins.Add(new PluginItemViewModel(e, installed, version, framework, this));
+                try
+                {
+                    // Installed if the plugin's DLL is present anywhere under stellar/plugins (adopts
+                    // old-launcher installs); the version is known only when our marker is present.
+                    var dll = CanonicalDll(e);
+                    var installed = gameMini is not null && dll is not null && _installer.FindInstalledDll(gameMini, dll) is not null;
+                    var version = gameMini is null ? null : _installer.InstalledVersion(gameMini, e.Id);
+                    Plugins.Add(new PluginItemViewModel(e, installed, version, framework, this));
+                }
+                catch { /* skip a malformed entry rather than failing the whole list */ }
             }
             Status = Plugins.Count == 0 ? "No plugins found." : $"{Plugins.Count} plugins available.";
         }
@@ -109,9 +113,10 @@ public partial class PluginsViewModel : ObservableObject
     // Canonical DLL filename for a plugin (from its newest version), for install/detect/remove.
     private static string? CanonicalDll(StellarLauncher.Core.Model.PluginEntry e)
     {
-        if (e.Versions.Count == 0) return null;
+        if (e.Versions is null || e.Versions.Count == 0) return null;
         var v = e.Versions[0];
-        return v.Dll ?? Path.GetFileName(new Uri(v.DllUrl).LocalPath);
+        if (!string.IsNullOrEmpty(v.Dll)) return v.Dll;
+        return Uri.TryCreate(v.DllUrl, UriKind.Absolute, out var u) ? Path.GetFileName(u.LocalPath) : null;
     }
 
     [RelayCommand]

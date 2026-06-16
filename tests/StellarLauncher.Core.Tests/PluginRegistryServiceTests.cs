@@ -65,6 +65,35 @@ public class PluginRegistryServiceTests
         Assert.True(byId.ContainsKey("playerhud"));
     }
 
+    private sealed class FlakyHandler : HttpMessageHandler
+    {
+        private readonly int _failFirst; private readonly string _body;
+        public int Calls { get; private set; }
+        public FlakyHandler(int failFirst, string body) { _failFirst = failFirst; _body = body; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken c)
+        {
+            if (++Calls <= _failFirst) throw new HttpRequestException("transient");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(_body) });
+        }
+    }
+
+    [Fact]
+    public async Task Retries_a_transient_failure_then_succeeds()
+    {
+        const string body = """
+        { "plugins": [ { "id":"x","name":"X","description":"d","author":"a",
+          "versions":[ {"version":"1.0.0","dll":"Stellar.X.dll","dllUrl":"https://e/Stellar.X-1.0.0.dll","sha256":"s","minModSystemVersion":"1.0.0"} ] } ] }
+        """;
+        var h = new FlakyHandler(failFirst: 2, body);          // fail twice, succeed on the 3rd attempt
+        var svc = new PluginRegistryService(new HttpClient(h));
+
+        var plugins = await svc.FetchAllAsync(new[] { new Uri("https://e/plugins.json") });
+
+        Assert.Single(plugins);
+        Assert.Equal("x", plugins[0].Id);
+        Assert.True(h.Calls >= 3);
+    }
+
     [Fact]
     public async Task Skips_entries_with_no_versions()
     {

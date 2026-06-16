@@ -20,18 +20,28 @@ public sealed class PluginRegistryService : IPluginRegistryService
         var byId = new Dictionary<string, PluginEntry>(StringComparer.OrdinalIgnoreCase);
         foreach (var url in registryUrls)
         {
-            try
+            var registry = await FetchOneAsync(url, ct);   // retries transient failures; null on give-up
+            if (registry?.Plugins is null) continue;
+            foreach (var plugin in registry.Plugins)
             {
-                var registry = await _http.GetFromJsonAsync<PluginRegistry>(url, PluginRegistry.JsonOptions, ct);
-                if (registry?.Plugins is null) continue;
-                foreach (var plugin in registry.Plugins)
-                {
-                    if (plugin.Versions is null || plugin.Versions.Count == 0) continue;  // skip malformed/legacy entries
-                    byId[plugin.Id] = plugin;                                             // later registries override
-                }
+                if (plugin is null || string.IsNullOrWhiteSpace(plugin.Id)) continue;     // guard malformed entries
+                if (plugin.Versions is null || plugin.Versions.Count == 0) continue;      // skip legacy/empty
+                byId[plugin.Id] = plugin;                                                 // later registries override
             }
-            catch { /* unreachable or invalid registry — skip it */ }
         }
         return byId.Values.ToList();
+    }
+
+    // Fetch one registry, retrying a couple of times so a transient network blip at startup
+    // doesn't drop the whole catalog. Returns null if it can't be loaded (unreachable/invalid).
+    private async Task<PluginRegistry?> FetchOneAsync(Uri url, CancellationToken ct)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try { return await _http.GetFromJsonAsync<PluginRegistry>(url, PluginRegistry.JsonOptions, ct); }
+            catch { /* retry below */ }
+            try { await Task.Delay(250, ct); } catch { return null; }
+        }
+        return null;
     }
 }
