@@ -63,6 +63,20 @@ keeps itself up to date automatically.
 dotnet build StellarLauncher.slnx -c Release
 ```
 
+## Releasing (maintainers)
+
+Fully CI/CD — the launcher has no game dependency, so `ci.yml` builds it and `release.yml` ships it:
+
+```bash
+gh workflow run release.yml -R StellarProtocol/StellarResonance -f version=<v> -f channel=stable
+```
+
+The dispatch `version` is the single source of truth — it's stamped into the assembly (the in-app
+`LauncherVersion` reads it back), so no code edit is needed to bump the version. CI builds Win + Linux,
+uploads the zips + `launcher.json` to the `stellar` MinIO bucket, and creates the GitHub release. Use
+`-f channel=testing` to publish to `launcher-testing.json` without affecting stable users. See the
+DevKit's `docs/release-process.md` for how this fits with the framework + plugin releases.
+
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). Free, open-source software; any
