@@ -18,6 +18,9 @@ public sealed class GameDetector : IGameDetector
     // Registry-derived: <root> is the parent of the StarLauncher install dir (the "Star" folder
     // isn't guaranteed above it), so probe <root>/StarLauncher/game/release_*/game_mini directly.
     private static readonly string[] LauncherSuffix = { "StarLauncher", "game" };
+    // JP StarASIA client under a Wine prefix: <prefix>/drive_c/StarLauncher/game/release_*/game_mini —
+    // i.e. StarLauncher directly under drive_c, with NO "Star" folder (the SEA-only layout has one).
+    private static readonly string[] WineLauncherSuffix = { "drive_c", "StarLauncher", "game" };
 
     private readonly IFileSystem _fs;
     private readonly IGameLocator _locator;
@@ -72,7 +75,7 @@ public sealed class GameDetector : IGameDetector
         var found = new List<string>();
         foreach (var root in _searchRoots())
         {
-            foreach (var suffix in new[] { WineSuffix, NativeSuffix, LauncherSuffix })
+            foreach (var suffix in new[] { WineSuffix, NativeSuffix, LauncherSuffix, WineLauncherSuffix })
             {
                 var parts = new List<string>(suffix.Length + 1) { root };
                 parts.AddRange(suffix);

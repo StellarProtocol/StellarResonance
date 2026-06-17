@@ -66,6 +66,22 @@ public class GameDetectorTests
     }
 
     [Fact]
+    public void Detects_JP_StarASIA_under_a_wine_prefix_without_a_Star_folder()
+    {
+        // JP StarASIA under Wine: <prefix>/drive_c/StarLauncher/game/release_*/game_mini — StarLauncher
+        // directly under drive_c, no "Star" parent. The prefix dir is the search root (AddChildren on Linux).
+        var fs = new MockFileSystem();
+        fs.AddDirectory("/opt/game/BPJP/drive_c/StarLauncher/game/release_2.11/game_mini");
+        var detector = new GameDetector(fs, new GameLocator(fs), () => new[] { "/opt/game/BPJP" });
+
+        var found = detector.Detect();
+
+        Assert.Contains(
+            fs.Path.Combine("/opt/game/BPJP", "drive_c", "StarLauncher", "game", "release_2.11", "game_mini"),
+            found);
+    }
+
+    [Fact]
     public void Returns_empty_when_nothing_matches()
     {
         var fs = new MockFileSystem();
