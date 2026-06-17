@@ -62,7 +62,9 @@ public partial class App : Application
 
         void AddChildren(string dir)
         {
-            if (fs.Directory.Exists(dir)) roots.AddRange(fs.Directory.GetDirectories(dir));
+            // Never let one unreadable/flaky dir (permission-denied drive root, disconnected mount) abort detection.
+            try { if (fs.Directory.Exists(dir)) roots.AddRange(fs.Directory.GetDirectories(dir)); }
+            catch { /* skip this dir */ }
         }
 
         if (platform.IsWindows)
@@ -73,6 +75,10 @@ public partial class App : Application
             foreach (var drive in EnumerateWindowsDriveRoots(fs))
             {
                 roots.Add(drive);
+                // Immediate subfolders of the drive — the JP StarASIA client installs to an arbitrary
+                // top-level folder (e.g. E:\bpsr\StarLauncher\game\…, no "Star" parent), so adding each
+                // drive child as a root lets GameDetector's StarLauncher\game suffix resolve it.
+                AddChildren(drive);
                 roots.Add(fs.Path.Combine(drive, "Program Files"));
                 roots.Add(fs.Path.Combine(drive, "Program Files (x86)"));
                 roots.Add(fs.Path.Combine(drive, "Games"));

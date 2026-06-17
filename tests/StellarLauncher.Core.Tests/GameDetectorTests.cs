@@ -49,6 +49,23 @@ public class GameDetectorTests
     }
 
     [Fact]
+    public void Detects_JP_StarASIA_install_under_an_arbitrary_drive_subfolder()
+    {
+        // JP StarASIA client: <drive>\<arbitrary>\StarLauncher\game\release_*\game_mini (e.g.
+        // E:\bpsr\StarLauncher\…) — no "Star" parent. BuildSearchRoots surfaces each drive's children, so the
+        // arbitrary parent folder ("bpsr") becomes a search root and LauncherSuffix resolves the install.
+        var fs = new MockFileSystem();
+        fs.AddDirectory("/e/bpsr/StarLauncher/game/release_2.11/game_mini");
+        var detector = new GameDetector(fs, new GameLocator(fs), () => new[] { "/e/bpsr" });
+
+        var found = detector.Detect();
+
+        Assert.Contains(
+            fs.Path.Combine("/e/bpsr", "StarLauncher", "game", "release_2.11", "game_mini"),
+            found);
+    }
+
+    [Fact]
     public void Returns_empty_when_nothing_matches()
     {
         var fs = new MockFileSystem();
