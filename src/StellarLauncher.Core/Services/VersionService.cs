@@ -42,5 +42,16 @@ public sealed class VersionService : IVersionService
         return true;
     }
 
-    private static Version Parse(string v) => Version.Parse(v.TrimStart('v', 'V'));
+    // Parse a version, tolerating a leading "v" and a SemVer pre-release / build suffix
+    // ("1.2.3-rc.1", "0.0.0-dev", "1.2.3+<sha>"). System.Version only accepts numeric dotted
+    // components, so a pre-release build (e.g. the launcher's own "0.0.0-dev") otherwise threw a
+    // FormatException — which surfaced as the launcher going "offline". Never throws: an
+    // unparseable value falls back to 0.0 (oldest), matching GameLocator's release-dir parsing.
+    private static Version Parse(string v)
+    {
+        var s = (v ?? string.Empty).TrimStart('v', 'V');
+        var cut = s.IndexOfAny(new[] { '-', '+' });
+        if (cut >= 0) s = s.Substring(0, cut);
+        return Version.TryParse(s, out var ver) ? ver : new Version(0, 0);
+    }
 }

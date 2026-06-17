@@ -59,4 +59,17 @@ public class VersionServiceTests
     [InlineData("1.1.0", "1.0.0", false)] // launcher older than required
     public void LauncherSupported(string minLauncher, string launcher, bool expected)
         => Assert.Equal(expected, VersionService.LauncherSupported(minLauncher, launcher));
+
+    [Theory]
+    [InlineData("1.2.3", "1.2.3-rc.1", false)]   // pre-release build of the SAME version is NOT newer
+    [InlineData("1.2.4", "1.2.3-dev", true)]     // pre-release suffix doesn't break the comparison
+    [InlineData("v1.2.0+abc123", "1.1.0", true)] // leading "v" + "+build" metadata tolerated
+    public void IsNewer_tolerates_prerelease_and_build_metadata(string remote, string installed, bool expected)
+        => Assert.Equal(expected, VersionService.IsNewer(remote, installed));
+
+    [Theory]
+    [InlineData("1.0.0", "1.2.99-dev", true)]    // a "-dev" launcher build still satisfies the min (the 0-dev bug)
+    [InlineData("1.0.0", "0.0.0-dev", false)]    // 0.0.0-dev parses (no throw) and is below min
+    public void LauncherSupported_tolerates_prerelease(string minLauncher, string launcher, bool expected)
+        => Assert.Equal(expected, VersionService.LauncherSupported(minLauncher, launcher));
 }
