@@ -9,6 +9,12 @@
       <TextBlock Text="{Binding LauncherVersionLabel}" Foreground="#8a93b2" FontSize="12" VerticalAlignment="Bottom"/>
     </StackPanel>
 
+    <Border IsVisible="{Binding GameMiniDir, Converter={x:Static StringConverters.IsNullOrEmpty}}"
+            Background="#1c2740" BorderBrush="#3a4f7a" BorderThickness="1" CornerRadius="8" Padding="12,10">
+      <TextBlock TextWrapping="Wrap" Foreground="#cfe0ff" FontSize="12"
+                 Text="👋 Set your game folder to get started — click Detect, or Browse to your install: the official …\game\release_x\game_mini folder, or your Steam &quot;Blue Protocol Star Resonance&quot; folder."/>
+    </Border>
+
     <TextBlock Text="Game (game_mini directory)" Foreground="#8a93b2"/>
     <Grid ColumnDefinitions="*,Auto,Auto">
       <TextBox Grid.Column="0" Text="{Binding GameMiniDir}"
@@ -55,6 +61,6 @@
     <CheckBox IsChecked="{Binding DebugLogging}" Content="Debug logging (game console + crash-flush)"
               ToolTip.Tip="Off (default) = prod: no BepInEx console, buffered disk logging — fastest. On = console window + instant-flush logging for crash triage. Applied to BepInEx.cfg on launch."/>
 
-    <Button Content="Save" Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,6,0,0"/>
+    <TextBlock Text="Changes save automatically." Foreground="#4a5273" FontSize="11" Margin="0,6,0,0"/>
   </StackPanel>
 </UserControl>

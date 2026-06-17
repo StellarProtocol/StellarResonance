@@ -14,12 +14,19 @@ public sealed class GameLauncher : IGameLauncher
     public ProcessStartInfo BuildStartInfo(LaunchRequest r)
     {
         if (_platform.IsWindows)
+        {
+            // Steam install: hand off to Steam (same as clicking Play) so the game gets a real Steam
+            // session — launching the exe directly failed and starved the combat-traffic capture.
+            if (!string.IsNullOrEmpty(r.SteamAppId))
+                return new ProcessStartInfo { FileName = $"steam://rungameid/{r.SteamAppId}", UseShellExecute = true };
+
             return new ProcessStartInfo
             {
                 FileName = r.StarLauncherExe,
                 UseShellExecute = true,
                 WorkingDirectory = Path.GetDirectoryName(r.StarLauncherExe) ?? "",
             };
+        }
 
         if (string.IsNullOrEmpty(r.Runner) || string.IsNullOrEmpty(r.WinePrefix))
             throw new InvalidOperationException("Linux launch needs a Runner + WINEPREFIX (set them in Settings)");

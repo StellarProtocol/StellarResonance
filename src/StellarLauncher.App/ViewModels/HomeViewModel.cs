@@ -40,6 +40,7 @@ public partial class HomeViewModel : ObservableObject
     private readonly IBepInExConfig _bepinex;
 
     [ObservableProperty] private string _gameStatus = "Detecting…";
+    [ObservableProperty] private bool _needsGameSetup;   // true when no game is set — drives onboarding
     [ObservableProperty] private string _frameworkStatus = "—";
     [ObservableProperty] private string _statusLine = "";
     [ObservableProperty] private bool _modded = true;
@@ -162,7 +163,9 @@ public partial class HomeViewModel : ObservableObject
 
         Modded = _cfg.Modded;
 
-        GameStatus = GameMini is { } g && Directory.Exists(g) ? g : "Not found — set it in Settings";
+        var haveGame = GameMini is { } g && Directory.Exists(g);
+        NeedsGameSetup = !haveGame;
+        GameStatus = haveGame ? GameMini! : "Not found — set it in Settings";
 
         _installedFramework = GameMini is null ? null : _installer.ReadInstalledVersion(GameMini);
         FrameworkStatus = _installedFramework is null ? "Not installed" : $"v{_installedFramework} installed";
@@ -275,12 +278,16 @@ public partial class HomeViewModel : ObservableObject
                 catch (Exception ex) { StatusLine = $"DXVK-NVAPI skipped: {ex.Message}"; }
             }
 
+            // Steam install (Windows): launch via Steam so the game gets a real session.
+            var steamAppId = _platform.IsWindows ? TryGetSteamAppId(GameMini) : null;
             var exe = StarLauncherExe(GameMini);
             var request = new LaunchRequest(exe, cfg.Runner, cfg.WinePrefix, _detector.DetectUmu(),
                 Esync: cfg.Esync, Fsync: cfg.Fsync, FpsOverlay: cfg.FpsOverlay, DxvkNvapi: cfg.DxvkNvapi,
-                StellarPerf: cfg.StellarPerf);
+                StellarPerf: cfg.StellarPerf, SteamAppId: steamAppId);
             StatusLine = "launching…";
             var proc = _launcher.Launch(request);
+
+            if (steamAppId is not null) { StatusLine = "launching via Steam…"; return; }   // Steam hands off — nothing to monitor
             if (proc is null) { StatusLine = "launch failed: process did not start"; return; }
 
             // Give the runner a moment; if it dies fast, surface the failure instead of a frozen "launching…".
@@ -320,5 +327,25 @@ public partial class HomeViewModel : ObservableObject
 
         // Nothing resolved — return the official path so any error names a sensible target.
         return Path.Combine(starLauncherDir ?? gameMini, "StarLauncher.exe");
+    }
+
+    // If gameMini is a Steam install (…\steamapps\common\<Game>), find its app id from the sibling
+    // appmanifest_<id>.acf so we can launch via Steam. Null when it isn't a Steam library path.
+    private static string? TryGetSteamAppId(string gameMini)
+    {
+        var common = Directory.GetParent(gameMini.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        var steamapps = common?.Parent;
+        if (common is null || steamapps is null) return null;
+        if (!string.Equals(common.Name, "common", StringComparison.OrdinalIgnoreCase)) return null;
+        if (!string.Equals(steamapps.Name, "steamapps", StringComparison.OrdinalIgnoreCase)) return null;
+
+        var leaf = Path.GetFileName(gameMini.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        try
+        {
+            foreach (var acf in Directory.EnumerateFiles(steamapps.FullName, "appmanifest_*.acf"))
+                if (SteamAcf.AppIdForInstallDir(File.ReadAllText(acf), leaf) is { } id) return id;
+        }
+        catch { /* unreadable library — fall back to direct launch */ }
+        return null;
     }
 }

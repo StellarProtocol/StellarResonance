@@ -74,8 +74,20 @@ public partial class SettingsViewModel : ObservableObject
             : $"Found {found.Count} installs — picked the first ({what}); Browse to choose another.";
     }
 
-    [RelayCommand]
-    private void Save()
+    // Every Settings field auto-saves on change — there is no Save button. The ctor sets the backing
+    // fields directly (not via the property setters), so none of these fire during initialization.
+    partial void OnGameMiniDirChanged(string? value) => Persist();
+    partial void OnRunnerChanged(string? value) => Persist();
+    partial void OnWinePrefixChanged(string? value) => Persist();
+    partial void OnEsyncChanged(bool value) => Persist();
+    partial void OnFsyncChanged(bool value) => Persist();
+    partial void OnFpsOverlayChanged(bool value) => Persist();
+    partial void OnStellarPerfChanged(bool value) => Persist();
+    partial void OnDxvkNvapiChanged(bool value) => Persist();
+    partial void OnTestingChannelChanged(bool value) => Persist();
+    partial void OnDebugLoggingChanged(bool value) => Persist();
+
+    private void Persist()
     {
         var cfg = _settings.Load();
         cfg.GameMiniDir = GameMiniDir; cfg.Runner = Runner; cfg.WinePrefix = WinePrefix;
@@ -83,26 +95,6 @@ public partial class SettingsViewModel : ObservableObject
         cfg.DebugLogging = DebugLogging;
         cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay;
         cfg.StellarPerf = StellarPerf; cfg.DxvkNvapi = DxvkNvapi;
-        _settings.Save(cfg);
-    }
-
-    // Toggles persist immediately — no separate Save click needed (ctor sets backing fields, so
-    // these don't fire during init). The text fields (paths) still persist via Save.
-    partial void OnEsyncChanged(bool value) => PersistToggles();
-    partial void OnFsyncChanged(bool value) => PersistToggles();
-    partial void OnFpsOverlayChanged(bool value) => PersistToggles();
-    partial void OnStellarPerfChanged(bool value) => PersistToggles();
-    partial void OnDxvkNvapiChanged(bool value) => PersistToggles();
-    partial void OnTestingChannelChanged(bool value) => PersistToggles();
-    partial void OnDebugLoggingChanged(bool value) => PersistToggles();
-
-    private void PersistToggles()
-    {
-        var cfg = _settings.Load();   // preserve on-disk paths; only update the toggles + channel
-        cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay;
-        cfg.StellarPerf = StellarPerf; cfg.DxvkNvapi = DxvkNvapi;
-        cfg.Channel = TestingChannel ? "testing" : "stable";
-        cfg.DebugLogging = DebugLogging;
         _settings.Save(cfg);
     }
 
