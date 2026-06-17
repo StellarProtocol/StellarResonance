@@ -3,6 +3,7 @@
              xmlns:vm="using:StellarLauncher.App.ViewModels"
              x:Class="StellarLauncher.App.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
   <StackPanel Margin="28" Spacing="14">
     <StackPanel Orientation="Horizontal" Spacing="10">
       <TextBlock Text="Settings" Foreground="White" FontSize="20" FontWeight="Bold"/>
@@ -63,4 +64,5 @@
 
     <TextBlock Text="Changes save automatically." Foreground="#4a5273" FontSize="11" Margin="0,6,0,0"/>
   </StackPanel>
+  </ScrollViewer>
 </UserControl>
