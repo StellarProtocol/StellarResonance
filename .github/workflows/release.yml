@@ -81,9 +81,9 @@ jobs:
             "version": "${{ inputs.version }}",
             "date": "$(date -u +%Y-%m-%d)",
             "channel": "${{ inputs.channel }}",
-            "windowsUrl": "https://minio.revette.io/stellar/$SUBDIR/StellarLauncher-win-x64.zip",
+            "windowsUrl": "https://cdn.revette.io/$SUBDIR/StellarLauncher-win-x64.zip",
             "windowsSha256": "$WIN_SHA",
-            "linuxUrl": "https://minio.revette.io/stellar/$SUBDIR/StellarLauncher-linux-x64.zip",
+            "linuxUrl": "https://cdn.revette.io/$SUBDIR/StellarLauncher-linux-x64.zip",
             "linuxSha256": "$LINUX_SHA",
             "notes": "Stellar Launcher ${{ inputs.version }} (${{ inputs.channel }})"
           }
@@ -94,19 +94,19 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_KEY }}
-          AWS_DEFAULT_REGION: sa-east-1
+          AWS_DEFAULT_REGION: auto
           AWS_REQUEST_CHECKSUM_CALCULATION: when_required
           AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
         run: |
           aws s3 cp StellarLauncher-win-x64.zip \
-            "s3://stellar/$SUBDIR/StellarLauncher-win-x64.zip" \
-            --endpoint-url https://minio.revette.io
+            "s3://cdn/$SUBDIR/StellarLauncher-win-x64.zip" \
+            --endpoint-url https://757f61fd2bda67f9a3bc7c3b9b8d62e1.r2.cloudflarestorage.com
           aws s3 cp StellarLauncher-linux-x64.zip \
-            "s3://stellar/$SUBDIR/StellarLauncher-linux-x64.zip" \
-            --endpoint-url https://minio.revette.io
+            "s3://cdn/$SUBDIR/StellarLauncher-linux-x64.zip" \
+            --endpoint-url https://757f61fd2bda67f9a3bc7c3b9b8d62e1.r2.cloudflarestorage.com
           aws s3 cp launcher.json \
-            "s3://stellar/$MANIFEST" \
-            --endpoint-url https://minio.revette.io
+            "s3://cdn/$MANIFEST" \
+            --endpoint-url https://757f61fd2bda67f9a3bc7c3b9b8d62e1.r2.cloudflarestorage.com
 
       # ---- GitHub Release: new-user download page (STABLE channel only), CURRENT VERSION ONLY ----
       - name: Publish GitHub Release (replace current)

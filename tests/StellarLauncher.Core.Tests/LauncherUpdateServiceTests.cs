@@ -21,8 +21,8 @@ public class LauncherUpdateServiceTests
     {
       "version": "1.2.0",
       "date": "2026-06-08",
-      "windowsUrl": "https://minio.revette.io/stellar/launcher/StellarLauncher-win-x64.zip",
-      "linuxUrl": "https://minio.revette.io/stellar/launcher/StellarLauncher-linux-x64.zip",
+      "windowsUrl": "https://cdn.revette.io/launcher/StellarLauncher-win-x64.zip",
+      "linuxUrl": "https://cdn.revette.io/launcher/StellarLauncher-linux-x64.zip",
       "notes": "faster startup"
     }
     """;
@@ -31,15 +31,15 @@ public class LauncherUpdateServiceTests
     public async Task Fetches_and_parses_launcher_manifest()
     {
         var svc = new LauncherUpdateService(new HttpClient(new StubHandler(Json)));
-        var m = await svc.FetchAsync(new Uri("https://minio.revette.io/stellar/launcher.json"));
+        var m = await svc.FetchAsync(new Uri("https://cdn.revette.io/launcher.json"));
         Assert.Equal("1.2.0", m.Version);
         Assert.Equal("2026-06-08", m.Date);
         Assert.Equal("faster startup", m.Notes);
     }
 
     [Theory]
-    [InlineData(true,  "https://minio.revette.io/stellar/launcher/StellarLauncher-win-x64.zip")]
-    [InlineData(false, "https://minio.revette.io/stellar/launcher/StellarLauncher-linux-x64.zip")]
+    [InlineData(true,  "https://cdn.revette.io/launcher/StellarLauncher-win-x64.zip")]
+    [InlineData(false, "https://cdn.revette.io/launcher/StellarLauncher-linux-x64.zip")]
     public async Task DownloadUrlFor_picks_per_platform(bool isWindows, string expected)
     {
         var svc = new LauncherUpdateService(new HttpClient(new StubHandler(Json)));

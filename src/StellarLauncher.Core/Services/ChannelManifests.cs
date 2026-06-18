@@ -5,7 +5,7 @@ namespace StellarLauncher.Core.Services;
 /// <summary>Maps an update channel to the MinIO manifest URLs the launcher fetches.</summary>
 public static class ChannelManifests
 {
-    private const string Base = "https://minio.revette.io/stellar";
+    private const string Base = "https://cdn.revette.io";
 
     public static bool IsTesting(string? channel)
         => string.Equals(channel, "testing", StringComparison.OrdinalIgnoreCase);
