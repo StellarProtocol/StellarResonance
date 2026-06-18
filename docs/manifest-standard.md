@@ -7,8 +7,13 @@ release workflow, and the plugin registry) must follow.
 All version strings are dotted semver-ish (`MAJOR.MINOR.PATCH`, optional leading `v`). Comparison
 is numeric per component (`System.Version`). Dates are `YYYY-MM-DD` (UTC).
 
-Channels: a `…-testing.json` sibling mirrors each manifest for the `testing` channel. The launcher
-only ever reads manifests for the channel selected in Settings; versions never cross channels.
+Channels: each producer emits a `…-testing.json` sibling for the `testing` channel alongside the
+stable file. The launcher only ever reads the file for the channel selected in Settings. For the
+**launcher** and **framework**, the testing file is a parallel history. For **plugins**, the testing
+file is a **superset**: `plugins-testing.json` carries *every* version of *every* plugin (stable +
+testing), while `plugins.json` carries only the stable versions — so a single plugin can offer a
+beta and a proven release at once on the testing channel. How the two plugin files are *produced*
+from source manifests is in § 3.1.
 
 ---
 
@@ -77,6 +82,9 @@ runs on** so the launcher can gate it against the installed/selected framework.
           "sha256": "<hex sha256 of the dll>",
           "minModSystemVersion": "1.4.0",
           "maxModSystemVersion": null,
+          "sourceRepository": "https://github.com/StellarProtocol/StellarPartyOverlayPlugin.git",
+          "sourceCommit": "<full 40-char sha CI built>",
+          "sourceTag": "v2.1.0",
           "changelog": { "added": ["…"], "changed": [], "fixed": ["…"], "removed": [] }
         },
         { "version": "2.0.0", "...": "…" }
@@ -95,6 +103,35 @@ runs on** so the launcher can gate it against the installed/selected framework.
 - `minModSystemVersion` — **required**. The lowest framework version this plugin build runs on.
 - `maxModSystemVersion` — optional (`null` = no upper bound). Set it when a later framework release
   breaks the plugin, so the launcher steers users to a newer plugin build instead.
+- `sourceRepository` / `sourceCommit` — **provenance** for curated plugins built by CI from a pinned
+  public repo (DIP17 model): the repo and the exact commit the binary was built from. `sourceCommit`
+  is authoritative.
+- `sourceTag` — optional, **display-only** provenance. CI verifies the tag resolves to `sourceCommit`
+  but never builds from a tag alone (tags are mutable; the pinned commit is not).
+
+### 3.1 Source registry (how `plugins.json` is produced)
+
+The published files above are **built by CI** (`StellarResonancePlugins/tools/build-registry.py`) from
+**source manifests** in that repo — they are not hand-edited. The registry holds **manifests only**; each
+plugin's binary is built from its own pinned public repo in an isolated container. The source is a
+**two-file-per-plugin** model so one plugin can be live on stable **and** testing simultaneously:
+
+- **`plugins/<id>/manifest.json`** — canonical record: the shared fields + one version. Fields:
+  `id, name, description, author, dll, repository, commit, [tag], projectPath, version,
+  minModSystemVersion, [maxModSystemVersion], [capPriorVersionsAt], [channel], [date], [changelog]`.
+  Optional `channel` (default `"stable"`) is the channel of *this* version — set `"testing"` for a
+  not-yet-stable plugin.
+- **`plugins/<id>/manifest.testing.json`** — *optional* sibling: a second, **testing-channel** build.
+  It **inherits the shared fields** (`id`/`name`/`description`/`author`/`dll`/`repository`/`projectPath`)
+  from `manifest.json` and may set **only** version-specific overrides
+  (`version, commit, [tag], minModSystemVersion, [maxModSystemVersion], [capPriorVersionsAt], [date],
+  [changelog]`). Shared metadata therefore lives in exactly one place and cannot drift.
+
+`build-registry.py` merges each plugin's current version(s) into the **published history** (newest
+first, old versions never dropped — rollback), splits by channel (stable → `plugins.json`; all →
+`plugins-testing.json`), and uploads each DLL under a version-specific key. `capPriorVersionsAt`
+retro-caps older published versions' `maxModSystemVersion` (when still null) at the named framework
+version. See `StellarResonancePlugins/CONTRIBUTING.md` for the contributor flow and lifecycle scripts.
 
 ### Compatibility rule
 
