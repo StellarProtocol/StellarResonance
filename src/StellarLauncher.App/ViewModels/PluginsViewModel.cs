@@ -13,8 +13,6 @@ namespace StellarLauncher.App.ViewModels;
 
 public partial class PluginsViewModel : ObservableObject
 {
-    private static readonly Uri CuratedRegistry = new("https://minio.revette.io/stellar/plugins.json");
-
     private readonly IPluginRegistryService _registry;
     private readonly IPluginInstaller _installer;
     private readonly IInstaller _frameworkInstaller;   // to read the installed framework version (compat)
@@ -41,7 +39,8 @@ public partial class PluginsViewModel : ObservableObject
         var cfg = _settings.Load();
         var gameMini = cfg.GameMiniDir;
 
-        var urls = new List<Uri> { CuratedRegistry };
+        // Curated registry for the selected channel (stable → plugins.json, testing → plugins-testing.json).
+        var urls = new List<Uri> { ChannelManifests.PluginRegistry(cfg.Channel) };
         Repos.Clear();
         foreach (var repo in cfg.ExtraPluginRepos)
         {

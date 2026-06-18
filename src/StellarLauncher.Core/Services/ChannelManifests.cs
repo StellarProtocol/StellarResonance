@@ -15,4 +15,8 @@ public static class ChannelManifests
 
     public static Uri LauncherManifest(string? channel)
         => new($"{Base}/{(IsTesting(channel) ? "launcher-testing.json" : "launcher.json")}");
+
+    /// <summary>Curated plugin registry for the channel. testing = a superset (stable + testing-only plugins).</summary>
+    public static Uri PluginRegistry(string? channel)
+        => new($"{Base}/{(IsTesting(channel) ? "plugins-testing.json" : "plugins.json")}");
 }
