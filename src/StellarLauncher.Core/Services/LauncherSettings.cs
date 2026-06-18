@@ -12,6 +12,7 @@ public sealed class LauncherSettings
     public List<string> ExtraPluginRepos { get; set; } = new();
     public string Channel { get; set; } = "stable";   // "stable" | "testing"
     public bool DebugLogging { get; set; } = false;    // off = prod BepInEx.cfg (no console, buffered); on = console + crash-flush
+    public int LastInteropCount { get; set; } = 0;     // interop assemblies generated last run; seeds the launch-progress estimate
 
     // Linux launch tweaks (applied when launching through the Wine/Proton runner).
     public bool Esync { get; set; } = true;            // WINEESYNC / PROTON_NO_ESYNC

@@ -157,7 +157,8 @@
       <Grid ColumnDefinitions="*,Auto,Auto" Margin="24,0">
         <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="5" Margin="0,0,16,0">
           <TextBlock Text="{Binding StatusLine}" Foreground="#8a93b2" FontSize="12"/>
-          <ProgressBar IsVisible="{Binding IsFrameworkDownloading}" Value="{Binding DownloadPercent}"
+          <ProgressBar IsVisible="{Binding FooterProgressVisible}" Value="{Binding DownloadPercent}"
+                       IsIndeterminate="{Binding LaunchProgressIndeterminate}"
                        Minimum="0" Maximum="100" Height="4" Foreground="#5b8cff" Background="#1c2740"/>
           <TextBlock Text="{Binding LauncherVersionLabel}" Foreground="#4a5273" FontSize="10"/>
         </StackPanel>

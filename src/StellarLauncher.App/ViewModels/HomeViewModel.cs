@@ -38,6 +38,7 @@ public partial class HomeViewModel : ObservableObject
     private readonly ILauncherSelfUpdater _selfUpdater;
     private readonly IDxvkNvapiInstaller _dxvkNvapi;
     private readonly IBepInExConfig _bepinex;
+    private readonly IInteropWatch _interop;
 
     [ObservableProperty] private string _gameStatus = "Detecting…";
     [ObservableProperty] private bool _needsGameSetup;   // true when no game is set — drives onboarding
@@ -49,7 +50,14 @@ public partial class HomeViewModel : ObservableObject
     [ObservableProperty] private string _launcherUpdateText = "";
     [ObservableProperty] private bool _isLauncherDownloading;   // drives the banner progress bar
     [ObservableProperty] private bool _isFrameworkDownloading;  // drives the footer progress bar
-    [ObservableProperty] private double _downloadPercent;       // 0..100; shared (one download at a time)
+    [ObservableProperty] private bool _isPreparingLaunch;       // first-run/post-update interop generation in progress
+    [ObservableProperty] private bool _launchProgressIndeterminate;  // slow in-memory gen phase: animate (no count yet)
+    [ObservableProperty] private double _downloadPercent;       // 0..100; shared (one download/gen at a time)
+
+    /// <summary>Footer progress bar shows during a framework download OR interop (re)generation.</summary>
+    public bool FooterProgressVisible => IsFrameworkDownloading || IsPreparingLaunch;
+    partial void OnIsFrameworkDownloadingChanged(bool value) => OnPropertyChanged(nameof(FooterProgressVisible));
+    partial void OnIsPreparingLaunchChanged(bool value) => OnPropertyChanged(nameof(FooterProgressVisible));
 
     // Framework version picker.
     [ObservableProperty] private VersionManifest? _selectedVersion;   // bound to the ComboBox
@@ -69,12 +77,12 @@ public partial class HomeViewModel : ObservableObject
     public HomeViewModel(ISettingsStore settings, IGameLocator locator, IDoorstopToggle doorstop,
         IInstaller installer, IGameLauncher launcher, IVersionService version, IPlatformInfo platform,
         ILauncherUpdateService launcherUpdates, IGameDetector detector, ILauncherSelfUpdater selfUpdater,
-        IDxvkNvapiInstaller dxvkNvapi, IBepInExConfig bepinex)
+        IDxvkNvapiInstaller dxvkNvapi, IBepInExConfig bepinex, IInteropWatch interop)
     {
         _settings = settings; _locator = locator; _doorstop = doorstop;
         _installer = installer; _launcher = launcher; _version = version; _platform = platform;
         _launcherUpdates = launcherUpdates; _detector = detector;
-        _selfUpdater = selfUpdater; _dxvkNvapi = dxvkNvapi; _bepinex = bepinex;
+        _selfUpdater = selfUpdater; _dxvkNvapi = dxvkNvapi; _bepinex = bepinex; _interop = interop;
         _ = RefreshAsync();
         _ = CheckLauncherUpdateAsync();
     }
@@ -290,6 +298,14 @@ public partial class HomeViewModel : ObservableObject
             if (steamAppId is not null) { StatusLine = "launching via Steam…"; return; }   // Steam hands off — nothing to monitor
             if (proc is null) { StatusLine = "launch failed: process did not start"; return; }
 
+            // First launch / post-update: BepInEx regenerates IL2CPP interop assemblies (2-3 min) with
+            // no visible window. Surface live progress from the interop dir instead of a silent wait.
+            if (GameMini is { } gm && _interop.RegenExpected(gm))
+            {
+                await MonitorInteropGenerationAsync(gm, proc);
+                return;
+            }
+
             // Give the runner a moment; if it dies fast, surface the failure instead of a frozen "launching…".
             await Task.Delay(2500);
             StatusLine = proc.HasExited && proc.ExitCode != 0
@@ -297,6 +313,72 @@ public partial class HomeViewModel : ObservableObject
                 : "game running";
         }
         catch (Exception ex) { StatusLine = $"launch failed: {ex.Message}"; }
+    }
+
+    // Watch BepInEx regenerate its IL2CPP interop assemblies, driving the footer progress bar from the
+    // interop dir's file count. Completes when the file set settles (generation done → the game proceeds
+    // to open its window) or the process exits. Console-independent: works with the BepInEx console off.
+    private async Task MonitorInteropGenerationAsync(string gameMiniDir, System.Diagnostics.Process proc)
+    {
+        const int settleSeconds = 10;    // file writes quiet this long ⇒ generation finished
+        const int timeoutSeconds = 600;  // safety cap so a stall never freezes the status forever
+        const int defaultEstimate = 190; // first-ever run has no prior count to estimate from
+
+        var target = _cfg.LastInteropCount > 0 ? _cfg.LastInteropCount : defaultEstimate;
+        var launchedAt = new DateTimeOffset(DateTime.UtcNow, TimeSpan.Zero);
+        DateTimeOffset? genStartedAt = null;   // set when the first interop assembly is WRITTEN this run
+        try
+        {
+            while (true)
+            {
+                var snap = _interop.Snapshot(gameMiniDir);
+
+                // Files only land in a BURST at the very end: BepInEx's Cpp2IL + Il2CppInteropGen run
+                // in-memory for most of the 2-3 min (the slow part — no .dll written), then write all ~190
+                // at once. So we have two honest phases. Phase 1 (no assembly written since launch yet):
+                // an INDETERMINATE "preparing…" bar with elapsed — the game is still starting / generating
+                // in-memory, and we'd be lying to show a "0/~190" count. Phase 2 (assemblies landing): the
+                // determinate N/~target count. A pre-existing stale set from a prior run never counts as fresh.
+                var freshWrite = snap.NewestWriteUtc is { } nw && nw >= launchedAt;
+                if (genStartedAt is null && !freshWrite)
+                {
+                    IsPreparingLaunch = true;             // show the bar…
+                    LaunchProgressIndeterminate = true;   // …but animated, since there's no count yet
+                    var waited = DateTimeOffset.UtcNow - launchedAt;
+                    StatusLine = $"First launch/update — preparing game interop (can take a few minutes)…  ({waited:m\\:ss})";
+                }
+                else
+                {
+                    genStartedAt ??= DateTimeOffset.UtcNow;
+                    IsPreparingLaunch = true;             // assemblies landing → determinate progress
+                    LaunchProgressIndeterminate = false;
+                    var genElapsed = DateTimeOffset.UtcNow - genStartedAt.Value;
+                    DownloadPercent = target > 0 ? Math.Min(99, snap.Count * 100.0 / target) : 0;
+                    StatusLine = $"First launch/update — generating game interop: {snap.Count}/~{target}  ({genElapsed:m\\:ss})";
+
+                    // Done: nothing written for the settle window after generation actually started.
+                    if (snap.NewestWriteUtc is { } w && (DateTimeOffset.UtcNow - w).TotalSeconds >= settleSeconds)
+                    {
+                        _cfg.LastInteropCount = snap.Count;
+                        _settings.Save(_cfg);
+                        DownloadPercent = 100;
+                        StatusLine = "interop ready — game window opening…";
+                        break;
+                    }
+                }
+
+                if (proc.HasExited)
+                {
+                    StatusLine = proc.ExitCode == 0
+                        ? "game running"
+                        : $"launch failed (runner exited {proc.ExitCode}) — check Runner / WINEPREFIX in Settings";
+                    break;
+                }
+                if ((DateTimeOffset.UtcNow - launchedAt).TotalSeconds >= timeoutSeconds) { StatusLine = "game running"; break; }
+                await Task.Delay(1000);
+            }
+        }
+        finally { IsPreparingLaunch = false; LaunchProgressIndeterminate = false; }
     }
 
     // Resolve the executable to launch, supporting both install layouts:
