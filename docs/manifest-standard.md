@@ -116,16 +116,46 @@ The published files above are **built by CI** (`StellarResonancePlugins/tools/bu
 plugin's binary is built from its own pinned public repo in an isolated container. The source is a
 **two-file-per-plugin** model so one plugin can be live on stable **and** testing simultaneously:
 
-- **`plugins/<id>/manifest.json`** — canonical record: the shared fields + one version. Fields:
-  `id, name, description, author, dll, repository, commit, [tag], projectPath, version,
-  minModSystemVersion, [maxModSystemVersion], [capPriorVersionsAt], [channel], [date], [changelog]`.
-  Optional `channel` (default `"stable"`) is the channel of *this* version — set `"testing"` for a
-  not-yet-stable plugin.
-- **`plugins/<id>/manifest.testing.json`** — *optional* sibling: a second, **testing-channel** build.
-  It **inherits the shared fields** (`id`/`name`/`description`/`author`/`dll`/`repository`/`projectPath`)
-  from `manifest.json` and may set **only** version-specific overrides
-  (`version, commit, [tag], minModSystemVersion, [maxModSystemVersion], [capPriorVersionsAt], [date],
-  [changelog]`). Shared metadata therefore lives in exactly one place and cannot drift.
+**`plugins/<id>/manifest.json`** — canonical record (shared fields + one version):
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | ✓ | unique plugin id; URL-safe (no `/` or `..`) |
+| `name` | string | ✓ | display name |
+| `description` | string | ✓ | one-line summary |
+| `author` | string | ✓ | author handle |
+| `dll` | string | ✓ | canonical assembly filename, e.g. `Stellar.X.dll` (the install name) |
+| `repository` | string (git URL) | ✓¹ | public repo CI clones + builds |
+| `commit` | string (40-hex) | ✓² | **authoritative** pinned commit CI builds + attests |
+| `tag` | string | — | display-only provenance; CI verifies `tag` → `commit`, never builds from it |
+| `projectPath` | string | — | path within the repo to build (default `"."`) |
+| `version` | string (semver) | ✓ | this build's version |
+| `minModSystemVersion` | string (semver) | ✓ | lowest framework version this build runs on |
+| `maxModSystemVersion` | string \| null | — | upper bound; `null`/omitted = none |
+| `capPriorVersionsAt` | string (semver) | — | retro-cap already-published versions' `maxModSystemVersion` at this framework version |
+| `channel` | `"stable"` \| `"testing"` | — | channel of **this** version (default `"stable"`; `"testing"` = the plugin is testing-**only**) |
+| `date` | string `YYYY-MM-DD` | — | release date (UTC) |
+| `changelog` | object | — | `{ added?, changed?, fixed?, removed? }` — arrays of strings |
+
+¹ Required by the curated registry (CI refuses a manifest without a pinned public repo). ² Required whenever `repository` is set.
+
+**`plugins/<id>/manifest.testing.json`** — *optional* sibling: a second, **testing-channel** build. It
+**inherits** the shared fields from `manifest.json` and may set **only** the version-specific fields
+below; any other key is rejected (so shared metadata lives in one place and cannot drift):
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `version` | string (semver) | ✓ | the testing build's version, e.g. `1.2.0-beta` |
+| `commit` | string (40-hex) | ✓ | the testing build's pinned commit |
+| `minModSystemVersion` | string (semver) | ✓ | framework floor for this build |
+| `tag` | string | — | display-only; CI verifies `tag` → `commit` |
+| `date` | string `YYYY-MM-DD` | — | release date |
+| `maxModSystemVersion` | string \| null | — | upper bound |
+| `capPriorVersionsAt` | string (semver) | — | retro-cap prior published versions |
+| `changelog` | object | — | as above |
+
+Inherited from `manifest.json` (do **not** repeat): `id`, `name`, `description`, `author`, `dll`,
+`repository`, `projectPath`.
 
 `build-registry.py` merges each plugin's current version(s) into the **published history** (newest
 first, old versions never dropped — rollback), splits by channel (stable → `plugins.json`; all →
