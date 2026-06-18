@@ -7,6 +7,13 @@ namespace StellarLauncher.Core.Services;
 /// prod/test modes. Prod (default) is the fast path: no console window (under Wine each log line is a
 /// GDI redraw), buffered disk logging. Debug turns the console + instant-flush back on for crash
 /// triage. UnityLogListening is always off — it's a per-frame perf cost with no prod value.
+///
+/// Also owns the framework's <c>game_mini/stellar_perf.flags</c> file: debug writes <c>DIAGNOSTICS</c>
+/// (the framework's per-event diagnostic logging, matching the legacy <c>test</c> mode); prod deletes
+/// the file outright. Deletion is the cleanup for users who came from the early script-based install
+/// or first-released launcher — the legacy <c>test</c>/<c>perf</c> modes left a flags file behind
+/// (<c>DIAGNOSTICS</c>, <c>NO_OVERLAY</c>, <c>UNCAP</c>) that nothing else reconciles, so those flags
+/// stayed silently active even with every launcher toggle off. The launcher owns the file now.
 /// </summary>
 public interface IBepInExConfig
 {
@@ -20,6 +27,8 @@ public sealed class BepInExConfig : IBepInExConfig
 
     public void ApplyMode(string gameMiniDir, bool debug)
     {
+        ApplyDiagnosticsFlag(gameMiniDir, debug);
+
         var path = _fs.Path.Combine(gameMiniDir, "BepInEx", "config", "BepInEx.cfg");
         var consoleAndFlush = debug ? "true" : "false";
 
@@ -50,6 +59,23 @@ public sealed class BepInExConfig : IBepInExConfig
             else if (t.StartsWith("Enabled") && section == "[Logging.Console]") { lines[i] = SetValue(lines[i], consoleAndFlush); changed = true; }
         }
         if (changed) _fs.File.WriteAllLines(path, lines);
+    }
+
+    // Reconcile game_mini/stellar_perf.flags — the framework's launch-flags file (read relative to the
+    // game's cwd, which is game_mini). Debug = just "DIAGNOSTICS" (overwrites any stale NO_OVERLAY/UNCAP
+    // a legacy perf-mode install left behind). Prod = delete the file so no leftover flag stays active.
+    private void ApplyDiagnosticsFlag(string gameMiniDir, bool debug)
+    {
+        var flags = _fs.Path.Combine(gameMiniDir, "stellar_perf.flags");
+        if (debug)
+        {
+            _fs.Directory.CreateDirectory(gameMiniDir);
+            _fs.File.WriteAllLines(flags, new[] { "DIAGNOSTICS" });
+        }
+        else if (_fs.File.Exists(flags))
+        {
+            _fs.File.Delete(flags);
+        }
     }
 
     // Write a minimal BepInEx.cfg with just the logging keys we manage, set for the chosen mode.

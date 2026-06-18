@@ -76,6 +76,34 @@ public class BepInExConfigTests
         Assert.Contains("UnityLogListening = false", lines);   // always off (perf)
     }
 
+    [Fact]
+    public void Debug_writes_diagnostics_flag()
+    {
+        var fs = FsWith(Cfg);
+        new BepInExConfig(fs).ApplyMode("/gm", debug: true);
+        Assert.True(fs.File.Exists("/gm/stellar_perf.flags"));
+        Assert.Contains("DIAGNOSTICS", fs.File.ReadAllLines("/gm/stellar_perf.flags"));
+    }
+
+    [Fact]
+    public void Prod_deletes_leftover_flags_file()
+    {
+        // A user from the legacy script/first launcher: a stale flags file forces DIAGNOSTICS (and here
+        // NO_OVERLAY/UNCAP) active even with the launcher toggle off. Prod must remove it on launch.
+        var fs = FsWith(Cfg);
+        fs.AddFile("/gm/stellar_perf.flags", new MockFileData("DIAGNOSTICS\nNO_OVERLAY\nUNCAP\n"));
+        new BepInExConfig(fs).ApplyMode("/gm", debug: false);
+        Assert.False(fs.File.Exists("/gm/stellar_perf.flags"));
+    }
+
+    [Fact]
+    public void Prod_is_a_noop_when_no_flags_file_exists()
+    {
+        var fs = FsWith(Cfg);
+        new BepInExConfig(fs).ApplyMode("/gm", debug: false);   // must not throw
+        Assert.False(fs.File.Exists("/gm/stellar_perf.flags"));
+    }
+
     private static string ValueOf(string[] lines, string section, string key)
     {
         string? cur = null;

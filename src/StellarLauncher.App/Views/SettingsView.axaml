@@ -59,8 +59,8 @@
     <ToggleSwitch IsChecked="{Binding TestingChannel}" OnContent="Testing (pre-release)" OffContent="Stable"/>
 
     <TextBlock Text="Game logging" Foreground="#8a93b2" Margin="0,4,0,0"/>
-    <CheckBox IsChecked="{Binding DebugLogging}" Content="Debug logging (game console + crash-flush)"
-              ToolTip.Tip="Off (default) = prod: no BepInEx console, buffered disk logging — fastest. On = console window + instant-flush logging for crash triage. Applied to BepInEx.cfg on launch."/>
+    <CheckBox IsChecked="{Binding DebugLogging}" Content="Debug logging (console + crash-flush + diagnostics)"
+              ToolTip.Tip="Off (default) = prod: no BepInEx console, buffered disk logging, no framework diagnostics — fastest. On = console window + instant-flush logging + framework per-event diagnostics for crash triage. Applied to BepInEx.cfg and stellar_perf.flags on launch; Off also clears any leftover flags from an older install."/>
 
     <TextBlock Text="Changes save automatically." Foreground="#4a5273" FontSize="11" Margin="0,6,0,0"/>
   </StackPanel>
