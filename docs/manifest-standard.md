@@ -36,7 +36,7 @@ Carries the **full release history**, newest first, so the launcher can offer a 
     {
       "version": "1.4.0",
       "date": "2026-06-10",
-      "bundleUrl": "https://minio.revette.io/stellar/framework/StellarResonance-1.4.0.zip",
+      "bundleUrl": "https://cdn.revette.io/framework/StellarResonance-1.4.0.zip",
       "sha256": "<hex sha256 of the bundle zip>",
       "minLauncherVersion": "1.0.0",
       "changelog": {
@@ -78,7 +78,7 @@ runs on** so the launcher can gate it against the installed/selected framework.
           "version": "2.1.0",
           "date": "2026-06-09",
           "dll": "Stellar.PartyOverlay.dll",
-          "dllUrl": "https://minio.revette.io/stellar/plugins/party-overlay/Stellar.PartyOverlay-2.1.0.dll",
+          "dllUrl": "https://cdn.revette.io/plugins/party-overlay/Stellar.PartyOverlay-2.1.0.dll",
           "sha256": "<hex sha256 of the dll>",
           "minModSystemVersion": "1.4.0",
           "maxModSystemVersion": null,

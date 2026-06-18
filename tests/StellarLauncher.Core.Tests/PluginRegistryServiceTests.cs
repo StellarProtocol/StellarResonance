@@ -26,9 +26,9 @@ public class PluginRegistryServiceTests
     private const string Curated = """
     { "plugins": [
       { "id":"combatmeter","name":"CombatMeter","description":"DPS meter","author":"Stellar",
-        "versions":[ {"version":"1.0.0","dllUrl":"https://minio.revette.io/stellar/plugins/combatmeter-1.0.0.dll","sha256":"aaa","minModSystemVersion":"1.0.0"} ] },
+        "versions":[ {"version":"1.0.0","dllUrl":"https://cdn.revette.io/plugins/combatmeter-1.0.0.dll","sha256":"aaa","minModSystemVersion":"1.0.0"} ] },
       { "id":"playerhud","name":"PlayerHUD","description":"HUD","author":"Stellar",
-        "versions":[ {"version":"1.0.0","dllUrl":"https://minio.revette.io/stellar/plugins/playerhud-1.0.0.dll","sha256":"bbb","minModSystemVersion":"1.0.0"} ] }
+        "versions":[ {"version":"1.0.0","dllUrl":"https://cdn.revette.io/plugins/playerhud-1.0.0.dll","sha256":"bbb","minModSystemVersion":"1.0.0"} ] }
     ] }
     """;
 
@@ -44,7 +44,7 @@ public class PluginRegistryServiceTests
     {
         var handler = new MapHandler(new()
         {
-            ["https://minio.revette.io/stellar/plugins.json"] = Curated,
+            ["https://cdn.revette.io/plugins.json"] = Curated,
             ["https://example.com/repo.json"] = ThirdParty,
             ["https://dead.example/repo.json"] = null,   // 404 → skipped, no throw
         });
@@ -52,7 +52,7 @@ public class PluginRegistryServiceTests
 
         var plugins = await svc.FetchAllAsync(new[]
         {
-            new Uri("https://minio.revette.io/stellar/plugins.json"),
+            new Uri("https://cdn.revette.io/plugins.json"),
             new Uri("https://example.com/repo.json"),
             new Uri("https://dead.example/repo.json"),
         });
@@ -107,10 +107,10 @@ public class PluginRegistryServiceTests
         """;
         var svc = new PluginRegistryService(new HttpClient(new MapHandler(new()
         {
-            ["https://minio.revette.io/stellar/plugins.json"] = mixed,
+            ["https://cdn.revette.io/plugins.json"] = mixed,
         })));
 
-        var plugins = await svc.FetchAllAsync(new[] { new Uri("https://minio.revette.io/stellar/plugins.json") });
+        var plugins = await svc.FetchAllAsync(new[] { new Uri("https://cdn.revette.io/plugins.json") });
 
         Assert.Single(plugins);
         Assert.Equal("good", plugins[0].Id);
