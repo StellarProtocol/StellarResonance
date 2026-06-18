@@ -1,6 +1,6 @@
 # Stellar manifest standard
 
-The launcher reads three kinds of JSON manifest from the `stellar` bucket. This document is the
+The launcher reads three kinds of JSON manifest from the public CDN (`cdn.revette.io`). This document is the
 **contract** every producer (the launcher's own release workflow, the StellarResonanceModSystem
 release workflow, and the plugin registry) must follow.
 
