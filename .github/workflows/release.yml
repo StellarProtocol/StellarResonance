@@ -154,6 +154,23 @@ jobs:
             | grep -vx "$TAG" \
             | while read -r old; do echo "deleting old release $old"; gh release delete "$old" --cleanup-tag --yes || true; done
 
+      # ---- GitHub PRE-release for RC builds (TESTING channel) so RCs are visible on the
+      # Releases page alongside the current stable release. These pre-releases are pruned by
+      # the stable "Prune old GitHub Releases (keep only current)" step above — i.e. once a
+      # stable release is published, every RC disappears from the Releases page. ----
+      - name: Publish GitHub pre-release (testing/RC)
+        if: ${{ inputs.channel == 'testing' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER="${{ inputs.version }}"; TAG="v$VER"
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$TAG" \
+            StellarLauncher-win-x64.zip StellarLauncher-linux-x64.zip \
+            --title "Stellar Launcher $VER (RC)" \
+            --prerelease \
+            --notes "Release candidate on the **testing** channel. Opt in via Settings → Update channel → testing. All RCs are removed from this page automatically when a stable release is published."
+
       - name: Prune old workflow runs (keep only this run)
         env:
           GH_TOKEN: ${{ github.token }}
