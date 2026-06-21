@@ -7,10 +7,16 @@ name: release
 # Fixed object names (no version in the filename) mean only the CURRENT version is ever
 # kept in the bucket — each release overwrites the previous binaries + launcher.json.
 #
-# The `version` input is the SINGLE source of truth: it's stamped into the binary via
+# The resolved version is the SINGLE source of truth: it's stamped into the binary via
 # -p:Version (HomeViewModel.LauncherVersion reads it back) AND written into launcher.json,
 # so the two can never disagree. No code edit is needed before a release.
+#
+# Trigger: push a tag v* (mirrors the framework repo). A plain version (v1.2.3) routes to
+# the STABLE channel; a prerelease tag (v1.2.3-rc1) routes to TESTING. Or run manually with
+# version + channel inputs — an explicit workflow_dispatch input always wins over the tag.
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -42,10 +48,24 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Resolve version + channel
+        id: ver
+        shell: bash
+        run: |
+          V="${{ github.event.inputs.version }}"
+          [ -n "$V" ] || V="${GITHUB_REF_NAME#v}"
+          CH="${{ github.event.inputs.channel }}"
+          # Tag pushes carry no channel input: a prerelease version (e.g. 1.2.3-rc1) routes to
+          # testing, a plain version to stable. An explicit workflow_dispatch input always wins.
+          if [ -z "$CH" ]; then case "$V" in *-*) CH=testing;; *) CH=stable;; esac; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "channel=$CH" >> "$GITHUB_OUTPUT"
+          echo "resolved: version=$V channel=$CH"
+
       - name: Publish win-x64 (self-contained, single file)
         run: >
           dotnet publish src/StellarLauncher.App -c Release -r win-x64
-          --self-contained true -p:PublishSingleFile=true -p:Version=${{ inputs.version }}
+          --self-contained true -p:PublishSingleFile=true -p:Version=${{ steps.ver.outputs.version }}
           -o publish/win-x64
 
       - name: Code-sign Windows executable
@@ -69,7 +89,7 @@ jobs:
       - name: Publish linux-x64 (self-contained, single file)
         run: >
           dotnet publish src/StellarLauncher.App -c Release -r linux-x64
-          --self-contained true -p:PublishSingleFile=true -p:Version=${{ inputs.version }}
+          --self-contained true -p:PublishSingleFile=true -p:Version=${{ steps.ver.outputs.version }}
           -o publish/linux-x64
 
       - name: Bundle Linux desktop integration (icon + .desktop + install.sh)
@@ -87,7 +107,7 @@ jobs:
 
       - name: Derive channel paths + checksums
         run: |
-          if [ "${{ inputs.channel }}" = "testing" ]; then
+          if [ "${{ steps.ver.outputs.channel }}" = "testing" ]; then
             echo "SUBDIR=launcher/testing" >> "$GITHUB_ENV"
             echo "MANIFEST=launcher-testing.json" >> "$GITHUB_ENV"
           else
@@ -101,14 +121,14 @@ jobs:
         run: |
           cat > launcher.json <<EOF
           {
-            "version": "${{ inputs.version }}",
+            "version": "${{ steps.ver.outputs.version }}",
             "date": "$(date -u +%Y-%m-%d)",
-            "channel": "${{ inputs.channel }}",
+            "channel": "${{ steps.ver.outputs.channel }}",
             "windowsUrl": "https://cdn.revette.io/$SUBDIR/StellarLauncher-win-x64.zip",
             "windowsSha256": "$WIN_SHA",
             "linuxUrl": "https://cdn.revette.io/$SUBDIR/StellarLauncher-linux-x64.zip",
             "linuxSha256": "$LINUX_SHA",
-            "notes": "Stellar Launcher ${{ inputs.version }} (${{ inputs.channel }})"
+            "notes": "Stellar Launcher ${{ steps.ver.outputs.version }} (${{ steps.ver.outputs.channel }})"
           }
           EOF
           cat launcher.json
@@ -133,23 +153,24 @@ jobs:
 
       # ---- GitHub Release: new-user download page (STABLE channel only), CURRENT VERSION ONLY ----
       - name: Publish GitHub Release (replace current)
-        if: ${{ inputs.channel == 'stable' }}
+        if: ${{ steps.ver.outputs.channel == 'stable' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VER="${{ inputs.version }}"; TAG="v$VER"
+          VER="${{ steps.ver.outputs.version }}"; TAG="v$VER"
           gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
           gh release create "$TAG" \
             StellarLauncher-win-x64.zip StellarLauncher-linux-x64.zip \
+            --target "$GITHUB_SHA" \
             --title "Stellar Launcher $VER" \
             --notes "Download the zip for your OS, extract, and run. Existing installs auto-update."
 
       - name: Prune old GitHub Releases (keep only current)
-        if: ${{ inputs.channel == 'stable' }}
+        if: ${{ steps.ver.outputs.channel == 'stable' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v${{ inputs.version }}"
+          TAG="v${{ steps.ver.outputs.version }}"
           gh release list --limit 200 --json tagName -q '.[].tagName' \
             | grep -vx "$TAG" \
             | while read -r old; do echo "deleting old release $old"; gh release delete "$old" --cleanup-tag --yes || true; done
@@ -159,14 +180,15 @@ jobs:
       # the stable "Prune old GitHub Releases (keep only current)" step above — i.e. once a
       # stable release is published, every RC disappears from the Releases page. ----
       - name: Publish GitHub pre-release (testing/RC)
-        if: ${{ inputs.channel == 'testing' }}
+        if: ${{ steps.ver.outputs.channel == 'testing' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VER="${{ inputs.version }}"; TAG="v$VER"
+          VER="${{ steps.ver.outputs.version }}"; TAG="v$VER"
           gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
           gh release create "$TAG" \
             StellarLauncher-win-x64.zip StellarLauncher-linux-x64.zip \
+            --target "$GITHUB_SHA" \
             --title "Stellar Launcher $VER (RC)" \
             --prerelease \
             --notes "Release candidate on the **testing** channel. Opt in via Settings → Update channel → testing. All RCs are removed from this page automatically when a stable release is published."
