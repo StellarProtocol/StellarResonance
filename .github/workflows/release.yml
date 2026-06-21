@@ -43,6 +43,24 @@ jobs:
           --self-contained true -p:PublishSingleFile=true -p:Version=${{ inputs.version }}
           -o publish/win-x64
 
+      - name: Code-sign Windows executable
+        if: ${{ secrets.CODE_SIGN_CERT != '' }}
+        env:
+          CERT_PFX_B64: ${{ secrets.CODE_SIGN_CERT }}
+          CERT_PWD: ${{ secrets.CODE_SIGN_PASSWORD }}
+        run: |
+          sudo apt-get install -y osslsigncode
+          echo "$CERT_PFX_B64" | base64 -d > cert.pfx
+          osslsigncode sign \
+            -pkcs12 cert.pfx \
+            -pass "$CERT_PWD" \
+            -n "Stellar Launcher" \
+            -t http://timestamp.digicert.com \
+            -in  publish/win-x64/StellarLauncher.App.exe \
+            -out publish/win-x64/StellarLauncher.App.signed.exe
+          mv publish/win-x64/StellarLauncher.App.signed.exe publish/win-x64/StellarLauncher.App.exe
+          rm cert.pfx
+
       - name: Publish linux-x64 (self-contained, single file)
         run: >
           dotnet publish src/StellarLauncher.App -c Release -r linux-x64
