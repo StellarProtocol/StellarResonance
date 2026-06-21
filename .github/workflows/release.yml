@@ -30,6 +30,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     environment: Production
+    # Hoisted from secrets so the code-sign step's `if:` can test it — the `secrets`
+    # context is NOT allowed in step/job `if:` conditions (the workflow fails to parse:
+    # "Unrecognized named-value: 'secrets'"), but job-level `env` is available there.
+    env:
+      CODE_SIGN_CERT: ${{ secrets.CODE_SIGN_CERT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +49,7 @@ jobs:
           -o publish/win-x64
 
       - name: Code-sign Windows executable
-        if: ${{ secrets.CODE_SIGN_CERT != '' }}
+        if: ${{ env.CODE_SIGN_CERT != '' }}
         env:
           CERT_PFX_B64: ${{ secrets.CODE_SIGN_CERT }}
           CERT_PWD: ${{ secrets.CODE_SIGN_PASSWORD }}
