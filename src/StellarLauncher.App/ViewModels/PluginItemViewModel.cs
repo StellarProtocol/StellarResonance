@@ -23,6 +23,9 @@ public partial class PluginItemViewModel : ObservableObject
     [ObservableProperty] private string _installLabel = "Install";
     [ObservableProperty] private bool _confirmVisible;
     [ObservableProperty] private bool _isDowngrade;
+    [ObservableProperty] private bool _isUpdate;
+    [ObservableProperty] private bool _isReinstall;
+    [ObservableProperty] private bool _isPlainInstall;
 
     public ObservableCollection<PluginVersion> Versions { get; } = new();
 
@@ -49,8 +52,22 @@ public partial class PluginItemViewModel : ObservableObject
         : null;
 
     public string InstalledBadge => InstalledVersion is { } iv ? $"INSTALLED v{iv}" : "INSTALLED";
-    partial void OnInstalledChanged(bool value) => OnPropertyChanged(nameof(InstalledBadge));
-    partial void OnInstalledVersionChanged(string? value) => OnPropertyChanged(nameof(InstalledBadge));
+
+    // True when the newest registry version is strictly newer than what's installed.
+    public bool HasUpdate => Installed && InstalledVersion is { } iv
+        && Versions.Count > 0
+        && VersionService.IsNewer(Versions[0].Version, iv);
+
+    partial void OnInstalledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(InstalledBadge));
+        OnPropertyChanged(nameof(HasUpdate));
+    }
+    partial void OnInstalledVersionChanged(string? value)
+    {
+        OnPropertyChanged(nameof(InstalledBadge));
+        OnPropertyChanged(nameof(HasUpdate));
+    }
 
     partial void OnSelectedVersionChanged(PluginVersion? value)
     {
@@ -58,11 +75,11 @@ public partial class PluginItemViewModel : ObservableObject
         IsDowngrade = false;
         OnPropertyChanged(nameof(SelectedChangelog));
 
-        if (value is null) { Compatible = false; CompatNote = ""; InstallLabel = "Install"; return; }
+        if (value is null) { Compatible = false; CompatNote = ""; InstallLabel = "Install"; IsUpdate = false; IsReinstall = false; IsPlainInstall = false; return; }
 
         if (_framework is null)
         {
-            Compatible = false; CompatNote = "install the framework first"; InstallLabel = "Install";
+            Compatible = false; CompatNote = "install the framework first"; InstallLabel = "Install"; IsUpdate = false; IsReinstall = false; IsPlainInstall = false;
             return;
         }
 
@@ -72,21 +89,21 @@ public partial class PluginItemViewModel : ObservableObject
             CompatNote = VersionService.IsNewer(value.MinModSystemVersion, _framework)
                 ? $"requires StellarResonance ≥ {value.MinModSystemVersion}"
                 : $"needs StellarResonance ≤ {value.MaxModSystemVersion}";
-            InstallLabel = "Incompatible";
+            InstallLabel = "Incompatible"; IsUpdate = false; IsReinstall = false; IsPlainInstall = false;
             return;
         }
 
         CompatNote = "";
         if (!Installed)
-            InstallLabel = $"Install v{value.Version}";
+            { InstallLabel = $"Install v{value.Version}"; IsUpdate = false; IsReinstall = false; IsPlainInstall = true; }
         else if (InstalledVersion is null)
-            InstallLabel = $"Reinstall v{value.Version}";   // present but unmanaged (no version marker) → adopt
+            { InstallLabel = $"Reinstall v{value.Version}"; IsUpdate = false; IsReinstall = true; IsPlainInstall = false; }   // present but unmanaged (no version marker) → adopt
         else if (VersionService.IsNewer(value.Version, InstalledVersion))
-            InstallLabel = $"Update to v{value.Version}";
+            { InstallLabel = $"Update to v{value.Version}"; IsUpdate = true; IsReinstall = false; IsPlainInstall = false; }
         else if (VersionService.IsNewer(InstalledVersion, value.Version))
-            { InstallLabel = $"Downgrade to v{value.Version}"; IsDowngrade = true; }
+            { InstallLabel = $"Downgrade to v{value.Version}"; IsDowngrade = true; IsUpdate = false; IsReinstall = false; IsPlainInstall = false; }
         else
-            InstallLabel = $"Reinstall v{value.Version}";
+            { InstallLabel = $"Reinstall v{value.Version}"; IsUpdate = false; IsReinstall = true; IsPlainInstall = false; }
     }
 
     // Called by the parent after a successful install to refresh installed state + label.

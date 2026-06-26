@@ -47,14 +47,24 @@
         </Viewbox>
       </Panel>
       <Button Classes="nav" Command="{Binding ShowHomeCommand}" ToolTip.Tip="Home">
-        <Viewbox><Canvas Width="24" Height="24">
-          <Path Fill="#cfd6f0" Data="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z"/>
-        </Canvas></Viewbox>
+        <Panel Width="22" Height="22">
+          <Viewbox Width="22" Height="22"><Canvas Width="24" Height="24">
+            <Path Fill="#cfd6f0" Data="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z"/>
+          </Canvas></Viewbox>
+          <Border Width="9" Height="9" CornerRadius="5" Background="#ffb740"
+                  HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-3,0"
+                  IsVisible="{Binding Home.UpdateAvailable}"/>
+        </Panel>
       </Button>
       <Button Classes="nav" Command="{Binding ShowPluginsCommand}" ToolTip.Tip="Plugins">
-        <Viewbox><Canvas Width="24" Height="24">
-          <Path Fill="#cfd6f0" Data="M20.5,11H19V7C19,5.89 18.1,5 17,5H13V3.5A2.5,2.5 0 0,0 10.5,1A2.5,2.5 0 0,0 8,3.5V5H4A2,2 0 0,0 2,7V10.8H3.5C5,10.8 6.2,12 6.2,13.5C6.2,15 5,16.2 3.5,16.2H2V20A2,2 0 0,0 4,22H7.8V20.5C7.8,19 9,17.8 10.5,17.8C12,17.8 13.2,19 13.2,20.5V22H17A2,2 0 0,0 19,20V16H20.5A2.5,2.5 0 0,0 23,13.5A2.5,2.5 0 0,0 20.5,11Z"/>
-        </Canvas></Viewbox>
+        <Panel Width="22" Height="22">
+          <Viewbox Width="22" Height="22"><Canvas Width="24" Height="24">
+            <Path Fill="#cfd6f0" Data="M20.5,11H19V7C19,5.89 18.1,5 17,5H13V3.5A2.5,2.5 0 0,0 10.5,1A2.5,2.5 0 0,0 8,3.5V5H4A2,2 0 0,0 2,7V10.8H3.5C5,10.8 6.2,12 6.2,13.5C6.2,15 5,16.2 3.5,16.2H2V20A2,2 0 0,0 4,22H7.8V20.5C7.8,19 9,17.8 10.5,17.8C12,17.8 13.2,19 13.2,20.5V22H17A2,2 0 0,0 19,20V16H20.5A2.5,2.5 0 0,0 23,13.5A2.5,2.5 0 0,0 20.5,11Z"/>
+          </Canvas></Viewbox>
+          <Border Width="9" Height="9" CornerRadius="5" Background="#ffb740"
+                  HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-3,0"
+                  IsVisible="{Binding Plugins.HasPluginUpdates}"/>
+        </Panel>
       </Button>
       <Button Classes="nav" Command="{Binding ShowSettingsCommand}" ToolTip.Tip="Settings">
         <Viewbox><Canvas Width="24" Height="24">

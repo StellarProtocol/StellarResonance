@@ -65,6 +65,9 @@ public partial class HomeViewModel : ObservableObject
     [ObservableProperty] private string _installAction = "Install";   // button label, reflects the selection
     [ObservableProperty] private bool _isDowngrade;
     [ObservableProperty] private bool _canChangeFramework;            // selection installable (launcher supported)
+    [ObservableProperty] private bool _isFrameworkInstall;
+    [ObservableProperty] private bool _isFrameworkUpdate;
+    [ObservableProperty] private bool _isFrameworkReinstall = true;
     [ObservableProperty] private bool _confirmVisible;                // inline "review then confirm" step
     public ObservableCollection<VersionManifest> Versions { get; } = new();   // all releases, newest first
     public ObservableCollection<VersionManifest> Changelog { get; } = new();  // the SELECTED version's changelog
@@ -197,28 +200,20 @@ public partial class HomeViewModel : ObservableObject
     {
         ConfirmVisible = false;
         Changelog.Clear();
-        if (value is null) { CanChangeFramework = false; InstallAction = "Install"; IsDowngrade = false; return; }
+        if (value is null) { CanChangeFramework = false; InstallAction = "Install"; IsDowngrade = false; IsFrameworkInstall = false; IsFrameworkUpdate = false; IsFrameworkReinstall = true; return; }
         Changelog.Add(value);
 
         CanChangeFramework = VersionService.LauncherSupported(value.MinLauncherVersion, LauncherVersion);
-        if (!CanChangeFramework) { InstallAction = "Update launcher first"; IsDowngrade = false; return; }
+        if (!CanChangeFramework) { InstallAction = "Update launcher first"; IsDowngrade = false; IsFrameworkInstall = false; IsFrameworkUpdate = false; IsFrameworkReinstall = true; return; }
 
         if (_installedFramework is null)
-        {
-            InstallAction = $"Install v{value.Version}"; IsDowngrade = false;
-        }
+            { InstallAction = $"Install v{value.Version}"; IsDowngrade = false; IsFrameworkInstall = true; IsFrameworkUpdate = false; IsFrameworkReinstall = false; }
         else if (VersionService.IsNewer(value.Version, _installedFramework))
-        {
-            InstallAction = $"Update to v{value.Version}"; IsDowngrade = false;
-        }
+            { InstallAction = $"Update to v{value.Version}"; IsDowngrade = false; IsFrameworkInstall = false; IsFrameworkUpdate = true; IsFrameworkReinstall = false; }
         else if (VersionService.IsNewer(_installedFramework, value.Version))
-        {
-            InstallAction = $"Downgrade to v{value.Version}"; IsDowngrade = true;
-        }
+            { InstallAction = $"Downgrade to v{value.Version}"; IsDowngrade = true; IsFrameworkInstall = false; IsFrameworkUpdate = false; IsFrameworkReinstall = true; }
         else
-        {
-            InstallAction = $"Reinstall v{value.Version}"; IsDowngrade = false;
-        }
+            { InstallAction = $"Reinstall v{value.Version}"; IsDowngrade = false; IsFrameworkInstall = false; IsFrameworkUpdate = false; IsFrameworkReinstall = true; }
     }
 
     // Step 1: reveal the inline confirm bar (the changelog above is the "review").

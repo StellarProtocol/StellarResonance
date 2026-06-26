@@ -11,6 +11,8 @@ using StellarLauncher.Core.Services;
 
 namespace StellarLauncher.App.ViewModels;
 
+public enum PluginTab { Available, Installed, Updates }
+
 public partial class PluginsViewModel : ObservableObject
 {
     private readonly IPluginRegistryService _registry;
@@ -21,9 +23,23 @@ public partial class PluginsViewModel : ObservableObject
 
     [ObservableProperty] private string _status = "";
     [ObservableProperty] private string? _newRepoUrl;
+    [ObservableProperty] private bool _hasPluginUpdates;
+    [ObservableProperty] private PluginTab _activeTab = PluginTab.Available;
+    [ObservableProperty] private int _installedCount;
+    [ObservableProperty] private int _updateCount;
+
+    // Full sorted list; Plugins is the filtered view of this.
+    private readonly List<PluginItemViewModel> _allPlugins = new();
 
     public ObservableCollection<PluginItemViewModel> Plugins { get; } = new();
     public ObservableCollection<string> Repos { get; } = new();
+
+    public bool IsTabAvailable => ActiveTab == PluginTab.Available;
+    public bool IsTabInstalled => ActiveTab == PluginTab.Installed;
+    public bool IsTabUpdates  => ActiveTab == PluginTab.Updates;
+
+    public string InstalledTabLabel => InstalledCount > 0 ? $"Installed ({InstalledCount})" : "Installed";
+    public string UpdatesTabLabel   => UpdateCount   > 0 ? $"Updates ({UpdateCount})"   : "Updates";
 
     public PluginsViewModel(IPluginRegistryService registry, IPluginInstaller installer,
         IInstaller frameworkInstaller, ISettingsStore settings, HttpClient http)
@@ -31,6 +47,39 @@ public partial class PluginsViewModel : ObservableObject
         _registry = registry; _installer = installer; _frameworkInstaller = frameworkInstaller;
         _settings = settings; _http = http;
         _ = ReloadAsync();
+    }
+
+    partial void OnActiveTabChanged(PluginTab value)
+    {
+        OnPropertyChanged(nameof(IsTabAvailable));
+        OnPropertyChanged(nameof(IsTabInstalled));
+        OnPropertyChanged(nameof(IsTabUpdates));
+        ApplyFilter();
+    }
+
+    [RelayCommand] private void SetTabAvailable() => ActiveTab = PluginTab.Available;
+    [RelayCommand] private void SetTabInstalled() => ActiveTab = PluginTab.Installed;
+    [RelayCommand] private void SetTabUpdates()   => ActiveTab = PluginTab.Updates;
+
+    private void ApplyFilter()
+    {
+        Plugins.Clear();
+        var source = ActiveTab switch
+        {
+            PluginTab.Installed => _allPlugins.Where(p => p.Installed),
+            PluginTab.Updates   => _allPlugins.Where(p => p.HasUpdate),
+            _                   => (IEnumerable<PluginItemViewModel>)_allPlugins
+        };
+        foreach (var p in source) Plugins.Add(p);
+    }
+
+    private void RefreshCounts()
+    {
+        InstalledCount   = _allPlugins.Count(p => p.Installed);
+        UpdateCount      = _allPlugins.Count(p => p.HasUpdate);
+        HasPluginUpdates = UpdateCount > 0;
+        OnPropertyChanged(nameof(InstalledTabLabel));
+        OnPropertyChanged(nameof(UpdatesTabLabel));
     }
 
     [RelayCommand]
@@ -53,8 +102,8 @@ public partial class PluginsViewModel : ObservableObject
         try
         {
             var entries = await _registry.FetchAllAsync(urls);
-            Plugins.Clear();
-            foreach (var e in entries.OrderBy(p => p.Name ?? "", StringComparer.OrdinalIgnoreCase))
+            _allPlugins.Clear();
+            foreach (var e in entries)
             {
                 try
                 {
@@ -63,11 +112,14 @@ public partial class PluginsViewModel : ObservableObject
                     var dll = CanonicalDll(e);
                     var installed = gameMini is not null && dll is not null && _installer.FindInstalledDll(gameMini, dll) is not null;
                     var version = gameMini is null ? null : _installer.InstalledVersion(gameMini, e.Id);
-                    Plugins.Add(new PluginItemViewModel(e, installed, version, framework, this));
+                    _allPlugins.Add(new PluginItemViewModel(e, installed, version, framework, this));
                 }
                 catch { /* skip a malformed entry rather than failing the whole list */ }
             }
-            Status = Plugins.Count == 0 ? "No plugins found." : $"{Plugins.Count} plugins available.";
+            _allPlugins.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
+            RefreshCounts();
+            ApplyFilter();
+            Status = _allPlugins.Count == 0 ? "No plugins found." : $"{_allPlugins.Count} plugins available.";
         }
         catch (Exception ex) { Status = $"failed to load plugins: {ex.Message}"; }
     }
@@ -96,6 +148,8 @@ public partial class PluginsViewModel : ObservableObject
             await _installer.InstallAsync(buffer, v.Sha256, gameMini, item.Entry.Id, fileName, v.Version);
             item.MarkInstalled(v.Version);
             item.Action = $"installed v{v.Version}";
+            RefreshCounts();
+            ApplyFilter();
         }
         catch (Exception ex) { item.Action = $"failed: {ex.Message}"; }
     }
@@ -104,7 +158,14 @@ public partial class PluginsViewModel : ObservableObject
     {
         var gameMini = _settings.Load().GameMiniDir;
         if (gameMini is null) { Status = "set the game path in Settings first."; return Task.CompletedTask; }
-        try { _installer.Remove(gameMini, item.Entry.Id, item.CanonicalDll); item.MarkRemoved(); item.Action = "removed"; }
+        try
+        {
+            _installer.Remove(gameMini, item.Entry.Id, item.CanonicalDll);
+            item.MarkRemoved();
+            item.Action = "removed";
+            RefreshCounts();
+            ApplyFilter();
+        }
         catch (Exception ex) { item.Action = $"failed: {ex.Message}"; }
         return Task.CompletedTask;
     }

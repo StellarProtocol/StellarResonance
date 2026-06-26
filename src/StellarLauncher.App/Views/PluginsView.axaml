@@ -5,14 +5,36 @@
              xmlns:sys="using:System"
              x:Class="StellarLauncher.App.Views.PluginsView"
              x:DataType="vm:PluginsViewModel">
-  <Grid RowDefinitions="Auto,Auto,*">
+  <Grid RowDefinitions="Auto,Auto,Auto,*">
+    <Grid.Styles>
+      <Style Selector="Button.tab">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Foreground" Value="#8a93b2"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="FontSize" Value="12"/>
+      </Style>
+      <Style Selector="Button.tab:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="TextElement.Foreground" Value="#9aa3bf"/>
+      </Style>
+      <Style Selector="Button.tab.active">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+      </Style>
+      <Style Selector="Button.tab.active:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="TextElement.Foreground" Value="White"/>
+      </Style>
+    </Grid.Styles>
     <StackPanel Grid.Row="0" Margin="28,24,28,8" Spacing="3">
       <TextBlock Text="Plugins" Foreground="White" FontSize="20" FontWeight="Bold"/>
       <TextBlock Text="{Binding Status}" Foreground="#8a93b2" FontSize="12"/>
     </StackPanel>
 
     <!-- add 3rd-party repo + existing repos -->
-    <StackPanel Grid.Row="1" Margin="28,0,28,10" Spacing="6">
+    <StackPanel Grid.Row="1" Margin="28,0,28,8" Spacing="6">
       <Grid ColumnDefinitions="*,Auto">
         <TextBox Grid.Column="0" Text="{Binding NewRepoUrl}"
                  PlaceholderText="add a 3rd-party plugin repo URL (a plugins.json)"/>
@@ -33,8 +55,29 @@
       </ItemsControl>
     </StackPanel>
 
+    <!-- tab bar -->
+    <Border Grid.Row="2" BorderBrush="#1e2540" BorderThickness="0,0,0,1" Margin="28,0,28,0">
+      <StackPanel Orientation="Horizontal" Spacing="0">
+        <StackPanel>
+          <Button Content="Available" Classes="tab" Classes.active="{Binding IsTabAvailable}"
+                  Command="{Binding SetTabAvailableCommand}"/>
+          <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabAvailable}"/>
+        </StackPanel>
+        <StackPanel>
+          <Button Content="{Binding InstalledTabLabel}" Classes="tab" Classes.active="{Binding IsTabInstalled}"
+                  Command="{Binding SetTabInstalledCommand}"/>
+          <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabInstalled}"/>
+        </StackPanel>
+        <StackPanel>
+          <Button Content="{Binding UpdatesTabLabel}" Classes="tab" Classes.active="{Binding IsTabUpdates}"
+                  Command="{Binding SetTabUpdatesCommand}"/>
+          <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabUpdates}"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
     <!-- plugin list -->
-    <ScrollViewer Grid.Row="2" Margin="28,0,28,16">
+    <ScrollViewer Grid.Row="3" Margin="28,10,28,16">
       <ItemsControl ItemsSource="{Binding Plugins}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:PluginItemViewModel">
@@ -48,6 +91,10 @@
                     <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1" IsVisible="{Binding Installed}">
                       <TextBlock Text="{Binding InstalledBadge}"
                                  Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
+                    </Border>
+                    <Border Background="#40cc8800" CornerRadius="5" Padding="6,1" IsVisible="{Binding HasUpdate}"
+                            BorderBrush="#ffb740" BorderThickness="1">
+                      <TextBlock Text="UPDATE AVAILABLE" Foreground="#ffb740" FontSize="9" FontWeight="Bold"/>
                     </Border>
                   </StackPanel>
                   <TextBlock Text="{Binding Description}" Foreground="#c5cce0" FontSize="12" TextWrapping="Wrap"/>
@@ -97,9 +144,19 @@
                   <!-- action row -->
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"
                               IsVisible="{Binding !ConfirmVisible}">
+                    <!-- green = fresh install -->
                     <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
-                            IsEnabled="{Binding Compatible}"
+                            IsEnabled="{Binding Compatible}" IsVisible="{Binding IsPlainInstall}"
                             Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="14,6" CornerRadius="8"/>
+                    <!-- amber = update -->
+                    <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
+                            IsEnabled="{Binding Compatible}" IsVisible="{Binding IsUpdate}"
+                            Foreground="#0b0e16" Background="#ffb740" FontWeight="Bold" Padding="14,6" CornerRadius="8"/>
+                    <!-- muted = reinstall (already on this version) -->
+                    <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
+                            IsEnabled="{Binding Compatible}" IsVisible="{Binding IsReinstall}"
+                            Foreground="#9aa3bf" Background="#1a2035" BorderBrush="#2f3a5a" BorderThickness="1"
+                            Padding="14,6" CornerRadius="8"/>
                     <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding Installed}"
                             Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
                             Padding="12,6" CornerRadius="8"/>

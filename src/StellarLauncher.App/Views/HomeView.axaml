@@ -66,11 +66,24 @@
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>
-          <!-- action button (hidden while confirming) -->
-          <Button Grid.Column="3" Content="{Binding InstallAction}" Command="{Binding RequestFrameworkChangeCommand}"
-                  IsEnabled="{Binding CanChangeFramework}" IsVisible="{Binding !ConfirmVisible}"
-                  Foreground="#cfe0ff" Background="#1c2740" BorderBrush="#2f4570" BorderThickness="1"
-                  FontWeight="SemiBold" Padding="16,8" CornerRadius="10"/>
+          <!-- action button (hidden while confirming) — three colour states -->
+          <Panel Grid.Column="3" IsVisible="{Binding !ConfirmVisible}">
+            <Button Content="{Binding InstallAction}" Command="{Binding RequestFrameworkChangeCommand}"
+                    IsEnabled="{Binding CanChangeFramework}"
+                    IsVisible="{Binding IsFrameworkInstall}"
+                    Foreground="#0b0e16" Background="#54e3a0"
+                    FontWeight="Bold" Padding="16,8" CornerRadius="10"/>
+            <Button Content="{Binding InstallAction}" Command="{Binding RequestFrameworkChangeCommand}"
+                    IsEnabled="{Binding CanChangeFramework}"
+                    IsVisible="{Binding IsFrameworkUpdate}"
+                    Foreground="#0b0e16" Background="#ffb740"
+                    FontWeight="Bold" Padding="16,8" CornerRadius="10"/>
+            <Button Content="{Binding InstallAction}" Command="{Binding RequestFrameworkChangeCommand}"
+                    IsEnabled="{Binding CanChangeFramework}"
+                    IsVisible="{Binding IsFrameworkReinstall}"
+                    Foreground="#9aa3bf" Background="#1a2035" BorderBrush="#2f3a5a" BorderThickness="1"
+                    FontWeight="SemiBold" Padding="16,8" CornerRadius="10"/>
+          </Panel>
           <!-- inline confirm -->
           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ConfirmVisible}">
             <TextBlock Text="⚠ downgrade" Foreground="#ffcf6b" FontSize="11" VerticalAlignment="Center"
