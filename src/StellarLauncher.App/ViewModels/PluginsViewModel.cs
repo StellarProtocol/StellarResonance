@@ -88,8 +88,12 @@ public partial class PluginsViewModel : ObservableObject
         var cfg = _settings.Load();
         var gameMini = cfg.GameMiniDir;
 
-        // Curated registry for the selected channel (stable → plugins.json, testing → plugins-testing.json).
-        var urls = new List<Uri> { ChannelManifests.PluginRegistry(cfg.Channel) };
+        // Always include the stable registry so stable updates are never hidden from testing-channel users.
+        // On testing channel: stable first, then testing on top (testing overrides same plugin ID).
+        var urls = new List<Uri>();
+        if (ChannelManifests.IsTesting(cfg.Channel))
+            urls.Add(ChannelManifests.PluginRegistry(null));
+        urls.Add(ChannelManifests.PluginRegistry(cfg.Channel));
         Repos.Clear();
         foreach (var repo in cfg.ExtraPluginRepos)
         {
