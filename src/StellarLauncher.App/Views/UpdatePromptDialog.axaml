@@ -1,0 +1,43 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="StellarLauncher.App.Views.UpdatePromptDialog"
+        Title="Framework Update Available"
+        Width="440" SizeToContent="Height"
+        CanResize="False" WindowStartupLocation="CenterOwner"
+        Background="#080a12" Icon="/Assets/stellar-window.png">
+  <Border Padding="28,24">
+    <StackPanel Spacing="20">
+
+      <!-- Header -->
+      <StackPanel Spacing="6">
+        <TextBlock Text="Framework Update Available" Foreground="White"
+                   FontSize="16" FontWeight="Bold"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock x:Name="CurrentVersion" Foreground="#8a93b2" FontSize="13"/>
+          <TextBlock Text="→" Foreground="#4a5273" FontSize="13"/>
+          <TextBlock x:Name="LatestVersion" Foreground="#54e3a0" FontSize="13" FontWeight="SemiBold"/>
+        </StackPanel>
+      </StackPanel>
+
+      <!-- Body -->
+      <TextBlock Foreground="#9aa3bf" FontSize="12" TextWrapping="Wrap"
+                 Text="A new version of the mod framework is available. You can update now before launching, or continue with the currently installed version."/>
+
+      <!-- Buttons -->
+      <Grid ColumnDefinitions="Auto,*,Auto,8,Auto" Margin="0,4,0,0">
+        <Button Grid.Column="0" Content="Cancel" Click="OnCancel"
+                Foreground="#9aa3bf" Background="Transparent"
+                BorderBrush="#2f3a5a" BorderThickness="1"
+                Padding="14,9" CornerRadius="10"/>
+        <Button Grid.Column="2" x:Name="LaunchAnywayButton" Click="OnLaunchAnyway"
+                Foreground="#9aa3bf" Background="#141a2e"
+                BorderBrush="#2f3a5a" BorderThickness="1"
+                Padding="14,9" CornerRadius="10"/>
+        <Button Grid.Column="4" Content="Update &amp; Launch" Click="OnUpdateAndLaunch"
+                Foreground="#0b0e16" Background="#54e3a0"
+                FontWeight="Bold" Padding="16,9" CornerRadius="10"/>
+      </Grid>
+
+    </StackPanel>
+  </Border>
+</Window>

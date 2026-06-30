@@ -179,6 +179,7 @@
                       OnContent="Modded" OffContent="Vanilla"
                       VerticalAlignment="Center" Margin="0,0,16,0"/>
         <Button Grid.Column="2" Command="{Binding LaunchCommand}" Content="▶  LAUNCH"
+                IsEnabled="{Binding IsLaunchEnabled}"
                 Foreground="White" FontWeight="Bold" Padding="38,14" CornerRadius="12"
                 VerticalAlignment="Center">
           <Button.Background>

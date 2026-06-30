@@ -39,6 +39,7 @@ public partial class HomeViewModel : ObservableObject
     private readonly IDxvkNvapiInstaller _dxvkNvapi;
     private readonly IBepInExConfig _bepinex;
     private readonly IInteropWatch _interop;
+    private readonly Func<string, string, Task<UpdateLaunchChoice>> _updatePrompt;
 
     [ObservableProperty] private string _gameStatus = "Detecting…";
     [ObservableProperty] private bool _needsGameSetup;   // true when no game is set — drives onboarding
@@ -56,8 +57,11 @@ public partial class HomeViewModel : ObservableObject
 
     /// <summary>Footer progress bar shows during a framework download OR interop (re)generation.</summary>
     public bool FooterProgressVisible => IsFrameworkDownloading || IsPreparingLaunch;
-    partial void OnIsFrameworkDownloadingChanged(bool value) => OnPropertyChanged(nameof(FooterProgressVisible));
+    partial void OnIsFrameworkDownloadingChanged(bool value) { OnPropertyChanged(nameof(FooterProgressVisible)); OnPropertyChanged(nameof(IsLaunchEnabled)); }
     partial void OnIsPreparingLaunchChanged(bool value) => OnPropertyChanged(nameof(FooterProgressVisible));
+
+    /// <summary>Launch is blocked while a framework download is in progress, or when modded mode is on but the framework isn't installed.</summary>
+    public bool IsLaunchEnabled => !IsFrameworkDownloading && (!Modded || _installedFramework is not null);
 
     // Framework version picker.
     [ObservableProperty] private VersionManifest? _selectedVersion;   // bound to the ComboBox
@@ -80,12 +84,14 @@ public partial class HomeViewModel : ObservableObject
     public HomeViewModel(ISettingsStore settings, IGameLocator locator, IDoorstopToggle doorstop,
         IInstaller installer, IGameLauncher launcher, IVersionService version, IPlatformInfo platform,
         ILauncherUpdateService launcherUpdates, IGameDetector detector, ILauncherSelfUpdater selfUpdater,
-        IDxvkNvapiInstaller dxvkNvapi, IBepInExConfig bepinex, IInteropWatch interop)
+        IDxvkNvapiInstaller dxvkNvapi, IBepInExConfig bepinex, IInteropWatch interop,
+        Func<string, string, Task<UpdateLaunchChoice>> updatePrompt)
     {
         _settings = settings; _locator = locator; _doorstop = doorstop;
         _installer = installer; _launcher = launcher; _version = version; _platform = platform;
         _launcherUpdates = launcherUpdates; _detector = detector;
         _selfUpdater = selfUpdater; _dxvkNvapi = dxvkNvapi; _bepinex = bepinex; _interop = interop;
+        _updatePrompt = updatePrompt;
         _ = RefreshAsync();
         _ = CheckLauncherUpdateAsync();
     }
@@ -96,6 +102,19 @@ public partial class HomeViewModel : ObservableObject
         {
             var channel = _settings.Load().Channel;
             var m = await _launcherUpdates.FetchAsync(ChannelManifests.LauncherManifest(channel));
+
+            // Testing channel only publishes RCs; stable releases land on launcher.json first.
+            // Always pick the higher version across both so a stable release is never hidden.
+            if (ChannelManifests.IsTesting(channel))
+            {
+                try
+                {
+                    var stable = await _launcherUpdates.FetchAsync(ChannelManifests.LauncherManifest(null));
+                    if (VersionService.IsNewer(stable.Version, m.Version)) m = stable;
+                }
+                catch { /* stable manifest unavailable — proceed with testing manifest */ }
+            }
+
             _remoteLauncher = m;
             if (VersionService.IsNewer(m.Version, LauncherVersion))
             {
@@ -180,6 +199,7 @@ public partial class HomeViewModel : ObservableObject
 
         _installedFramework = GameMini is null ? null : _installer.ReadInstalledVersion(GameMini);
         FrameworkStatus = _installedFramework is null ? "Not installed" : $"v{_installedFramework} installed";
+        OnPropertyChanged(nameof(IsLaunchEnabled));
 
         try
         {
@@ -232,26 +252,29 @@ public partial class HomeViewModel : ObservableObject
         var target = SelectedVersion;
         if (!VersionService.LauncherSupported(target.MinLauncherVersion, LauncherVersion))
         { StatusLine = "update the launcher first"; return; }
-
-        try
-        {
-            using var http = new System.Net.Http.HttpClient();
-            using var buffered = new MemoryStream();
-            var progress = MakeProgress($"downloading v{target.Version}…", t => StatusLine = t);
-            IsFrameworkDownloading = true;
-            try { await http.DownloadToAsync(new Uri(target.BundleUrl), buffered, progress); }
-            finally { IsFrameworkDownloading = false; }
-            buffered.Position = 0;
-            StatusLine = $"installing v{target.Version}…";
-            await _installer.InstallAsync(buffered, target.Sha256, GameMini, target.Version);
-            StatusLine = $"installed v{target.Version}";
-            await RefreshAsync();
-        }
+        try { await InstallVersionAsync(target); }
         catch (Exception ex) { StatusLine = $"install failed: {ex.Message}"; }
+    }
+
+    private async Task InstallVersionAsync(VersionManifest target)
+    {
+        if (GameMini is null) throw new InvalidOperationException("game path not set");
+        using var http = new System.Net.Http.HttpClient();
+        using var buffered = new MemoryStream();
+        var progress = MakeProgress($"downloading v{target.Version}…", t => StatusLine = t);
+        IsFrameworkDownloading = true;
+        try { await http.DownloadToAsync(new Uri(target.BundleUrl), buffered, progress); }
+        finally { IsFrameworkDownloading = false; }
+        buffered.Position = 0;
+        StatusLine = $"installing v{target.Version}…";
+        await _installer.InstallAsync(buffered, target.Sha256, GameMini, target.Version);
+        StatusLine = $"installed v{target.Version}";
+        await RefreshAsync();
     }
 
     partial void OnModdedChanged(bool value)
     {
+        OnPropertyChanged(nameof(IsLaunchEnabled));
         // Persist the preference regardless of install state…
         _cfg.Modded = value;
         _settings.Save(_cfg);
@@ -269,6 +292,22 @@ public partial class HomeViewModel : ObservableObject
         if (GameMini is null) { StatusLine = "set the game path first"; return; }
         try
         {
+            // If a framework update is available, ask the user what to do before proceeding.
+            if (UpdateAvailable && _installedFramework is not null && _manifest is not null)
+            {
+                var latest = Versions.FirstOrDefault(v => v.Version == _manifest.Latest);
+                if (latest is not null)
+                {
+                    var choice = await _updatePrompt(_installedFramework, _manifest.Latest);
+                    if (choice == UpdateLaunchChoice.Cancel) { StatusLine = ""; return; }
+                    if (choice == UpdateLaunchChoice.UpdateAndLaunch)
+                    {
+                        try { await InstallVersionAsync(latest); }
+                        catch (Exception ex) { StatusLine = $"update failed: {ex.Message}"; return; }
+                    }
+                }
+            }
+
             var cfg = _settings.Load();   // pick up the latest Settings (esync/fsync/overlay/dxvk-nvapi)
 
             // Tune the game's BepInEx logging for prod (fast) vs debug (console + crash-flush).

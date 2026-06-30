@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using System.IO.Abstractions;
 using System.Net.Http;
 using Avalonia;
@@ -45,12 +46,21 @@ public partial class App : Application
         var dxvkNvapi = new DxvkNvapiInstaller(http);
         var bepinex = new BepInExConfig(fs);
         var interop = new InteropWatch(fs);
-        var home = new HomeViewModel(settings, locator, doorstop, installer, launcher, version, platform, launcherUpdates, detector, selfUpdater, dxvkNvapi, bepinex, interop);
+
+        // Lazily captured — mainWindow is set before the user can ever click Launch.
+        MainWindow? mainWindow = null;
+        Task<ViewModels.UpdateLaunchChoice> UpdatePrompt(string current, string latest) =>
+            new Views.UpdatePromptDialog(current, latest).ShowDialog<ViewModels.UpdateLaunchChoice>(mainWindow!);
+
+        var home = new HomeViewModel(settings, locator, doorstop, installer, launcher, version, platform, launcherUpdates, detector, selfUpdater, dxvkNvapi, bepinex, interop, UpdatePrompt);
         var setVm = new SettingsViewModel(settings, locator, detector, platform);
         var main = new MainWindowViewModel(home, setVm, pluginsVm);
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            desktop.MainWindow = new MainWindow { DataContext = main };
+        {
+            mainWindow = new MainWindow { DataContext = main };
+            desktop.MainWindow = mainWindow;
+        }
 
         base.OnFrameworkInitializationCompleted();
     }
