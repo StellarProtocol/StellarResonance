@@ -1,6 +1,10 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StellarLauncher.Core.Model;
@@ -42,6 +46,53 @@ public partial class PluginItemViewModel : ObservableObject
     public string Name => Entry.Name;
     public string Description => Entry.Description;
     public string Author => Entry.Author ?? "";
+
+    // ---- detail page data (media gallery, guide, links) — loaded lazily on first open ----
+
+    public IReadOnlyList<string> Tags => Entry.Tags ?? Array.Empty<string>();
+    public bool HasTags => Tags.Count > 0;
+    public string? Homepage => Entry.Homepage;
+    public bool HasHomepage => !string.IsNullOrWhiteSpace(Entry.Homepage);
+    // Provenance link from the newest version; ".git" stripped so it opens as a web page.
+    public string? SourceUrl => Versions.FirstOrDefault()?.SourceRepository is { } r
+        ? (r.EndsWith(".git", StringComparison.OrdinalIgnoreCase) ? r[..^4] : r)
+        : null;
+    public bool HasSource => SourceUrl is not null;
+
+    public ObservableCollection<MediaItemViewModel> Media { get; } = new();
+    public bool HasMedia => Media.Count > 0;
+    public bool HasGuideUrl => Entry.GuideUrl is not null;
+    [ObservableProperty] private string? _guideMarkdown;
+    [ObservableProperty] private string _guideStatus = "";
+    public bool HasGuideStatus => GuideStatus.Length > 0;
+    partial void OnGuideStatusChanged(string value) => OnPropertyChanged(nameof(HasGuideStatus));
+
+    private bool _detailLoaded;
+
+    // Populates the media tiles and fetches the guide markdown the first time the detail page
+    // opens. Runs on the UI thread; downloads are awaited so property sets stay on the UI thread.
+    public async Task EnsureDetailLoadedAsync(HttpClient http, Action<Bitmap> openLightbox)
+    {
+        if (_detailLoaded) return;
+        _detailLoaded = true;
+        if (Entry.Media is { Count: > 0 } media)
+        {
+            foreach (var m in media)
+                if (!string.IsNullOrWhiteSpace(m?.Url)) Media.Add(new MediaItemViewModel(m!, http, openLightbox));
+            OnPropertyChanged(nameof(HasMedia));
+            foreach (var tile in Media) _ = tile.LoadAsync();
+        }
+        if (Entry.GuideUrl is { } guideUrl)
+        {
+            GuideStatus = "loading guide…";
+            try
+            {
+                GuideMarkdown = await http.GetStringAsync(guideUrl);
+                GuideStatus = "";
+            }
+            catch { GuideStatus = "guide unavailable (couldn't download it — check your connection)"; }
+        }
+    }
 
     // Selected version's changelog (may be null); the view guards visibility.
     public Changelog? SelectedChangelog => SelectedVersion?.Changelog;

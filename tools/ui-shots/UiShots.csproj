@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Headless UI screenshot harness — renders the real launcher off-screen (no display server)
+       and saves PNGs of the Home page and the Plugins list/detail pages for visual verification.
+       Not part of StellarLauncher.slnx; build/run it directly:
+         dotnet run (project tools/ui-shots, first arg = output dir)
+       Point the launcher at test data via XDG_CONFIG_HOME (isolated settings.json). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AssemblyName>UiShots</AssemblyName>
+    <RootNamespace>StellarLauncher.UiShots</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" Version="12.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/StellarLauncher.App/StellarLauncher.App.csproj" />
+  </ItemGroup>
+</Project>

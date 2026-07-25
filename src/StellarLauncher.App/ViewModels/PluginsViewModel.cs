@@ -28,6 +28,36 @@ public partial class PluginsViewModel : ObservableObject
     [ObservableProperty] private int _installedCount;
     [ObservableProperty] private int _updateCount;
 
+    // Detail page: non-null swaps the list for the selected plugin's detail view.
+    [ObservableProperty] private PluginItemViewModel? _selectedPlugin;
+    // Full-size image overlay opened from the detail media gallery.
+    [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? _lightboxImage;
+
+    public bool IsDetailOpen => SelectedPlugin is not null;
+    public bool IsLightboxOpen => LightboxImage is not null;
+
+    partial void OnSelectedPluginChanged(PluginItemViewModel? value) => OnPropertyChanged(nameof(IsDetailOpen));
+    partial void OnLightboxImageChanged(Avalonia.Media.Imaging.Bitmap? value) => OnPropertyChanged(nameof(IsLightboxOpen));
+
+    [RelayCommand]
+    private void OpenPlugin(PluginItemViewModel item)
+    {
+        SelectedPlugin = item;
+        _ = item.EnsureDetailLoadedAsync(_http, bmp => LightboxImage = bmp);
+    }
+
+    [RelayCommand] private void CloseDetail() => SelectedPlugin = null;
+
+    [RelayCommand]
+    private void CloseLightbox()
+    {
+        var old = LightboxImage;
+        LightboxImage = null;
+        old?.Dispose();
+    }
+
+    [RelayCommand] private void OpenLink(string? url) => Services.Browser.Open(url);
+
     // Full sorted list; Plugins is the filtered view of this.
     private readonly List<PluginItemViewModel> _allPlugins = new();
 
@@ -106,6 +136,7 @@ public partial class PluginsViewModel : ObservableObject
         try
         {
             var entries = await _registry.FetchAllAsync(urls);
+            SelectedPlugin = null;   // item VMs are about to be replaced — drop a stale detail page
             _allPlugins.Clear();
             foreach (var e in entries)
             {

@@ -23,6 +23,7 @@ public partial class App : Application
         var fs = new FileSystem();
         var platform = new PlatformInfo();
         var http = new HttpClient();
+        Views.MarkdownView.Http = http;   // guide images share the app-wide client
 
         var settings = new SettingsStore(fs, platform);
         var locator = new GameLocator(fs);
