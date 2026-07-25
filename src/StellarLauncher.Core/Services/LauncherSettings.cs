@@ -17,7 +17,32 @@ public sealed class LauncherSettings
     // Linux launch tweaks (applied when launching through the Wine/Proton runner).
     public bool Esync { get; set; } = true;            // WINEESYNC / PROTON_NO_ESYNC
     public bool Fsync { get; set; } = true;            // WINEFSYNC / PROTON_NO_FSYNC
-    public bool FpsOverlay { get; set; } = false;      // DXVK_HUD=fps (DXVK built-in FPS counter, no install)
+    public bool FpsOverlay { get; set; } = false;      // LEGACY (pre-1.2.26 "Show FPS"); read only as the
+                                                       // fallback in EffectiveOverlay(), written for downgrade compat
+    public string PerfOverlay { get; set; } = "";      // "off" | "fps" | "full"; "" = unset -> legacy FpsOverlay
     public bool StellarPerf { get; set; } = false;     // STELLAR_PERFHUD=1 (framework's in-game perf overlay)
     public bool DxvkNvapi { get; set; } = true;        // auto install/update DXVK-NVAPI into the prefix
+
+    /// <summary>Resolve the overlay mode: the new tri-state key wins; an unset key falls back to
+    /// the legacy <see cref="FpsOverlay"/> checkbox so pre-1.2.26 settings keep their behavior.</summary>
+    public PerfOverlayMode EffectiveOverlay() => PerfOverlay switch
+    {
+        "off"  => PerfOverlayMode.Off,
+        "fps"  => PerfOverlayMode.Fps,
+        "full" => PerfOverlayMode.Full,
+        _      => FpsOverlay ? PerfOverlayMode.Fps : PerfOverlayMode.Off,
+    };
+
+    /// <summary>Store an overlay mode: writes the tri-state key and mirrors the legacy bool so a
+    /// downgraded launcher still shows the closest equivalent.</summary>
+    public void SetOverlay(PerfOverlayMode mode)
+    {
+        PerfOverlay = mode switch
+        {
+            PerfOverlayMode.Fps  => "fps",
+            PerfOverlayMode.Full => "full",
+            _                    => "off",
+        };
+        FpsOverlay = mode != PerfOverlayMode.Off;
+    }
 }

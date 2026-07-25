@@ -56,10 +56,10 @@ public class GameLauncherTests
         var psi = Linux().BuildStartInfo(new LaunchRequest(
             StarLauncherExe: "/p/drive_c/Star/StarLauncher/StarLauncher.exe",
             Runner: "/usr/bin/wine", WinePrefix: "/p",
-            Esync: true, Fsync: true, FpsOverlay: true, DxvkNvapi: true, StellarPerf: true));
+            Esync: true, Fsync: true, Overlay: PerfOverlayMode.Fps, DxvkNvapi: true, StellarPerf: true));
         Assert.Equal("1", psi.Environment["WINEESYNC"]);
         Assert.Equal("1", psi.Environment["WINEFSYNC"]);
-        Assert.Equal("fps", psi.Environment["DXVK_HUD"]);        // Show FPS → DXVK counter
+        Assert.Equal("fps", psi.Environment["DXVK_HUD"]);        // FPS counter → DXVK counter
         Assert.Equal("1", psi.Environment["STELLAR_PERFHUD"]);   // Stellar Perf → framework overlay
         Assert.Contains("nvapi,nvapi64=n,b", psi.Environment["WINEDLLOVERRIDES"]);
         Assert.Contains("winhttp=n,b", psi.Environment["WINEDLLOVERRIDES"]);
@@ -69,7 +69,7 @@ public class GameLauncherTests
     public void Linux_fps_counter_and_perf_overlay_are_independent()
     {
         var fpsOnly = Linux().BuildStartInfo(new LaunchRequest(
-            StarLauncherExe: "/p/x.exe", Runner: "/usr/bin/wine", WinePrefix: "/p", FpsOverlay: true));
+            StarLauncherExe: "/p/x.exe", Runner: "/usr/bin/wine", WinePrefix: "/p", Overlay: PerfOverlayMode.Fps));
         Assert.Equal("fps", fpsOnly.Environment["DXVK_HUD"]);
         Assert.False(fpsOnly.Environment.ContainsKey("STELLAR_PERFHUD"));
 
@@ -77,6 +77,61 @@ public class GameLauncherTests
             StarLauncherExe: "/p/x.exe", Runner: "/usr/bin/wine", WinePrefix: "/p", StellarPerf: true));
         Assert.Equal("1", perfOnly.Environment["STELLAR_PERFHUD"]);
         Assert.False(perfOnly.Environment.ContainsKey("DXVK_HUD"));
+    }
+
+    [Fact]
+    public void Linux_full_overlay_activates_mangohud_with_preset()
+    {
+        var psi = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/x.exe", Runner: "/usr/bin/wine", WinePrefix: "/p",
+            Overlay: PerfOverlayMode.Full, MangoHudPreset: MangoHud.DefaultPreset));
+        Assert.Equal("1", psi.Environment["MANGOHUD"]);
+        Assert.Equal(MangoHud.DefaultPreset, psi.Environment["MANGOHUD_CONFIG"]);
+        Assert.False(psi.Environment.ContainsKey("DXVK_HUD"));   // modes are exclusive
+    }
+
+    [Fact]
+    public void Linux_full_overlay_respects_user_mangohud_config()
+    {
+        // Null preset = the user has their own MangoHud.conf; MANGOHUD_CONFIG must stay unset
+        // (the env var would override their file).
+        var psi = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/x.exe", Runner: "/usr/bin/wine", WinePrefix: "/p",
+            Overlay: PerfOverlayMode.Full, MangoHudPreset: null));
+        Assert.Equal("1", psi.Environment["MANGOHUD"]);
+        Assert.False(psi.Environment.ContainsKey("MANGOHUD_CONFIG"));
+    }
+
+    [Fact]
+    public void Linux_overlay_off_sets_no_hud_env()
+    {
+        var psi = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/x.exe", Runner: "/usr/bin/wine", WinePrefix: "/p",
+            Overlay: PerfOverlayMode.Off));
+        Assert.False(psi.Environment.ContainsKey("DXVK_HUD"));
+        Assert.False(psi.Environment.ContainsKey("MANGOHUD"));
+        Assert.False(psi.Environment.ContainsKey("MANGOHUD_CONFIG"));
+    }
+
+    [Fact]
+    public void Settings_overlay_tristate_migrates_legacy_fps_bool()
+    {
+        // Pre-1.2.26 settings: only the legacy bool exists ("" = tri-state unset).
+        Assert.Equal(PerfOverlayMode.Fps, new LauncherSettings { FpsOverlay = true }.EffectiveOverlay());
+        Assert.Equal(PerfOverlayMode.Off, new LauncherSettings { FpsOverlay = false }.EffectiveOverlay());
+
+        // New tri-state key wins over the legacy bool.
+        Assert.Equal(PerfOverlayMode.Full, new LauncherSettings { FpsOverlay = false, PerfOverlay = "full" }.EffectiveOverlay());
+        Assert.Equal(PerfOverlayMode.Off, new LauncherSettings { FpsOverlay = true, PerfOverlay = "off" }.EffectiveOverlay());
+
+        // SetOverlay mirrors the legacy bool for downgrade compatibility.
+        var s = new LauncherSettings();
+        s.SetOverlay(PerfOverlayMode.Full);
+        Assert.Equal("full", s.PerfOverlay);
+        Assert.True(s.FpsOverlay);
+        s.SetOverlay(PerfOverlayMode.Off);
+        Assert.Equal("off", s.PerfOverlay);
+        Assert.False(s.FpsOverlay);
     }
 
     [Fact]

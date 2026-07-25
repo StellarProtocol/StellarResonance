@@ -323,9 +323,12 @@ public partial class HomeViewModel : ObservableObject
             // Steam install (Windows): launch via Steam so the game gets a real session.
             var steamAppId = _platform.IsWindows ? TryGetSteamAppId(GameMini) : null;
             var exe = StarLauncherExe(GameMini);
+            var overlay = cfg.EffectiveOverlay();
             var request = new LaunchRequest(exe, cfg.Runner, cfg.WinePrefix, _detector.DetectUmu(),
-                Esync: cfg.Esync, Fsync: cfg.Fsync, FpsOverlay: cfg.FpsOverlay, DxvkNvapi: cfg.DxvkNvapi,
-                StellarPerf: cfg.StellarPerf, SteamAppId: steamAppId);
+                Esync: cfg.Esync, Fsync: cfg.Fsync, Overlay: overlay,
+                // A user-maintained MangoHud.conf always wins; the preset only fills the no-config case.
+                MangoHudPreset: overlay == PerfOverlayMode.Full && !MangoHud.UserConfigExists() ? MangoHud.DefaultPreset : null,
+                DxvkNvapi: cfg.DxvkNvapi, StellarPerf: cfg.StellarPerf, SteamAppId: steamAppId);
             StatusLine = "launching…";
             var proc = _launcher.Launch(request);
 
