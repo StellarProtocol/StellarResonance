@@ -4,7 +4,7 @@
         xmlns:views="using:StellarLauncher.App.Views"
         x:Class="StellarLauncher.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Width="880" Height="560" Title="Stellar Launcher"
+        Width="880" Height="560" MinWidth="760" MinHeight="500" Title="Stellar Launcher"
         Icon="/Assets/stellar-window.png"
         Background="#080a12">
   <Window.Styles>
