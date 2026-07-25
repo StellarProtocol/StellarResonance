@@ -44,6 +44,22 @@
       <Setter Property="FontWeight" Value="Bold"/>
       <Setter Property="LetterSpacing" Value="1.5"/>
     </Style>
+    <!-- grid/list view-mode toggle buttons -->
+    <Style Selector="Button.viewmode">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="7,5"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style Selector="Button.viewmode:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#161d33"/>
+    </Style>
+    <Style Selector="Button.viewmode.active">
+      <Setter Property="Background" Value="#1a2340"/>
+    </Style>
+    <Style Selector="Button.viewmode.active:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#1a2340"/>
+    </Style>
     <!-- link-styled buttons (homepage / source) -->
     <Style Selector="Button.link">
       <Setter Property="Background" Value="Transparent"/>
@@ -89,30 +105,96 @@
         </ItemsControl>
       </StackPanel>
 
-      <!-- tab bar -->
+      <!-- tab bar + view-mode toggle -->
       <Border Grid.Row="2" BorderBrush="#1e2540" BorderThickness="0,0,0,1" Margin="28,0,28,0">
-        <StackPanel Orientation="Horizontal" Spacing="0">
-          <StackPanel>
-            <Button Content="Available" Classes="tab" Classes.active="{Binding IsTabAvailable}"
-                    Command="{Binding SetTabAvailableCommand}"/>
-            <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabAvailable}"/>
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="0">
+            <StackPanel>
+              <Button Content="Available" Classes="tab" Classes.active="{Binding IsTabAvailable}"
+                      Command="{Binding SetTabAvailableCommand}"/>
+              <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabAvailable}"/>
+            </StackPanel>
+            <StackPanel>
+              <Button Content="{Binding InstalledTabLabel}" Classes="tab" Classes.active="{Binding IsTabInstalled}"
+                      Command="{Binding SetTabInstalledCommand}"/>
+              <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabInstalled}"/>
+            </StackPanel>
+            <StackPanel>
+              <Button Content="{Binding UpdatesTabLabel}" Classes="tab" Classes.active="{Binding IsTabUpdates}"
+                      Command="{Binding SetTabUpdatesCommand}"/>
+              <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabUpdates}"/>
+            </StackPanel>
           </StackPanel>
-          <StackPanel>
-            <Button Content="{Binding InstalledTabLabel}" Classes="tab" Classes.active="{Binding IsTabInstalled}"
-                    Command="{Binding SetTabInstalledCommand}"/>
-            <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabInstalled}"/>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+            <Button Classes="viewmode" Classes.active="{Binding IsGridMode}"
+                    Command="{Binding SetGridModeCommand}" ToolTip.Tip="Card view">
+              <Viewbox Width="14" Height="14"><Canvas Width="24" Height="24">
+                <Path Fill="#9aa3bf" Data="M3,3H11V11H3V3M13,3H21V11H13V3M3,13H11V21H3V13M13,13H21V21H13V13Z"/>
+              </Canvas></Viewbox>
+            </Button>
+            <Button Classes="viewmode" Classes.active="{Binding IsListMode}"
+                    Command="{Binding SetListModeCommand}" ToolTip.Tip="List view">
+              <Viewbox Width="14" Height="14"><Canvas Width="24" Height="24">
+                <Path Fill="#9aa3bf" Data="M3,4H21V8H3V4M3,10H21V14H3V10M3,16H21V20H3V16Z"/>
+              </Canvas></Viewbox>
+            </Button>
           </StackPanel>
-          <StackPanel>
-            <Button Content="{Binding UpdatesTabLabel}" Classes="tab" Classes.active="{Binding IsTabUpdates}"
-                    Command="{Binding SetTabUpdatesCommand}"/>
-            <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabUpdates}"/>
-          </StackPanel>
-        </StackPanel>
+        </Grid>
       </Border>
 
-      <!-- plugin list -->
+      <!-- plugin list / card grid -->
       <ScrollViewer Grid.Row="3" Margin="28,10,28,16">
-        <ItemsControl ItemsSource="{Binding Plugins}">
+        <Panel>
+          <!-- card grid mode -->
+          <ItemsControl ItemsSource="{Binding Plugins}" IsVisible="{Binding IsGridMode}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PluginItemViewModel">
+                <Border Classes="pluginCard" BorderThickness="1" CornerRadius="12" ClipToBounds="True"
+                        Width="212" Margin="0,0,12,12"
+                        PointerReleased="OnCardPointerReleased">
+                  <StackPanel>
+                    <!-- cover: thumbnail / monogram, with state badges overlaid -->
+                    <Panel Height="118" Background="#1a2340">
+                      <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"/>
+                      <TextBlock Text="{Binding Monogram}" IsVisible="{Binding ShowMonogram}"
+                                 Foreground="#8ea4d8" FontSize="34" FontWeight="Bold"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      <Border IsVisible="{Binding HasUpdate}" Background="#E60b0e16"
+                              BorderBrush="#ffb740" BorderThickness="1" CornerRadius="6"
+                              Padding="7,2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="7">
+                        <TextBlock Text="UPDATE" Foreground="#ffb740" FontSize="9" FontWeight="Bold"/>
+                      </Border>
+                      <Border IsVisible="{Binding Installed}" Background="#E60b0e16"
+                              BorderBrush="#2f6b46" BorderThickness="1" CornerRadius="6"
+                              Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="7">
+                        <TextBlock Text="✓" Foreground="#9affd0" FontSize="10" FontWeight="Bold"/>
+                      </Border>
+                    </Panel>
+                    <!-- name + mini detail -->
+                    <StackPanel Margin="11,8,11,10" Spacing="4">
+                      <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="Bold" FontSize="13"
+                                 TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Text="{Binding Description}" Foreground="#8a93b2" FontSize="11"
+                                 TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                 LineHeight="15" Height="30"/>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1" IsVisible="{Binding Installed}">
+                          <TextBlock Text="{Binding InstalledBadge}" Foreground="#9affd0" FontSize="8" FontWeight="Bold"/>
+                        </Border>
+                        <TextBlock Text="{Binding Author}" Foreground="#566083" FontSize="10" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <!-- list mode -->
+          <ItemsControl ItemsSource="{Binding Plugins}" IsVisible="{Binding IsListMode}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:PluginItemViewModel">
               <Border Classes="pluginCard" BorderThickness="1"
@@ -230,7 +312,8 @@
               </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
-        </ItemsControl>
+          </ItemsControl>
+        </Panel>
       </ScrollViewer>
     </Grid>
 

@@ -28,6 +28,20 @@ public partial class PluginsViewModel : ObservableObject
     [ObservableProperty] private int _installedCount;
     [ObservableProperty] private int _updateCount;
 
+    // Card grid vs list rows; persisted so the page reopens the way the user left it.
+    [ObservableProperty] private bool _isGridMode;
+    public bool IsListMode => !IsGridMode;
+
+    partial void OnIsGridModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsListMode));
+        var cfg = _settings.Load();
+        if (cfg.PluginsGridView != value) { cfg.PluginsGridView = value; _settings.Save(cfg); }
+    }
+
+    [RelayCommand] private void SetGridMode() => IsGridMode = true;
+    [RelayCommand] private void SetListMode() => IsGridMode = false;
+
     // Detail page: non-null swaps the list for the selected plugin's detail view.
     [ObservableProperty] private PluginItemViewModel? _selectedPlugin;
     // Full-size image overlay opened from the detail media gallery.
@@ -76,6 +90,7 @@ public partial class PluginsViewModel : ObservableObject
     {
         _registry = registry; _installer = installer; _frameworkInstaller = frameworkInstaller;
         _settings = settings; _http = http;
+        _isGridMode = settings.Load().PluginsGridView;
         _ = ReloadAsync();
     }
 

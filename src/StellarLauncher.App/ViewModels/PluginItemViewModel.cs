@@ -86,7 +86,7 @@ public partial class PluginItemViewModel : ObservableObject
             Thumbnail = await Task.Run(() =>
             {
                 using var ms = new System.IO.MemoryStream(bytes);
-                return Bitmap.DecodeToWidth(ms, 128);
+                return Bitmap.DecodeToWidth(ms, 420);   // sharp enough for the 210px grid cover
             });
         }
         catch { /* badge falls back to the monogram */ }

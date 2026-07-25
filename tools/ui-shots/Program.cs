@@ -56,9 +56,14 @@ internal static class Program
         main.ShowPluginsCommand.Execute(null);
         var plugins = main.Plugins;
         Require(WaitUntil(() => plugins.Plugins.Count >= 5), "plugin registry loaded");
-        WaitUntil(() => plugins.Plugins.Count(p => p.Thumbnail is not null) >= 3, 10000);   // list badges
+        WaitUntil(() => plugins.Plugins.Count(p => p.Thumbnail is not null) >= 3, 10000);   // badges/covers
         Pump(600);
-        Shot(window, "03-plugins-list");
+        plugins.IsGridMode = true;
+        Pump(300);
+        Shot(window, "03a-plugins-grid");
+        plugins.IsGridMode = false;
+        Pump(300);
+        Shot(window, "03b-plugins-list");
 
         // -------- Detail page (CombatMeter — media + guide + changelog) --------
         var meter = plugins.Plugins.FirstOrDefault(p => p.Entry.Id == "combatmeter")
