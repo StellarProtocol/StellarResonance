@@ -2,181 +2,578 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StellarLauncher.App.ViewModels"
              xmlns:model="using:StellarLauncher.Core.Model"
+             xmlns:views="using:StellarLauncher.App.Views"
              xmlns:sys="using:System"
              x:Class="StellarLauncher.App.Views.PluginsView"
              x:DataType="vm:PluginsViewModel">
-  <Grid RowDefinitions="Auto,Auto,Auto,*">
-    <Grid.Styles>
-      <Style Selector="Button.tab">
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Foreground" Value="#8a93b2"/>
-        <Setter Property="Padding" Value="16,8"/>
-        <Setter Property="CornerRadius" Value="0"/>
-        <Setter Property="FontSize" Value="12"/>
-      </Style>
-      <Style Selector="Button.tab:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="TextElement.Foreground" Value="#9aa3bf"/>
-      </Style>
-      <Style Selector="Button.tab.active">
-        <Setter Property="Foreground" Value="White"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-      </Style>
-      <Style Selector="Button.tab.active:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="TextElement.Foreground" Value="White"/>
-      </Style>
-    </Grid.Styles>
-    <StackPanel Grid.Row="0" Margin="28,24,28,8" Spacing="3">
-      <TextBlock Text="Plugins" Foreground="White" FontSize="20" FontWeight="Bold"/>
-      <TextBlock Text="{Binding Status}" Foreground="#8a93b2" FontSize="12"/>
-    </StackPanel>
+  <UserControl.Styles>
+    <Style Selector="Button.tab">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="#8a93b2"/>
+      <Setter Property="Padding" Value="16,8"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="FontSize" Value="12"/>
+    </Style>
+    <Style Selector="Button.tab:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="TextElement.Foreground" Value="#9aa3bf"/>
+    </Style>
+    <Style Selector="Button.tab.active">
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="Button.tab.active:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="TextElement.Foreground" Value="White"/>
+    </Style>
+    <!-- whole card opens the detail page (interactive children excluded in code-behind) -->
+    <Style Selector="Border.pluginCard">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Background" Value="#141a2e"/>
+      <Setter Property="BorderBrush" Value="#222a44"/>
+    </Style>
+    <Style Selector="Border.pluginCard:pointerover">
+      <Setter Property="Background" Value="#171e36"/>
+      <Setter Property="BorderBrush" Value="#2c3860"/>
+    </Style>
+    <!-- section labels on the detail page -->
+    <Style Selector="TextBlock.section">
+      <Setter Property="Foreground" Value="#566083"/>
+      <Setter Property="FontSize" Value="10"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="LetterSpacing" Value="1.5"/>
+    </Style>
+    <!-- grid/list view-mode toggle buttons -->
+    <Style Selector="Button.viewmode">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="7,5"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style Selector="Button.viewmode:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#161d33"/>
+    </Style>
+    <Style Selector="Button.viewmode.active">
+      <Setter Property="Background" Value="#1a2340"/>
+    </Style>
+    <Style Selector="Button.viewmode.active:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#1a2340"/>
+    </Style>
+    <!-- link-styled buttons (homepage / source) -->
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Foreground" Value="#5b8cff"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="TextElement.Foreground" Value="#8cb0ff"/>
+    </Style>
+  </UserControl.Styles>
 
-    <!-- add 3rd-party repo + existing repos -->
-    <StackPanel Grid.Row="1" Margin="28,0,28,8" Spacing="6">
-      <Grid ColumnDefinitions="*,Auto">
-        <TextBox Grid.Column="0" Text="{Binding NewRepoUrl}"
-                 PlaceholderText="add a 3rd-party plugin repo URL (a plugins.json)"/>
-        <Button Grid.Column="1" Content="Add repo" Command="{Binding AddRepoCommand}" Margin="8,0,0,0"/>
-      </Grid>
-      <ItemsControl ItemsSource="{Binding Repos}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="x:String">
-            <Grid ColumnDefinitions="*,Auto" Margin="0,2,0,0">
-              <TextBlock Grid.Column="0" Text="{Binding}" Foreground="#8a93b2" FontSize="11" VerticalAlignment="Center"/>
-              <Button Grid.Column="1" Content="✕" FontSize="11" Padding="8,2"
-                      Background="Transparent" Foreground="#9aa3bf"
-                      Command="{Binding $parent[UserControl].((vm:PluginsViewModel)DataContext).RemoveRepoCommand}"
-                      CommandParameter="{Binding}"/>
-            </Grid>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-    </StackPanel>
-
-    <!-- tab bar -->
-    <Border Grid.Row="2" BorderBrush="#1e2540" BorderThickness="0,0,0,1" Margin="28,0,28,0">
-      <StackPanel Orientation="Horizontal" Spacing="0">
-        <StackPanel>
-          <Button Content="Available" Classes="tab" Classes.active="{Binding IsTabAvailable}"
-                  Command="{Binding SetTabAvailableCommand}"/>
-          <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabAvailable}"/>
-        </StackPanel>
-        <StackPanel>
-          <Button Content="{Binding InstalledTabLabel}" Classes="tab" Classes.active="{Binding IsTabInstalled}"
-                  Command="{Binding SetTabInstalledCommand}"/>
-          <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabInstalled}"/>
-        </StackPanel>
-        <StackPanel>
-          <Button Content="{Binding UpdatesTabLabel}" Classes="tab" Classes.active="{Binding IsTabUpdates}"
-                  Command="{Binding SetTabUpdatesCommand}"/>
-          <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabUpdates}"/>
-        </StackPanel>
+  <Panel>
+    <!-- ======================= LIST PAGE ======================= -->
+    <Grid RowDefinitions="Auto,Auto,Auto,*" IsVisible="{Binding !IsDetailOpen}">
+      <StackPanel Grid.Row="0" Margin="28,24,28,8" Spacing="3">
+        <TextBlock Text="Plugins" Foreground="White" FontSize="20" FontWeight="Bold"/>
+        <TextBlock Text="{Binding Status}" Foreground="#8a93b2" FontSize="12"/>
       </StackPanel>
-    </Border>
 
-    <!-- plugin list -->
-    <ScrollViewer Grid.Row="3" Margin="28,10,28,16">
-      <ItemsControl ItemsSource="{Binding Plugins}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:PluginItemViewModel">
-            <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"
-                    CornerRadius="12" Padding="15,13" Margin="0,0,0,10">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
-                <StackPanel Grid.Column="0" Spacing="5">
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="Bold"/>
-                    <TextBlock Text="{Binding Author}" Foreground="#566083" FontSize="11" VerticalAlignment="Center"/>
-                    <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1" IsVisible="{Binding Installed}">
-                      <TextBlock Text="{Binding InstalledBadge}"
-                                 Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
-                    </Border>
-                    <Border Background="#40cc8800" CornerRadius="5" Padding="6,1" IsVisible="{Binding HasUpdate}"
-                            BorderBrush="#ffb740" BorderThickness="1">
-                      <TextBlock Text="UPDATE AVAILABLE" Foreground="#ffb740" FontSize="9" FontWeight="Bold"/>
-                    </Border>
-                  </StackPanel>
-                  <TextBlock Text="{Binding Description}" Foreground="#c5cce0" FontSize="12" TextWrapping="Wrap"/>
-                  <!-- selected version's changelog preview -->
-                  <ItemsControl ItemsSource="{Binding SelectedChangelog.Added}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="sys:String">
-                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,1,0,0">
-                          <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1">
-                            <TextBlock Text="ADDED" Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
-                          </Border>
-                          <TextBlock Text="{Binding}" Foreground="#aab3d0" FontSize="11" TextWrapping="Wrap"/>
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                  <ItemsControl ItemsSource="{Binding SelectedChangelog.Fixed}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="sys:String">
-                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,1,0,0">
-                          <Border Background="#235b8cff" CornerRadius="5" Padding="6,1">
-                            <TextBlock Text="FIXED" Foreground="#9ec2ff" FontSize="9" FontWeight="Bold"/>
-                          </Border>
-                          <TextBlock Text="{Binding}" Foreground="#aab3d0" FontSize="11" TextWrapping="Wrap"/>
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                  <TextBlock Text="{Binding CompatNote}" Foreground="#ff9a9a" FontSize="11"
-                             IsVisible="{Binding CompatNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                  <TextBlock Text="{Binding Action}" Foreground="#7ee0a0" FontSize="11"
-                             IsVisible="{Binding Action, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                </StackPanel>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6" MinWidth="172">
-                  <ComboBox HorizontalAlignment="Stretch"
-                            ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}">
-                    <ComboBox.ItemTemplate>
-                      <DataTemplate x:DataType="model:PluginVersion">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                          <TextBlock Text="{Binding Version, StringFormat='v{0}'}"/>
-                          <TextBlock Text="{Binding Date}" Foreground="#697297"/>
-                        </StackPanel>
-                      </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                  </ComboBox>
-                  <!-- action row -->
-                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"
-                              IsVisible="{Binding !ConfirmVisible}">
-                    <!-- green = fresh install -->
-                    <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
-                            IsEnabled="{Binding Compatible}" IsVisible="{Binding IsPlainInstall}"
-                            Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="14,6" CornerRadius="8"/>
-                    <!-- amber = update -->
-                    <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
-                            IsEnabled="{Binding Compatible}" IsVisible="{Binding IsUpdate}"
-                            Foreground="#0b0e16" Background="#ffb740" FontWeight="Bold" Padding="14,6" CornerRadius="8"/>
-                    <!-- muted = reinstall (already on this version) -->
-                    <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
-                            IsEnabled="{Binding Compatible}" IsVisible="{Binding IsReinstall}"
-                            Foreground="#9aa3bf" Background="#1a2035" BorderBrush="#2f3a5a" BorderThickness="1"
-                            Padding="14,6" CornerRadius="8"/>
-                    <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding Installed}"
-                            Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
-                            Padding="12,6" CornerRadius="8"/>
-                  </StackPanel>
-                  <!-- inline confirm -->
-                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"
-                              IsVisible="{Binding ConfirmVisible}">
-                    <TextBlock Text="⚠" Foreground="#ffcf6b" VerticalAlignment="Center" IsVisible="{Binding IsDowngrade}"/>
-                    <Button Content="Cancel" Command="{Binding CancelInstallCommand}"
-                            Foreground="#cfd6f0" Background="Transparent" BorderBrush="#2f4570" BorderThickness="1"
-                            Padding="12,6" CornerRadius="8"/>
-                    <Button Content="Confirm" Command="{Binding ConfirmInstallCommand}"
-                            Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="12,6" CornerRadius="8"/>
-                  </StackPanel>
-                </StackPanel>
+      <!-- add 3rd-party repo + existing repos -->
+      <StackPanel Grid.Row="1" Margin="28,0,28,8" Spacing="6">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Grid.Column="0" Text="{Binding NewRepoUrl}"
+                   PlaceholderText="add a 3rd-party plugin repo URL (a plugins.json)"/>
+          <Button Grid.Column="1" Content="Add repo" Command="{Binding AddRepoCommand}" Margin="8,0,0,0"/>
+        </Grid>
+        <ItemsControl ItemsSource="{Binding Repos}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Grid ColumnDefinitions="*,Auto" Margin="0,2,0,0">
+                <TextBlock Grid.Column="0" Text="{Binding}" Foreground="#8a93b2" FontSize="11" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Content="✕" FontSize="11" Padding="8,2"
+                        Background="Transparent" Foreground="#9aa3bf"
+                        Command="{Binding $parent[UserControl].((vm:PluginsViewModel)DataContext).RemoveRepoCommand}"
+                        CommandParameter="{Binding}"/>
               </Grid>
-            </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <!-- tab bar + view-mode toggle -->
+      <Border Grid.Row="2" BorderBrush="#1e2540" BorderThickness="0,0,0,1" Margin="28,0,28,0">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="0">
+            <StackPanel>
+              <Button Content="Available" Classes="tab" Classes.active="{Binding IsTabAvailable}"
+                      Command="{Binding SetTabAvailableCommand}"/>
+              <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabAvailable}"/>
+            </StackPanel>
+            <StackPanel>
+              <Button Content="{Binding InstalledTabLabel}" Classes="tab" Classes.active="{Binding IsTabInstalled}"
+                      Command="{Binding SetTabInstalledCommand}"/>
+              <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabInstalled}"/>
+            </StackPanel>
+            <StackPanel>
+              <Button Content="{Binding UpdatesTabLabel}" Classes="tab" Classes.active="{Binding IsTabUpdates}"
+                      Command="{Binding SetTabUpdatesCommand}"/>
+              <Border Height="2" Background="#54e3a0" IsVisible="{Binding IsTabUpdates}"/>
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+            <Button Classes="viewmode" Classes.active="{Binding IsGridMode}"
+                    Command="{Binding SetGridModeCommand}" ToolTip.Tip="Card view">
+              <Viewbox Width="14" Height="14"><Canvas Width="24" Height="24">
+                <Path Fill="#9aa3bf" Data="M3,3H11V11H3V3M13,3H21V11H13V3M3,13H11V21H3V13M13,13H21V21H13V13Z"/>
+              </Canvas></Viewbox>
+            </Button>
+            <Button Classes="viewmode" Classes.active="{Binding IsListMode}"
+                    Command="{Binding SetListModeCommand}" ToolTip.Tip="List view">
+              <Viewbox Width="14" Height="14"><Canvas Width="24" Height="24">
+                <Path Fill="#9aa3bf" Data="M3,4H21V8H3V4M3,10H21V14H3V10M3,16H21V20H3V16Z"/>
+              </Canvas></Viewbox>
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- plugin list / card grid -->
+      <ScrollViewer Grid.Row="3" Margin="28,10,28,16">
+        <Panel>
+          <!-- card grid mode -->
+          <ItemsControl ItemsSource="{Binding Plugins}" IsVisible="{Binding IsGridMode}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PluginItemViewModel">
+                <Border Classes="pluginCard" BorderThickness="1" CornerRadius="12" ClipToBounds="True"
+                        Width="212" Margin="0,0,12,12"
+                        PointerReleased="OnCardPointerReleased">
+                  <StackPanel>
+                    <!-- cover: thumbnail / monogram, with state badges overlaid -->
+                    <Panel Height="118" Background="#1a2340">
+                      <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"/>
+                      <TextBlock Text="{Binding Monogram}" IsVisible="{Binding ShowMonogram}"
+                                 Foreground="#8ea4d8" FontSize="34" FontWeight="Bold"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      <Border IsVisible="{Binding HasUpdate}" Background="#E60b0e16"
+                              BorderBrush="#ffb740" BorderThickness="1" CornerRadius="6"
+                              Padding="7,2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="7">
+                        <TextBlock Text="UPDATE" Foreground="#ffb740" FontSize="9" FontWeight="Bold"/>
+                      </Border>
+                      <Border IsVisible="{Binding Installed}" Background="#E60b0e16"
+                              BorderBrush="#2f6b46" BorderThickness="1" CornerRadius="6"
+                              Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="7">
+                        <TextBlock Text="✓" Foreground="#9affd0" FontSize="10" FontWeight="Bold"/>
+                      </Border>
+                    </Panel>
+                    <!-- name + mini detail -->
+                    <StackPanel Margin="11,8,11,10" Spacing="4">
+                      <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="Bold" FontSize="13"
+                                 TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Text="{Binding Description}" Foreground="#8a93b2" FontSize="11"
+                                 TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                 LineHeight="15" Height="30"/>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1" IsVisible="{Binding Installed}">
+                          <TextBlock Text="{Binding InstalledBadge}" Foreground="#9affd0" FontSize="8" FontWeight="Bold"/>
+                        </Border>
+                        <TextBlock Text="{Binding Author}" Foreground="#566083" FontSize="10" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <!-- list mode -->
+          <ItemsControl ItemsSource="{Binding Plugins}" IsVisible="{Binding IsListMode}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PluginItemViewModel">
+              <Border Classes="pluginCard" BorderThickness="1"
+                      CornerRadius="12" Padding="15,13" Margin="0,0,0,10"
+                      PointerReleased="OnCardPointerReleased">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="14">
+                  <!-- badge: icon / first screenshot / monogram -->
+                  <Border Grid.Column="0" Width="56" Height="56" CornerRadius="10" ClipToBounds="True"
+                          Background="#1a2340" BorderBrush="#222a44" BorderThickness="1"
+                          VerticalAlignment="Top">
+                    <Panel>
+                      <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"/>
+                      <TextBlock Text="{Binding Monogram}" IsVisible="{Binding ShowMonogram}"
+                                 Foreground="#8ea4d8" FontSize="24" FontWeight="Bold"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Panel>
+                  </Border>
+                  <StackPanel Grid.Column="1" Spacing="5">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="Bold"/>
+                      <TextBlock Text="{Binding Author}" Foreground="#566083" FontSize="11" VerticalAlignment="Center"/>
+                      <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1" IsVisible="{Binding Installed}">
+                        <TextBlock Text="{Binding InstalledBadge}"
+                                   Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
+                      </Border>
+                      <Border Background="#40cc8800" CornerRadius="5" Padding="6,1" IsVisible="{Binding HasUpdate}"
+                              BorderBrush="#ffb740" BorderThickness="1">
+                        <TextBlock Text="UPDATE AVAILABLE" Foreground="#ffb740" FontSize="9" FontWeight="Bold"/>
+                      </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Description}" Foreground="#c5cce0" FontSize="12" TextWrapping="Wrap"/>
+                    <!-- selected version's changelog preview (badge column + wrapping text column) -->
+                    <ItemsControl ItemsSource="{Binding SelectedChangelog.Added}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="sys:String">
+                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,1,0,0">
+                            <Border Grid.Column="0" Background="#2354e3a0" CornerRadius="5" Padding="6,1"
+                                    VerticalAlignment="Top" Margin="0,2,0,0">
+                              <TextBlock Text="ADDED" Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#aab3d0" FontSize="11"
+                                       TextWrapping="Wrap" LineHeight="16"/>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding SelectedChangelog.Fixed}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="sys:String">
+                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,1,0,0">
+                            <Border Grid.Column="0" Background="#235b8cff" CornerRadius="5" Padding="6,1"
+                                    VerticalAlignment="Top" Margin="0,2,0,0">
+                              <TextBlock Text="FIXED" Foreground="#9ec2ff" FontSize="9" FontWeight="Bold"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#aab3d0" FontSize="11"
+                                       TextWrapping="Wrap" LineHeight="16"/>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding CompatNote}" Foreground="#ff9a9a" FontSize="11"
+                               IsVisible="{Binding CompatNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <TextBlock Text="{Binding Action}" Foreground="#7ee0a0" FontSize="11"
+                               IsVisible="{Binding Action, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="6" MinWidth="172">
+                    <ComboBox HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="model:PluginVersion">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{Binding Version, StringFormat='v{0}'}"/>
+                            <TextBlock Text="{Binding Date}" Foreground="#697297"/>
+                          </StackPanel>
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <!-- action row -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"
+                                IsVisible="{Binding !ConfirmVisible}">
+                      <!-- green = fresh install -->
+                      <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
+                              IsEnabled="{Binding Compatible}" IsVisible="{Binding IsPlainInstall}"
+                              Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="14,6" CornerRadius="8"/>
+                      <!-- amber = update -->
+                      <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
+                              IsEnabled="{Binding Compatible}" IsVisible="{Binding IsUpdate}"
+                              Foreground="#0b0e16" Background="#ffb740" FontWeight="Bold" Padding="14,6" CornerRadius="8"/>
+                      <!-- muted = reinstall (already on this version) -->
+                      <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
+                              IsEnabled="{Binding Compatible}" IsVisible="{Binding IsReinstall}"
+                              Foreground="#9aa3bf" Background="#1a2035" BorderBrush="#2f3a5a" BorderThickness="1"
+                              Padding="14,6" CornerRadius="8"/>
+                      <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding Installed}"
+                              Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
+                              Padding="12,6" CornerRadius="8"/>
+                    </StackPanel>
+                    <!-- inline confirm -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"
+                                IsVisible="{Binding ConfirmVisible}">
+                      <TextBlock Text="⚠" Foreground="#ffcf6b" VerticalAlignment="Center" IsVisible="{Binding IsDowngrade}"/>
+                      <Button Content="Cancel" Command="{Binding CancelInstallCommand}"
+                              Foreground="#cfd6f0" Background="Transparent" BorderBrush="#2f4570" BorderThickness="1"
+                              Padding="12,6" CornerRadius="8"/>
+                      <Button Content="Confirm" Command="{Binding ConfirmInstallCommand}"
+                              Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="12,6" CornerRadius="8"/>
+                    </StackPanel>
+                  </StackPanel>
+
+                  <!-- details affordance -->
+                  <TextBlock Grid.Column="3" Text="›" FontSize="24" Foreground="#566083"
+                             VerticalAlignment="Center" Margin="0,0,2,2"/>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Panel>
+      </ScrollViewer>
+    </Grid>
+
+    <!-- ======================= DETAIL PAGE ======================= -->
+    <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsDetailOpen}">
+      <Button Grid.Row="0" Content="←  All plugins" Command="{Binding CloseDetailCommand}"
+              Margin="28,20,28,10" Padding="10,6" CornerRadius="8" FontSize="12"
+              Foreground="#cfd6f0" Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"/>
+      <ContentControl Grid.Row="1" Content="{Binding SelectedPlugin}">
+        <ContentControl.ContentTemplate>
+          <DataTemplate x:DataType="vm:PluginItemViewModel">
+            <ScrollViewer>
+              <StackPanel Margin="28,0,28,20" Spacing="12">
+
+                <!-- header: identity + install actions -->
+                <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"
+                        CornerRadius="12" Padding="18,15">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                    <Border Grid.Column="0" Width="68" Height="68" CornerRadius="12" ClipToBounds="True"
+                            Background="#1a2340" BorderBrush="#222a44" BorderThickness="1"
+                            VerticalAlignment="Top">
+                      <Panel>
+                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"/>
+                        <TextBlock Text="{Binding Monogram}" IsVisible="{Binding ShowMonogram}"
+                                   Foreground="#8ea4d8" FontSize="28" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      </Panel>
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="7">
+                      <StackPanel Orientation="Horizontal" Spacing="9">
+                        <TextBlock Text="{Binding Name}" Foreground="White" FontSize="19" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding Author}" Foreground="#566083" FontSize="12" VerticalAlignment="Center"/>
+                        <Border Background="#2354e3a0" CornerRadius="5" Padding="6,1" IsVisible="{Binding Installed}"
+                                VerticalAlignment="Center">
+                          <TextBlock Text="{Binding InstalledBadge}" Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
+                        </Border>
+                        <Border Background="#40cc8800" CornerRadius="5" Padding="6,1" IsVisible="{Binding HasUpdate}"
+                                BorderBrush="#ffb740" BorderThickness="1" VerticalAlignment="Center">
+                          <TextBlock Text="UPDATE AVAILABLE" Foreground="#ffb740" FontSize="9" FontWeight="Bold"/>
+                        </Border>
+                      </StackPanel>
+                      <TextBlock Text="{Binding Description}" Foreground="#c5cce0" FontSize="12.5"
+                                 TextWrapping="Wrap" LineHeight="18"/>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6"/></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                              <Border Background="#1a2340" CornerRadius="9" Padding="8,2">
+                                <TextBlock Text="{Binding}" Foreground="#8ea4d8" FontSize="10"/>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="link" Content="Homepage ↗" IsVisible="{Binding HasHomepage}"
+                                Command="{Binding $parent[UserControl].((vm:PluginsViewModel)DataContext).OpenLinkCommand}"
+                                CommandParameter="{Binding Homepage}"/>
+                        <Button Classes="link" Content="Source ↗" IsVisible="{Binding HasSource}"
+                                Command="{Binding $parent[UserControl].((vm:PluginsViewModel)DataContext).OpenLinkCommand}"
+                                CommandParameter="{Binding SourceUrl}"/>
+                      </StackPanel>
+                      <TextBlock Text="{Binding CompatNote}" Foreground="#ff9a9a" FontSize="11"
+                                 IsVisible="{Binding CompatNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                      <TextBlock Text="{Binding Action}" Foreground="#7ee0a0" FontSize="11"
+                                 IsVisible="{Binding Action, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" VerticalAlignment="Top" Spacing="6" MinWidth="172">
+                      <ComboBox HorizontalAlignment="Stretch"
+                                ItemsSource="{Binding Versions}" SelectedItem="{Binding SelectedVersion}">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate x:DataType="model:PluginVersion">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Text="{Binding Version, StringFormat='v{0}'}"/>
+                              <TextBlock Text="{Binding Date}" Foreground="#697297"/>
+                            </StackPanel>
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"
+                                  IsVisible="{Binding !ConfirmVisible}">
+                        <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
+                                IsEnabled="{Binding Compatible}" IsVisible="{Binding IsPlainInstall}"
+                                Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="14,6" CornerRadius="8"/>
+                        <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
+                                IsEnabled="{Binding Compatible}" IsVisible="{Binding IsUpdate}"
+                                Foreground="#0b0e16" Background="#ffb740" FontWeight="Bold" Padding="14,6" CornerRadius="8"/>
+                        <Button Content="{Binding InstallLabel}" Command="{Binding RequestInstallCommand}"
+                                IsEnabled="{Binding Compatible}" IsVisible="{Binding IsReinstall}"
+                                Foreground="#9aa3bf" Background="#1a2035" BorderBrush="#2f3a5a" BorderThickness="1"
+                                Padding="14,6" CornerRadius="8"/>
+                        <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding Installed}"
+                                Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
+                                Padding="12,6" CornerRadius="8"/>
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"
+                                  IsVisible="{Binding ConfirmVisible}">
+                        <TextBlock Text="⚠" Foreground="#ffcf6b" VerticalAlignment="Center" IsVisible="{Binding IsDowngrade}"/>
+                        <Button Content="Cancel" Command="{Binding CancelInstallCommand}"
+                                Foreground="#cfd6f0" Background="Transparent" BorderBrush="#2f4570" BorderThickness="1"
+                                Padding="12,6" CornerRadius="8"/>
+                        <Button Content="Confirm" Command="{Binding ConfirmInstallCommand}"
+                                Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="12,6" CornerRadius="8"/>
+                      </StackPanel>
+                    </StackPanel>
+                  </Grid>
+                </Border>
+
+                <!-- media gallery -->
+                <StackPanel Spacing="7" IsVisible="{Binding HasMedia}">
+                  <TextBlock Classes="section" Text="SCREENSHOTS &amp; VIDEOS"/>
+                  <!-- vertical bar Hidden (not Disabled): Disabled forces content into the viewport
+                       height and clips the second caption line under the tiles -->
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Hidden">
+                    <!-- bottom margin keeps the overlay horizontal scrollbar off the captions -->
+                    <ItemsControl ItemsSource="{Binding Media}" Margin="0,0,0,14">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="10"/></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MediaItemViewModel">
+                          <Button Command="{Binding OpenCommand}" Padding="0" Background="Transparent"
+                                  BorderThickness="0" CornerRadius="10" VerticalAlignment="Top">
+                            <StackPanel Spacing="5" Width="248">
+                              <Border Height="140" CornerRadius="10" ClipToBounds="True"
+                                      Background="#0d1120" BorderBrush="#222a44" BorderThickness="1">
+                                <Panel>
+                                  <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"/>
+                                  <TextBlock Text="{Binding PlaceholderLabel}" IsVisible="{Binding ShowPlaceholder}"
+                                             Foreground="#566083" FontSize="13"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                  <Border IsVisible="{Binding ShowPlayOverlay}" Width="44" Height="44"
+                                          CornerRadius="22" Background="#C0060810"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="▶" Foreground="White" FontSize="17"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Margin="4,0,0,0"/>
+                                  </Border>
+                                </Panel>
+                              </Border>
+                              <TextBlock Text="{Binding Caption}" IsVisible="{Binding HasCaption}"
+                                         Foreground="#8a93b2" FontSize="11" TextWrapping="Wrap"/>
+                            </StackPanel>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </StackPanel>
+
+                <!-- guide -->
+                <StackPanel Spacing="7">
+                  <TextBlock Classes="section" Text="GUIDE"/>
+                  <Border Background="#10141f" BorderBrush="#222a44" BorderThickness="1"
+                          CornerRadius="12" Padding="18,14">
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding GuideStatus}" IsVisible="{Binding HasGuideStatus}"
+                                 Foreground="#8a93b2" FontSize="12"/>
+                      <TextBlock Text="This plugin hasn't published a guide yet — the description above covers the basics."
+                                 IsVisible="{Binding !HasGuideUrl}" Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
+                      <views:MarkdownView Markdown="{Binding GuideMarkdown}" BaseUrl="{Binding Entry.GuideUrl}"/>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+
+                <!-- changelog -->
+                <StackPanel Spacing="7">
+                  <TextBlock Classes="section" Text="CHANGELOG"/>
+                  <ItemsControl ItemsSource="{Binding Versions}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="model:PluginVersion">
+                        <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"
+                                CornerRadius="12" Padding="15,13" Margin="0,0,0,10">
+                          <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                              <TextBlock Text="{Binding Version, StringFormat='v{0}'}"
+                                         Foreground="White" FontWeight="Bold"/>
+                              <TextBlock Text="{Binding Date}" Foreground="#566083" FontSize="11"
+                                         VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <ItemsControl ItemsSource="{Binding Changelog.Added}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="sys:String">
+                                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,0,0,3">
+                                    <Border Grid.Column="0" Background="#2354e3a0" CornerRadius="5" Padding="6,1"
+                                            VerticalAlignment="Top" Margin="0,2,0,0">
+                                      <TextBlock Text="ADDED" Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
+                                    </Border>
+                                    <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#c5cce0" FontSize="12"
+                                               TextWrapping="Wrap" LineHeight="17"/>
+                                  </Grid>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding Changelog.Changed}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="sys:String">
+                                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,0,0,3">
+                                    <Border Grid.Column="0" Background="#23ffcf6b" CornerRadius="5" Padding="6,1"
+                                            VerticalAlignment="Top" Margin="0,2,0,0">
+                                      <TextBlock Text="CHANGED" Foreground="#ffcf6b" FontSize="9" FontWeight="Bold"/>
+                                    </Border>
+                                    <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#c5cce0" FontSize="12"
+                                               TextWrapping="Wrap" LineHeight="17"/>
+                                  </Grid>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding Changelog.Fixed}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="sys:String">
+                                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,0,0,3">
+                                    <Border Grid.Column="0" Background="#235b8cff" CornerRadius="5" Padding="6,1"
+                                            VerticalAlignment="Top" Margin="0,2,0,0">
+                                      <TextBlock Text="FIXED" Foreground="#9ec2ff" FontSize="9" FontWeight="Bold"/>
+                                    </Border>
+                                    <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#c5cce0" FontSize="12"
+                                               TextWrapping="Wrap" LineHeight="17"/>
+                                  </Grid>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding Changelog.Removed}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="sys:String">
+                                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,0,0,3">
+                                    <Border Grid.Column="0" Background="#23ff6b6b" CornerRadius="5" Padding="6,1"
+                                            VerticalAlignment="Top" Margin="0,2,0,0">
+                                      <TextBlock Text="REMOVED" Foreground="#ff9a9a" FontSize="9" FontWeight="Bold"/>
+                                    </Border>
+                                    <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#c5cce0" FontSize="12"
+                                               TextWrapping="Wrap" LineHeight="17"/>
+                                  </Grid>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+
+              </StackPanel>
+            </ScrollViewer>
           </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-    </ScrollViewer>
-  </Grid>
+        </ContentControl.ContentTemplate>
+      </ContentControl>
+    </Grid>
+
+    <!-- ======================= LIGHTBOX ======================= -->
+    <Panel IsVisible="{Binding IsLightboxOpen}" Background="#EB060810"
+           PointerReleased="OnLightboxPointerReleased">
+      <Image Source="{Binding LightboxImage}" Margin="46" Stretch="Uniform" StretchDirection="DownOnly"/>
+      <Button Content="✕" Command="{Binding CloseLightboxCommand}"
+              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,14,18,0"
+              FontSize="14" Padding="10,6" CornerRadius="8"
+              Foreground="#cfd6f0" Background="#40141a2e" BorderBrush="#2f3a5a" BorderThickness="1"/>
+    </Panel>
+  </Panel>
 </UserControl>

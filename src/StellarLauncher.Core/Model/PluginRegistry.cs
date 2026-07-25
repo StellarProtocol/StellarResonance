@@ -14,14 +14,29 @@ public sealed record PluginVersion(
     [property: JsonPropertyName("sha256")]              string Sha256,
     [property: JsonPropertyName("minModSystemVersion")] string MinModSystemVersion,
     [property: JsonPropertyName("maxModSystemVersion")] string? MaxModSystemVersion,
-    [property: JsonPropertyName("changelog")]           Changelog? Changelog);
+    [property: JsonPropertyName("changelog")]           Changelog? Changelog,
+    [property: JsonPropertyName("sourceRepository")]    string? SourceRepository = null,   // display-only provenance
+    [property: JsonPropertyName("sourceTag")]           string? SourceTag = null);
+
+// One media item on a plugin's detail page: a screenshot or a YouTube video.
+// "image" → Url is the picture itself; "youtube" → Url is a watch/short/embed link the
+// launcher opens in the system browser (it only ever downloads the thumbnail).
+public sealed record PluginMedia(
+    [property: JsonPropertyName("type")]    string Type,
+    [property: JsonPropertyName("url")]     string Url,
+    [property: JsonPropertyName("caption")] string? Caption);
 
 public sealed record PluginEntry(
     [property: JsonPropertyName("id")]          string Id,
     [property: JsonPropertyName("name")]        string Name,
     [property: JsonPropertyName("description")] string Description,
     [property: JsonPropertyName("author")]      string? Author,
-    [property: JsonPropertyName("versions")]    IReadOnlyList<PluginVersion> Versions);
+    [property: JsonPropertyName("versions")]    IReadOnlyList<PluginVersion> Versions,
+    [property: JsonPropertyName("tags")]        IReadOnlyList<string>? Tags = null,
+    [property: JsonPropertyName("homepage")]    string? Homepage = null,
+    [property: JsonPropertyName("media")]       IReadOnlyList<PluginMedia>? Media = null,
+    [property: JsonPropertyName("guideUrl")]    string? GuideUrl = null,
+    [property: JsonPropertyName("iconUrl")]     string? IconUrl = null);   // badge image; list falls back to the first image media
 
 public sealed record PluginRegistry(
     [property: JsonPropertyName("plugins")] IReadOnlyList<PluginEntry> Plugins)

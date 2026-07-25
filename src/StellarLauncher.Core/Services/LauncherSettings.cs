@@ -9,6 +9,7 @@ public sealed class LauncherSettings
     public string? Runner { get; set; }      // Linux only
     public string? WinePrefix { get; set; }  // Linux only
     public bool Modded { get; set; } = true;
+    public bool PluginsGridView { get; set; } = true;   // Plugins page: card grid (default) vs list rows
     public List<string> ExtraPluginRepos { get; set; } = new();
     public string Channel { get; set; } = "stable";   // "stable" | "testing"
     public bool DebugLogging { get; set; } = false;    // off = prod BepInEx.cfg (no console, buffered); on = console + crash-flush

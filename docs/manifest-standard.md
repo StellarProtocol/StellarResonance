@@ -73,6 +73,13 @@ runs on** so the launcher can gate it against the installed/selected framework.
       "name": "Party Overlay",
       "description": "Raid party roster overlay.",
       "author": "example",
+      "tags": ["overlay", "party"],
+      "homepage": "https://example.com/party-overlay",
+      "media": [
+        { "type": "image", "url": "https://cdn.revette.io/plugins/party-overlay/media/roster.png", "caption": "The roster overlay." },
+        { "type": "youtube", "url": "https://www.youtube.com/watch?v=XXXXXXXXXXX", "caption": "Setup walkthrough." }
+      ],
+      "guideUrl": "https://cdn.revette.io/plugins/party-overlay/guide.md",
       "versions": [
         {
           "version": "2.1.0",
@@ -109,6 +116,33 @@ runs on** so the launcher can gate it against the installed/selected framework.
 - `sourceTag` — optional, **display-only** provenance. CI verifies the tag resolves to `sourceCommit`
   but never builds from a tag alone (tags are mutable; the pinned commit is not).
 
+**Plugin-level presentation fields (all optional)** — powering the launcher's plugin **detail page**
+(added 2026-07-25; older launchers ignore them, and the new launcher renders registries without
+them unchanged):
+
+- `tags` — short keyword chips (`["combat", "overlay"]`).
+- `homepage` — an http(s) link shown as "Homepage ↗".
+- `iconUrl` — badge image for the plugin list and detail header; when absent the launcher uses
+  the first `media` image, else a monogram tile.
+- `media` — ordered gallery entries `{ "type", "url", "caption"? }` with `type` one of:
+  - `"image"` — `url` is the picture; the launcher shows a tile and a click-to-enlarge lightbox.
+  - `"youtube"` — `url` is a watch/shorts/embed link; the launcher shows the video thumbnail and
+    opens the watch page in the **system browser** (video is never embedded).
+  - `"video"` — `url` is a hosted video file; shown as a ▶ tile that opens in the system browser.
+- `guideUrl` — an http(s) URL of a **markdown** usage guide the launcher renders on the detail
+  page. Supported markdown subset: `#`–`######` headings, paragraphs, `-`/`1.` lists (one nesting
+  level), fenced code blocks, `> ` quotes, `---` rules, images, links, `**bold**`, `*italic*`,
+  `` `code` ``. Raw HTML is rendered as literal text, never interpreted.
+  **Relative image/link targets resolve against `guideUrl` itself** (e.g. `media/shot.png` in
+  `…/plugins/<id>/guide.md` → `…/plugins/<id>/media/shot.png`), so a guide never hard-codes its
+  plugin id or CDN base — the same document renders in the registry repo, on the curated CDN,
+  and in any third-party registry. Non-http(s) targets are ignored.
+
+Unlike release binaries, `guideUrl`/`media` objects produced by the curated registry live at
+**stable, non-versioned keys** (`plugins/<id>/guide.md`, `plugins/<id>/media/<name>`): they are
+documentation, deliberately mutable so a typo fix doesn't require a release. The immutability
+rule (never republish different bytes under a published key) covers **release binaries only**.
+
 ### 3.1 Source registry (how `plugins.json` is produced)
 
 The published files above are **built by CI** (`StellarResonancePlugins/tools/build-registry.py`) from
@@ -136,6 +170,11 @@ plugin's binary is built from its own pinned public repo in an isolated containe
 | `channel` | `"stable"` \| `"testing"` | — | channel of **this** version (default `"stable"`; `"testing"` = the plugin is testing-**only**) |
 | `date` | string `YYYY-MM-DD` | — | release date (UTC) |
 | `changelog` | object | — | `{ added?, changed?, fixed?, removed? }` — arrays of strings |
+| `tags` | string[] | — | keyword chips for the launcher detail page |
+| `homepage` | string (URL) | — | http(s) link shown on the detail page |
+| `media` | array | — | `{ type: "image"\|"youtube"\|"video", url? \| file?, caption? }` — exactly one of `url` (absolute http(s)) or `file` (repo-relative path under `plugins/<id>/`, uploaded by CI to `plugins/<id>/media/<name>`; ≤ 25 MB). `youtube` entries take a `url`. |
+| `guide` | string (path) | — | repo-relative markdown guide (conventionally `guide.md`; ≤ 1 MB) — CI uploads it to `plugins/<id>/guide.md` and publishes it as `guideUrl` |
+| `icon` | string (path or URL) | — | badge image (list + detail header); file uploads to `plugins/<id>/icon.<ext>`, published as `iconUrl`. Launcher falls back to the first `media` image, then a monogram tile. |
 
 ¹ Required by the curated registry (CI refuses a manifest without a pinned public repo). ² Required whenever `repository` is set.
 
@@ -155,7 +194,8 @@ below; any other key is rejected (so shared metadata lives in one place and cann
 | `changelog` | object | — | as above |
 
 Inherited from `manifest.json` (do **not** repeat): `id`, `name`, `description`, `author`, `dll`,
-`repository`, `projectPath`.
+`repository`, `projectPath`, `tags`, `homepage`, `media`, `guide`, `icon` (presentation metadata
+describes the plugin, not one build — it is always shared across channels).
 
 `build-registry.py` merges each plugin's current version(s) into the **published history** (newest
 first, old versions never dropped — rollback), splits by channel (stable → `plugins.json`; all →
