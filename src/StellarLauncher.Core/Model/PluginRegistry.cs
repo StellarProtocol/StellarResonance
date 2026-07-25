@@ -35,7 +35,8 @@ public sealed record PluginEntry(
     [property: JsonPropertyName("tags")]        IReadOnlyList<string>? Tags = null,
     [property: JsonPropertyName("homepage")]    string? Homepage = null,
     [property: JsonPropertyName("media")]       IReadOnlyList<PluginMedia>? Media = null,
-    [property: JsonPropertyName("guideUrl")]    string? GuideUrl = null);
+    [property: JsonPropertyName("guideUrl")]    string? GuideUrl = null,
+    [property: JsonPropertyName("iconUrl")]     string? IconUrl = null);   // badge image; list falls back to the first image media
 
 public sealed record PluginRegistry(
     [property: JsonPropertyName("plugins")] IReadOnlyList<PluginEntry> Plugins)

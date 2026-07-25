@@ -56,7 +56,8 @@ internal static class Program
         main.ShowPluginsCommand.Execute(null);
         var plugins = main.Plugins;
         Require(WaitUntil(() => plugins.Plugins.Count >= 5), "plugin registry loaded");
-        Pump(400);
+        WaitUntil(() => plugins.Plugins.Count(p => p.Thumbnail is not null) >= 3, 10000);   // list badges
+        Pump(600);
         Shot(window, "03-plugins-list");
 
         // -------- Detail page (CombatMeter — media + guide + changelog) --------

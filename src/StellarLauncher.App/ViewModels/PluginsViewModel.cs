@@ -154,6 +154,7 @@ public partial class PluginsViewModel : ObservableObject
             _allPlugins.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
             RefreshCounts();
             ApplyFilter();
+            foreach (var p in _allPlugins) _ = p.LoadThumbnailAsync(_http);   // list badges, async
             Status = _allPlugins.Count == 0 ? "No plugins found." : $"{_allPlugins.Count} plugins available.";
         }
         catch (Exception ex) { Status = $"failed to load plugins: {ex.Message}"; }

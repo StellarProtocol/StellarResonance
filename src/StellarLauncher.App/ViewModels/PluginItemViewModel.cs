@@ -62,6 +62,35 @@ public partial class PluginItemViewModel : ObservableObject
     public ObservableCollection<MediaItemViewModel> Media { get; } = new();
     public bool HasMedia => Media.Count > 0;
     public bool HasGuideUrl => Entry.GuideUrl is not null;
+
+    // List-card badge: the plugin's icon, else its first screenshot, else a monogram tile.
+    [ObservableProperty] private Bitmap? _thumbnail;
+    public bool ShowMonogram => Thumbnail is null;
+    public string Monogram => Entry.Name.Length > 0 ? Entry.Name[..1].ToUpperInvariant() : "?";
+    partial void OnThumbnailChanged(Bitmap? value) => OnPropertyChanged(nameof(ShowMonogram));
+
+    private bool _thumbnailRequested;
+
+    public async Task LoadThumbnailAsync(HttpClient http)
+    {
+        if (_thumbnailRequested) return;
+        _thumbnailRequested = true;
+        var url = Entry.IconUrl
+                  ?? Entry.Media?.FirstOrDefault(m =>
+                      string.Equals(m?.Type, "image", StringComparison.OrdinalIgnoreCase)
+                      && !string.IsNullOrWhiteSpace(m!.Url))?.Url;
+        if (url is null) return;   // monogram tile stays
+        try
+        {
+            var bytes = await http.GetByteArrayAsync(url);
+            Thumbnail = await Task.Run(() =>
+            {
+                using var ms = new System.IO.MemoryStream(bytes);
+                return Bitmap.DecodeToWidth(ms, 128);
+            });
+        }
+        catch { /* badge falls back to the monogram */ }
+    }
     [ObservableProperty] private string? _guideMarkdown;
     [ObservableProperty] private string _guideStatus = "";
     public bool HasGuideStatus => GuideStatus.Length > 0;
