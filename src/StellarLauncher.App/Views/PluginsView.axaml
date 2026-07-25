@@ -372,7 +372,7 @@
                                  Foreground="#8a93b2" FontSize="12"/>
                       <TextBlock Text="This plugin hasn't published a guide yet — the description above covers the basics."
                                  IsVisible="{Binding !HasGuideUrl}" Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
-                      <views:MarkdownView Markdown="{Binding GuideMarkdown}"/>
+                      <views:MarkdownView Markdown="{Binding GuideMarkdown}" BaseUrl="{Binding Entry.GuideUrl}"/>
                     </StackPanel>
                   </Border>
                 </StackPanel>

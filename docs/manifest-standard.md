@@ -131,6 +131,10 @@ them unchanged):
   page. Supported markdown subset: `#`–`######` headings, paragraphs, `-`/`1.` lists (one nesting
   level), fenced code blocks, `> ` quotes, `---` rules, images, links, `**bold**`, `*italic*`,
   `` `code` ``. Raw HTML is rendered as literal text, never interpreted.
+  **Relative image/link targets resolve against `guideUrl` itself** (e.g. `media/shot.png` in
+  `…/plugins/<id>/guide.md` → `…/plugins/<id>/media/shot.png`), so a guide never hard-codes its
+  plugin id or CDN base — the same document renders in the registry repo, on the curated CDN,
+  and in any third-party registry. Non-http(s) targets are ignored.
 
 Unlike release binaries, `guideUrl`/`media` objects produced by the curated registry live at
 **stable, non-versioned keys** (`plugins/<id>/guide.md`, `plugins/<id>/media/<name>`): they are

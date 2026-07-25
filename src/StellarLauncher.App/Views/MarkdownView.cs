@@ -24,10 +24,21 @@ public sealed class MarkdownView : ContentControl
     public static readonly StyledProperty<string?> MarkdownProperty =
         AvaloniaProperty.Register<MarkdownView, string?>(nameof(Markdown));
 
+    // URL of the markdown document itself; relative image/link targets resolve against it
+    // (GuideUrls), so guides reference "media/shot.png" without knowing their CDN location.
+    public static readonly StyledProperty<string?> BaseUrlProperty =
+        AvaloniaProperty.Register<MarkdownView, string?>(nameof(BaseUrl));
+
     public string? Markdown
     {
         get => GetValue(MarkdownProperty);
         set => SetValue(MarkdownProperty, value);
+    }
+
+    public string? BaseUrl
+    {
+        get => GetValue(BaseUrlProperty);
+        set => SetValue(BaseUrlProperty, value);
     }
 
     // App-wide HttpClient for guide images; set once in App.OnFrameworkInitializationCompleted.
@@ -44,7 +55,7 @@ public sealed class MarkdownView : ContentControl
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == MarkdownProperty) Rebuild();
+        if (change.Property == MarkdownProperty || change.Property == BaseUrlProperty) Rebuild();
     }
 
     private void Rebuild()
@@ -53,31 +64,31 @@ public sealed class MarkdownView : ContentControl
         if (string.IsNullOrWhiteSpace(text)) { Content = null; return; }
         var root = new StackPanel { Spacing = 10 };
         foreach (var block in MarkdownParser.Parse(text))
-            root.Children.Add(RenderBlock(block));
+            root.Children.Add(RenderBlock(block, BaseUrl));
         Content = root;
     }
 
-    private static Control RenderBlock(MdBlock block) => block switch
+    private static Control RenderBlock(MdBlock block, string? baseUrl) => block switch
     {
-        MdHeading h => RenderHeading(h),
-        MdParagraph p => RenderText(p.Inlines, 13, Body),
-        MdList l => RenderList(l),
+        MdHeading h => RenderHeading(h, baseUrl),
+        MdParagraph p => RenderText(p.Inlines, 13, Body, baseUrl),
+        MdList l => RenderList(l, baseUrl),
         MdCodeBlock c => RenderCode(c),
-        MdQuote q => RenderQuote(q),
-        MdImage img => RenderImage(img),
+        MdQuote q => RenderQuote(q, baseUrl),
+        MdImage img => RenderImage(img, baseUrl),
         _ => new Border { Height = 1, Background = Line, Margin = new Thickness(0, 4) },   // MdRule
     };
 
-    private static Control RenderHeading(MdHeading h)
+    private static Control RenderHeading(MdHeading h, string? baseUrl)
     {
         var size = h.Level switch { 1 => 19, 2 => 16, 3 => 14, _ => 13 };
-        var tb = RenderText(h.Inlines, size, Brushes.White);
+        var tb = RenderText(h.Inlines, size, Brushes.White, baseUrl);
         tb.FontWeight = FontWeight.Bold;
         tb.Margin = new Thickness(0, h.Level <= 2 ? 8 : 4, 0, 0);
         return tb;
     }
 
-    private static TextBlock RenderText(IReadOnlyList<MdInline> inlines, double size, IBrush brush)
+    private static TextBlock RenderText(IReadOnlyList<MdInline> inlines, double size, IBrush brush, string? baseUrl)
     {
         var tb = new TextBlock
         {
@@ -87,14 +98,15 @@ public sealed class MarkdownView : ContentControl
             LineHeight = size * 1.45,
         };
         foreach (var inline in inlines)
-            tb.Inlines!.Add(RenderInline(inline, size));
+            tb.Inlines!.Add(RenderInline(inline, size, baseUrl));
         return tb;
     }
 
-    private static Inline RenderInline(MdInline inline, double size)
+    private static Inline RenderInline(MdInline inline, double size, string? baseUrl)
     {
         if (inline is MdLink link)
         {
+            var target = GuideUrls.Resolve(baseUrl, link.Url);
             var linkBlock = new TextBlock
             {
                 Text = link.Text,
@@ -103,8 +115,8 @@ public sealed class MarkdownView : ContentControl
                 TextDecorations = TextDecorations.Underline,
                 Cursor = new Cursor(StandardCursorType.Hand),
             };
-            ToolTip.SetTip(linkBlock, link.Url);
-            linkBlock.PointerReleased += (_, _) => Services.Browser.Open(link.Url);
+            ToolTip.SetTip(linkBlock, target ?? link.Url);
+            linkBlock.PointerReleased += (_, _) => Services.Browser.Open(target);
             return new InlineUIContainer(linkBlock) { BaselineAlignment = BaselineAlignment.Baseline };
         }
         var t = (MdText)inline;
@@ -117,7 +129,7 @@ public sealed class MarkdownView : ContentControl
         return run;
     }
 
-    private static Control RenderList(MdList list)
+    private static Control RenderList(MdList list, string? baseUrl)
     {
         var panel = new StackPanel { Spacing = 4 };
         foreach (var item in list.Items)
@@ -135,7 +147,7 @@ public sealed class MarkdownView : ContentControl
                 Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Top,
             };
-            var text = RenderText(item.Inlines, 13, Body);
+            var text = RenderText(item.Inlines, 13, Body, baseUrl);
             Grid.SetColumn(text, 1);
             grid.Children.Add(marker);
             grid.Children.Add(text);
@@ -166,9 +178,9 @@ public sealed class MarkdownView : ContentControl
         },
     };
 
-    private static Control RenderQuote(MdQuote quote)
+    private static Control RenderQuote(MdQuote quote, string? baseUrl)
     {
-        var tb = RenderText(quote.Inlines, 13, Muted);
+        var tb = RenderText(quote.Inlines, 13, Muted, baseUrl);
         return new Border
         {
             BorderBrush = Line,
@@ -178,7 +190,7 @@ public sealed class MarkdownView : ContentControl
         };
     }
 
-    private static Control RenderImage(MdImage img)
+    private static Control RenderImage(MdImage img, string? baseUrl)
     {
         var image = new Image
         {
@@ -198,7 +210,7 @@ public sealed class MarkdownView : ContentControl
             Child = image,
         };
         ToolTip.SetTip(frame, img.Alt.Length > 0 ? img.Alt : img.Url);
-        _ = LoadImageAsync(image, img.Url);
+        if (GuideUrls.Resolve(baseUrl, img.Url) is { } url) _ = LoadImageAsync(image, url);
         return frame;
     }
 
