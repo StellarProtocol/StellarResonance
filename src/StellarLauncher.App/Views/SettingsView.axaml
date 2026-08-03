@@ -49,8 +49,17 @@
                 ToolTip.Tip="WINEESYNC — eventfd-based sync; lowers CPU overhead. Enabled by default."/>
       <CheckBox IsChecked="{Binding Fsync}" Content="Enable Fsync"
                 ToolTip.Tip="WINEFSYNC — futex-based sync; faster than esync on supported kernels. Harmlessly ignored if unsupported."/>
-      <CheckBox IsChecked="{Binding FpsOverlay}" Content="Show FPS"
-                ToolTip.Tip="FPS counter via DXVK's built-in HUD (DXVK_HUD=fps). Ships with Proton — no install needed."/>
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <TextBlock Text="Performance overlay" VerticalAlignment="Center"/>
+        <ComboBox SelectedIndex="{Binding PerfOverlayIndex}" MinWidth="230"
+                  ToolTip.Tip="Off — nothing.&#x0a;FPS counter — DXVK's built-in counter (ships with Proton, no install).&#x0a;Full overlay — MangoHud: GPU/CPU load, FPS and a frametime graph (needs the system 'mangohud' package; your own MangoHud.conf is respected).">
+          <ComboBoxItem Content="Off"/>
+          <ComboBoxItem Content="FPS counter (DXVK)"/>
+          <ComboBoxItem Content="Full overlay (MangoHud)"/>
+        </ComboBox>
+      </StackPanel>
+      <TextBlock IsVisible="{Binding MangoHudMissing}" Foreground="#d9a441" Margin="24,0,0,0"
+                 Text="MangoHud not detected — install your distro's 'mangohud' package (the setting is kept and activates once installed)."/>
       <CheckBox IsChecked="{Binding StellarPerf}" Content="Stellar Perf overlay (advanced)"
                 ToolTip.Tip="Enables the framework's in-game Stellar Perf overlay sampling (STELLAR_PERFHUD) — frame &amp; CPU times for debugging. Has a small overhead."/>
     </StackPanel>

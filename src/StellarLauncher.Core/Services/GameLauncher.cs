@@ -42,7 +42,19 @@ public sealed class GameLauncher : IGameLauncher
         // esync/fsync (Wine vars; Proton enables both by default so we only flip the NO_* knobs off).
         psi.Environment["WINEESYNC"] = r.Esync ? "1" : "0";
         psi.Environment["WINEFSYNC"] = r.Fsync ? "1" : "0";
-        if (r.FpsOverlay) psi.Environment["DXVK_HUD"] = "fps";       // DXVK's built-in FPS counter (no install)
+        switch (r.Overlay)
+        {
+            case PerfOverlayMode.Fps:
+                psi.Environment["DXVK_HUD"] = "fps";        // DXVK's built-in FPS counter (no install)
+                break;
+            case PerfOverlayMode.Full:
+                // MangoHud rides its Vulkan implicit layer — env-only activation works under
+                // Proton/Wine/umu unchanged, and is harmlessly inert if MangoHud isn't installed.
+                psi.Environment["MANGOHUD"] = "1";
+                if (!string.IsNullOrEmpty(r.MangoHudPreset))
+                    psi.Environment["MANGOHUD_CONFIG"] = r.MangoHudPreset;
+                break;
+        }
         if (r.StellarPerf) psi.Environment["STELLAR_PERFHUD"] = "1"; // framework's Stellar Perf overlay sampling
 
         var isProton = Path.GetFileName(r.Runner).Contains("proton", StringComparison.OrdinalIgnoreCase);

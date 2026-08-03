@@ -24,7 +24,9 @@ public partial class SettingsViewModel : ObservableObject
     public bool IsLinux { get; }
     [ObservableProperty] private bool _esync;
     [ObservableProperty] private bool _fsync;
-    [ObservableProperty] private bool _fpsOverlay;
+    // Performance overlay tri-state (ComboBox index): 0 Off · 1 FPS counter (DXVK) · 2 Full (MangoHud).
+    [ObservableProperty] private int _perfOverlayIndex;
+    [ObservableProperty] private bool _mangoHudMissing;   // hint under the ComboBox when Full is picked but MangoHud isn't installed
     [ObservableProperty] private bool _stellarPerf;
     [ObservableProperty] private bool _dxvkNvapi;
 
@@ -36,7 +38,9 @@ public partial class SettingsViewModel : ObservableObject
         _gameMiniDir = cfg.GameMiniDir; _runner = cfg.Runner; _winePrefix = cfg.WinePrefix;
         _testingChannel = ChannelManifests.IsTesting(cfg.Channel);
         _debugLogging = cfg.DebugLogging;
-        _esync = cfg.Esync; _fsync = cfg.Fsync; _fpsOverlay = cfg.FpsOverlay;
+        _esync = cfg.Esync; _fsync = cfg.Fsync;
+        _perfOverlayIndex = (int)cfg.EffectiveOverlay();
+        _mangoHudMissing = _perfOverlayIndex == (int)PerfOverlayMode.Full && !MangoHud.IsInstalled();
         _stellarPerf = cfg.StellarPerf; _dxvkNvapi = cfg.DxvkNvapi;
         if (string.IsNullOrWhiteSpace(_gameMiniDir)) RunDetect();   // auto-detect on first open
     }
@@ -81,7 +85,11 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnWinePrefixChanged(string? value) => Persist();
     partial void OnEsyncChanged(bool value) => Persist();
     partial void OnFsyncChanged(bool value) => Persist();
-    partial void OnFpsOverlayChanged(bool value) => Persist();
+    partial void OnPerfOverlayIndexChanged(int value)
+    {
+        MangoHudMissing = value == (int)PerfOverlayMode.Full && !MangoHud.IsInstalled();
+        Persist();
+    }
     partial void OnStellarPerfChanged(bool value) => Persist();
     partial void OnDxvkNvapiChanged(bool value) => Persist();
     partial void OnTestingChannelChanged(bool value) => Persist();
@@ -93,7 +101,8 @@ public partial class SettingsViewModel : ObservableObject
         cfg.GameMiniDir = GameMiniDir; cfg.Runner = Runner; cfg.WinePrefix = WinePrefix;
         cfg.Channel = TestingChannel ? "testing" : "stable";
         cfg.DebugLogging = DebugLogging;
-        cfg.Esync = Esync; cfg.Fsync = Fsync; cfg.FpsOverlay = FpsOverlay;
+        cfg.Esync = Esync; cfg.Fsync = Fsync;
+        cfg.SetOverlay((PerfOverlayMode)PerfOverlayIndex);
         cfg.StellarPerf = StellarPerf; cfg.DxvkNvapi = DxvkNvapi;
         _settings.Save(cfg);
     }
