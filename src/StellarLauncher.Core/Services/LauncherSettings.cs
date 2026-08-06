@@ -10,6 +10,7 @@ public sealed class LauncherSettings
     public string? WinePrefix { get; set; }  // Linux only
     public bool Modded { get; set; } = true;
     public bool PluginsGridView { get; set; } = true;   // Plugins page: card grid (default) vs list rows
+    public bool AutoUpdateBeforeLaunch { get; set; } = true;   // update framework + plugins before launch; ON by default
     public List<string> ExtraPluginRepos { get; set; } = new();
     public string Channel { get; set; } = "stable";   // "stable" | "testing"
     public bool DebugLogging { get; set; } = false;    // off = prod BepInEx.cfg (no console, buffered); on = console + crash-flush

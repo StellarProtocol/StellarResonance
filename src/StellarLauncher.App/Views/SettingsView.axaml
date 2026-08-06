@@ -71,6 +71,10 @@
     <CheckBox IsChecked="{Binding DebugLogging}" Content="Debug logging (console + crash-flush + diagnostics)"
               ToolTip.Tip="Off (default) = prod: no BepInEx console, buffered disk logging, no framework diagnostics — fastest. On = console window + instant-flush logging + framework per-event diagnostics for crash triage. Applied to BepInEx.cfg and stellar_perf.flags on launch; Off also clears any leftover flags from an older install."/>
 
+    <CheckBox IsChecked="{Binding AutoUpdateBeforeLaunch}"
+              Content="Auto-update before launch (framework + plugins)"
+              ToolTip.Tip="Keep the mod framework and your plugins on their newest compatible version. On by default."/>
+
     <TextBlock Text="Changes save automatically." Foreground="#4a5273" FontSize="11" Margin="0,6,0,0"/>
   </StackPanel>
   </ScrollViewer>
