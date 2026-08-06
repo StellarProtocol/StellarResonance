@@ -103,6 +103,13 @@ public partial class PreLaunchReviewViewModel : ObservableObject
     // a command already completed it first.
     public void CancelIfUnfinished() => _tcs.TrySetResult(PreLaunchResult.Cancel);
 
+    // Auto-update ON: start updating + launching IMMEDIATELY when the dialog opens — no click needed
+    // (owner Image #17). Only fires when nothing needs a decision (CanLaunch true): an
+    // unfixable-incompatible plugin keeps CanLaunch false, so it still waits for the user to disable it
+    // and then use the button. The safety gate holds either way — UpdateAllAndLaunch re-checks CanLaunch.
+    public Task StartIfAutoAsync()
+        => _autoUpdate && CanLaunch && !IsApplying ? UpdateAllAndLaunch() : Task.CompletedTask;
+
     // OFF-mode "Launch" (skip updates) — only offered when auto-update is off AND nothing blocks.
     [RelayCommand]
     private async Task Launch()
