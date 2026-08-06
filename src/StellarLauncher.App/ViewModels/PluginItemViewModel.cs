@@ -30,6 +30,7 @@ public partial class PluginItemViewModel : ObservableObject
     [ObservableProperty] private bool _isUpdate;
     [ObservableProperty] private bool _isReinstall;
     [ObservableProperty] private bool _isPlainInstall;
+    [ObservableProperty] private bool _isDisabled;
 
     public ObservableCollection<PluginVersion> Versions { get; } = new();
 
@@ -138,15 +139,34 @@ public partial class PluginItemViewModel : ObservableObject
         && Versions.Count > 0
         && VersionService.IsNewer(Versions[0].Version, iv);
 
+    // A disabled plugin's row offers only Re-enable — Remove would be a silent no-op
+    // (the on-disk copy lives under stellar/plugins-disabled/, not the scanned slot).
+    public bool ShowRemove => Installed && !IsDisabled;
+
     partial void OnInstalledChanged(bool value)
     {
         OnPropertyChanged(nameof(InstalledBadge));
         OnPropertyChanged(nameof(HasUpdate));
+        OnPropertyChanged(nameof(ShowRemove));
     }
     partial void OnInstalledVersionChanged(string? value)
     {
         OnPropertyChanged(nameof(InstalledBadge));
         OnPropertyChanged(nameof(HasUpdate));
+    }
+
+    // Disabling parks the on-disk copy under plugins-disabled/ (version marker moves with it,
+    // so InstalledVersion reads null) — force the install-state flags off so the row can't
+    // offer Install/Reinstall/Update while disabled; only Re-enable should show.
+    partial void OnIsDisabledChanged(bool value)
+    {
+        if (value)
+        {
+            IsPlainInstall = false;
+            IsUpdate = false;
+            IsReinstall = false;
+        }
+        OnPropertyChanged(nameof(ShowRemove));
     }
 
     partial void OnSelectedVersionChanged(PluginVersion? value)
@@ -156,6 +176,8 @@ public partial class PluginItemViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedChangelog));
 
         if (value is null) { Compatible = false; CompatNote = ""; InstallLabel = "Install"; IsUpdate = false; IsReinstall = false; IsPlainInstall = false; return; }
+
+        if (IsDisabled) { IsPlainInstall = false; IsUpdate = false; IsReinstall = false; CompatNote = ""; return; }
 
         if (_framework is null)
         {
@@ -205,4 +227,5 @@ public partial class PluginItemViewModel : ObservableObject
     [RelayCommand] private void CancelInstall() => ConfirmVisible = false;
     [RelayCommand] private Task ConfirmInstall() { ConfirmVisible = false; return _parent.InstallAsync(this); }
     [RelayCommand] private Task Remove() => _parent.RemoveAsync(this);
+    [RelayCommand] private Task ReEnable() => _parent.EnableAsync(this);
 }

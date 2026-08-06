@@ -17,6 +17,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _detectStatus = "";
     [ObservableProperty] private bool _testingChannel;
     [ObservableProperty] private bool _debugLogging;   // off = prod (fast); on = game console + crash-flush logging
+    [ObservableProperty] private bool _autoUpdateBeforeLaunch;   // update framework + plugins before launch; ON by default
 
     public string LauncherVersionLabel => $"Launcher v{HomeViewModel.LauncherVersion}";
 
@@ -38,6 +39,7 @@ public partial class SettingsViewModel : ObservableObject
         _gameMiniDir = cfg.GameMiniDir; _runner = cfg.Runner; _winePrefix = cfg.WinePrefix;
         _testingChannel = ChannelManifests.IsTesting(cfg.Channel);
         _debugLogging = cfg.DebugLogging;
+        _autoUpdateBeforeLaunch = cfg.AutoUpdateBeforeLaunch;
         _esync = cfg.Esync; _fsync = cfg.Fsync;
         _perfOverlayIndex = (int)cfg.EffectiveOverlay();
         _mangoHudMissing = _perfOverlayIndex == (int)PerfOverlayMode.Full && !MangoHud.IsInstalled();
@@ -94,6 +96,7 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnDxvkNvapiChanged(bool value) => Persist();
     partial void OnTestingChannelChanged(bool value) => Persist();
     partial void OnDebugLoggingChanged(bool value) => Persist();
+    partial void OnAutoUpdateBeforeLaunchChanged(bool value) => Persist();
 
     private void Persist()
     {
@@ -101,6 +104,7 @@ public partial class SettingsViewModel : ObservableObject
         cfg.GameMiniDir = GameMiniDir; cfg.Runner = Runner; cfg.WinePrefix = WinePrefix;
         cfg.Channel = TestingChannel ? "testing" : "stable";
         cfg.DebugLogging = DebugLogging;
+        cfg.AutoUpdateBeforeLaunch = AutoUpdateBeforeLaunch;
         cfg.Esync = Esync; cfg.Fsync = Fsync;
         cfg.SetOverlay((PerfOverlayMode)PerfOverlayIndex);
         cfg.StellarPerf = StellarPerf; cfg.DxvkNvapi = DxvkNvapi;

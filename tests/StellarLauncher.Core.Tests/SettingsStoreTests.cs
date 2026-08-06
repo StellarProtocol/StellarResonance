@@ -47,4 +47,19 @@ public class SettingsStoreTests
         Assert.Null(store.Load().GameMiniDir);
         Assert.True(store.Load().Modded);  // default
     }
+
+    [Fact]
+    public void AutoUpdateBeforeLaunch_defaults_on_and_round_trips()
+    {
+        var fs = new System.IO.Abstractions.TestingHelpers.MockFileSystem();
+        var store = new StellarLauncher.Core.Services.SettingsStore(fs, new StellarLauncher.Core.Platform.PlatformInfo());
+
+        // default is ON for a fresh install
+        Assert.True(store.Load().AutoUpdateBeforeLaunch);
+
+        var cfg = store.Load();
+        cfg.AutoUpdateBeforeLaunch = false;
+        store.Save(cfg);
+        Assert.False(store.Load().AutoUpdateBeforeLaunch);
+    }
 }

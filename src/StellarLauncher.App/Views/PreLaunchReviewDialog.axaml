@@ -1,0 +1,65 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:StellarLauncher.App.ViewModels"
+        x:Class="StellarLauncher.App.Views.PreLaunchReviewDialog"
+        x:DataType="vm:PreLaunchReviewViewModel"
+        Title="Before launching" Width="480" SizeToContent="Height"
+        CanResize="False" WindowStartupLocation="CenterOwner"
+        Background="#080a12" Icon="/Assets/stellar-window.png">
+  <Border Padding="24,22">
+    <StackPanel Spacing="16">
+      <TextBlock Text="{Binding Title}" Foreground="White" FontSize="16" FontWeight="Bold"/>
+
+      <Border IsVisible="{Binding HasFrameworkRow}" Background="#141a2e" BorderBrush="#222a44"
+              BorderThickness="1" CornerRadius="10" Padding="12,10">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <CheckBox Grid.Column="0" IsChecked="{Binding ApplyFramework}"
+                    IsEnabled="{Binding !FrameworkBlockedByLauncher}" VerticalAlignment="Center"/>
+          <TextBlock Grid.Column="1" Text="{Binding FrameworkLabel}" Foreground="#e8ebf5"
+                     VerticalAlignment="Center" Margin="8,0,0,0"/>
+          <TextBlock Grid.Column="2" Text="update the launcher first" Foreground="#ff7a7a" FontSize="11"
+                     IsVisible="{Binding FrameworkBlockedByLauncher}" VerticalAlignment="Center"/>
+        </Grid>
+      </Border>
+
+      <ItemsControl ItemsSource="{Binding Rows}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:PluginPlanRowViewModel">
+            <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"
+                    CornerRadius="10" Padding="12,10" Margin="0,0,0,8">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}"
+                          IsVisible="{Binding CanUpdate}" VerticalAlignment="Center"/>
+                <CheckBox Grid.Column="0" IsChecked="{Binding IsDisableChosen}"
+                          IsVisible="{Binding IsUnfixable}" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Name}" Foreground="#e8ebf5" FontWeight="SemiBold"/>
+                  <TextBlock Text="{Binding VersionLabel}" Foreground="#8a93b2" FontSize="12"/>
+                  <TextBlock Text="{Binding StatusText}" Foreground="#54e3a0" FontSize="11"/>
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="Disable" Foreground="#ff7a7a" FontSize="11"
+                           IsVisible="{Binding IsUnfixable}" VerticalAlignment="Center"/>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Text="{Binding StatusLine}" Foreground="#9aa3bf" FontSize="12" TextWrapping="Wrap"
+                 IsVisible="{Binding IsApplying}"/>
+
+      <Grid ColumnDefinitions="*,Auto,8,Auto,8,Auto">
+        <Button Grid.Column="1" Content="Cancel" Command="{Binding CancelCommand}"
+                Foreground="#9aa3bf" Background="Transparent" BorderBrush="#2f3a5a" BorderThickness="1"
+                Padding="14,9" CornerRadius="10"/>
+        <Button Grid.Column="3" Content="Launch" Command="{Binding LaunchCommand}"
+                IsVisible="{Binding ShowLaunchWithout}" IsEnabled="{Binding CanLaunch}"
+                Foreground="#9aa3bf" Background="#141a2e" BorderBrush="#2f3a5a" BorderThickness="1"
+                Padding="14,9" CornerRadius="10"/>
+        <Button Grid.Column="5" Content="Update &amp; Launch" Command="{Binding UpdateAllAndLaunchCommand}"
+                IsEnabled="{Binding CanLaunch}" Foreground="#0b0e16" Background="#54e3a0"
+                FontWeight="Bold" Padding="16,9" CornerRadius="10"/>
+      </Grid>
+    </StackPanel>
+  </Border>
+</Window>

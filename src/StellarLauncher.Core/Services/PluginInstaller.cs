@@ -97,6 +97,39 @@ public sealed class PluginInstaller : IPluginInstaller
     private string PluginDir(string gameMiniDir, string pluginId)
         => _fs.Path.Combine(PluginsRoot(gameMiniDir), pluginId);
 
+    private string DisabledRoot(string gameMiniDir)
+        => _fs.Path.Combine(gameMiniDir, "stellar", "plugins-disabled");
+    private string DisabledDir(string gameMiniDir, string pluginId)
+        => _fs.Path.Combine(DisabledRoot(gameMiniDir), pluginId);
+
+    public void Disable(string gameMiniDir, string pluginId)
+    {
+        GuardName(pluginId, nameof(pluginId));
+        var live = PluginDir(gameMiniDir, pluginId);
+        if (!_fs.Directory.Exists(live)) return;                       // nothing to disable
+        var parked = DisabledDir(gameMiniDir, pluginId);
+        if (_fs.Directory.Exists(parked)) _fs.Directory.Delete(parked, recursive: true); // stale park
+        _fs.Directory.CreateDirectory(DisabledRoot(gameMiniDir));
+        _fs.Directory.Move(live, parked);
+    }
+
+    public void Enable(string gameMiniDir, string pluginId)
+    {
+        GuardName(pluginId, nameof(pluginId));
+        var parked = DisabledDir(gameMiniDir, pluginId);
+        if (!_fs.Directory.Exists(parked)) return;
+        var live = PluginDir(gameMiniDir, pluginId);
+        if (_fs.Directory.Exists(live)) _fs.Directory.Delete(live, recursive: true);
+        _fs.Directory.CreateDirectory(PluginsRoot(gameMiniDir));
+        _fs.Directory.Move(parked, live);
+    }
+
+    public bool IsDisabled(string gameMiniDir, string pluginId)
+    {
+        GuardName(pluginId, nameof(pluginId));
+        return _fs.Directory.Exists(DisabledDir(gameMiniDir, pluginId));
+    }
+
     private static void GuardName(string value, string param)
     {
         if (string.IsNullOrWhiteSpace(value)
