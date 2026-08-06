@@ -104,4 +104,22 @@ public class PluginInstallerTests
         Assert.False(installer.IsInstalled("/game_mini", "combatmeter"));
         Assert.Null(installer.InstalledVersion("/game_mini", "combatmeter"));
     }
+
+    [Fact]
+    public void Disable_moves_plugin_out_of_scan_path_and_Enable_restores_it()
+    {
+        var fs = new System.IO.Abstractions.TestingHelpers.MockFileSystem();
+        fs.AddFile("/gm/stellar/plugins/combatmeter/Stellar.CombatMeter.dll", new System.IO.Abstractions.TestingHelpers.MockFileData("x"));
+        fs.AddFile("/gm/stellar/plugins/combatmeter/.plugin-version", new System.IO.Abstractions.TestingHelpers.MockFileData("1.6.0"));
+        var installer = new StellarLauncher.Core.Services.PluginInstaller(fs);
+
+        installer.Disable("/gm", "combatmeter");
+        Assert.False(fs.Directory.Exists("/gm/stellar/plugins/combatmeter"));      // gone from scan path
+        Assert.True(fs.Directory.Exists("/gm/stellar/plugins-disabled/combatmeter")); // parked
+        Assert.True(installer.IsDisabled("/gm", "combatmeter"));
+
+        installer.Enable("/gm", "combatmeter");
+        Assert.True(fs.File.Exists("/gm/stellar/plugins/combatmeter/Stellar.CombatMeter.dll"));
+        Assert.False(installer.IsDisabled("/gm", "combatmeter"));
+    }
 }
