@@ -76,8 +76,16 @@ public partial class PreLaunchReviewViewModel : ObservableObject
     [RelayCommand]
     private async Task Launch()
     {
-        await ApplyDisablesAsync();
-        _tcs.TrySetResult(PreLaunchResult.Proceed); RequestClose?.Invoke();
+        if (!CanLaunch) return;
+        try
+        {
+            await ApplyDisablesAsync();
+            _tcs.TrySetResult(PreLaunchResult.Proceed); RequestClose?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            StatusLine = $"launch failed: {ex.Message}";
+        }
     }
 
     [RelayCommand]

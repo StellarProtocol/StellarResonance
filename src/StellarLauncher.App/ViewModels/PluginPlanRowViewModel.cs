@@ -11,8 +11,13 @@ public partial class PluginPlanRowViewModel : ObservableObject
     public PluginEntry Entry { get; }
     public PluginVersion? Target { get; }   // the version to install when selected (null for unfixable)
 
-    [ObservableProperty] private bool _isSelected;
-    [ObservableProperty] private bool _isDisableChosen;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsResolved))]
+    private bool _isSelected;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsResolved))]
+    private bool _isDisableChosen;
     [ObservableProperty] private double _percent;
     [ObservableProperty] private string _statusText = "";
 
