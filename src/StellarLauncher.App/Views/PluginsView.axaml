@@ -301,7 +301,7 @@
                               IsEnabled="{Binding Compatible}" IsVisible="{Binding IsReinstall}"
                               Foreground="#9aa3bf" Background="#1a2035" BorderBrush="#2f3a5a" BorderThickness="1"
                               Padding="14,6" CornerRadius="8"/>
-                      <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding Installed}"
+                      <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding ShowRemove}"
                               Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
                               Padding="12,6" CornerRadius="8"/>
                       <Button Content="Re-enable" Command="{Binding ReEnableCommand}" IsVisible="{Binding IsDisabled}"
@@ -421,7 +421,7 @@
                                 IsEnabled="{Binding Compatible}" IsVisible="{Binding IsReinstall}"
                                 Foreground="#9aa3bf" Background="#1a2035" BorderBrush="#2f3a5a" BorderThickness="1"
                                 Padding="14,6" CornerRadius="8"/>
-                        <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding Installed}"
+                        <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding ShowRemove}"
                                 Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
                                 Padding="12,6" CornerRadius="8"/>
                       </StackPanel>
