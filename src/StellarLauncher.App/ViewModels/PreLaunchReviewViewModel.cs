@@ -14,13 +14,18 @@ namespace StellarLauncher.App.ViewModels;
 
 public partial class PreLaunchReviewViewModel : ObservableObject
 {
-    private readonly PreLaunchPlan _plan;
-    private readonly string _gameMini;
+    private readonly string? _installedFramework;
     private readonly VersionManifest? _frameworkTarget;   // when the framework row will be applied
+    private readonly string _launcherVersion;
+    private readonly IReadOnlyList<InstalledPluginInfo> _installed;
+    private readonly IReadOnlyList<PluginEntry> _registry;
+    private readonly bool _autoUpdate;
+    private readonly string _gameMini;
     private readonly IInstaller _installer;
     private readonly IPluginInstaller _plugins;
     private readonly HttpClient _http;
     private readonly TaskCompletionSource<PreLaunchResult> _tcs = new();
+    private PreLaunchPlan _plan = null!;   // set on every Rebuild(); never null once the ctor returns
 
     public Task<PreLaunchResult> Completion => _tcs.Task;
     public event Action? RequestClose;
@@ -41,36 +46,62 @@ public partial class PreLaunchReviewViewModel : ObservableObject
     public bool ShowLaunchWithout { get; }
 
     public PreLaunchReviewViewModel(
-        PreLaunchPlan plan, IReadOnlyList<PluginEntry> registry, VersionManifest? frameworkTarget,
+        string? installedFramework, VersionManifest? frameworkTarget, string launcherVersion,
+        IReadOnlyList<InstalledPluginInfo> installed, IReadOnlyList<PluginEntry> registry,
         bool autoUpdate, string gameMini,
         IInstaller installer, IPluginInstaller plugins, HttpClient http)
     {
-        _plan = plan; _frameworkTarget = frameworkTarget; _gameMini = gameMini;
+        _installedFramework = installedFramework; _frameworkTarget = frameworkTarget;
+        _launcherVersion = launcherVersion; _installed = installed; _registry = registry;
+        _autoUpdate = autoUpdate; _gameMini = gameMini;
         _installer = installer; _plugins = plugins; _http = http;
         ShowLaunchWithout = !autoUpdate;
+
+        // Set BEFORE the first Rebuild() so the initial classification reflects the pre-selected
+        // framework state; OnApplyFrameworkChanged re-runs Rebuild() for every later user toggle.
+        var initialPlan = PreLaunchPlanner.Build(_installedFramework, _frameworkTarget, _launcherVersion, _installed, autoUpdate);
+        _applyFramework = autoUpdate && initialPlan.FrameworkAction == FrameworkPlanAction.UpdateAvailable;
+        Title = autoUpdate ? "Updates are ready before you launch" : "Choose what to update";
+        Rebuild();
+    }
+
+    // Re-classifies plugins against the framework that will actually run (installed, or the target
+    // once ApplyFramework is checked) and repopulates Rows. Called from the ctor and on every
+    // ApplyFramework toggle — see docs/superpowers/specs/2026-08-06-launcher-prelaunch-autoupdate-design.md §Flow step 4.
+    private void Rebuild()
+    {
+        var plan = PreLaunchPlanner.Build(_installedFramework, _frameworkTarget, _launcherVersion, _installed, ApplyFramework);
+        _plan = plan;
 
         HasFrameworkRow = plan.FrameworkAction != FrameworkPlanAction.None;
         FrameworkBlockedByLauncher = plan.FrameworkAction == FrameworkPlanAction.UpdateBlockedByLauncher;
         FrameworkLabel = plan.FrameworkTarget is { } t ? $"Mod framework  v{InstalledOr("?")} → v{t}" : "";
-        ApplyFramework = autoUpdate && plan.FrameworkAction == FrameworkPlanAction.UpdateAvailable;
 
+        Rows.Clear();
         foreach (var item in plan.Items.Where(i => i.Status != PluginPlanStatus.UpToDate))
         {
-            var entry = registry.FirstOrDefault(e => e.Id == item.Id);
+            var entry = _registry.FirstOrDefault(e => e.Id == item.Id);
             if (entry is null) continue;
             var target = item.TargetVersion is null ? null
                 : entry.Versions.FirstOrDefault(v => v.Version == item.TargetVersion);
-            var row = new PluginPlanRowViewModel(item, entry, target, preselect: autoUpdate);
+            var row = new PluginPlanRowViewModel(item, entry, target, preselect: _autoUpdate);
             row.ResolvedChanged = () => OnPropertyChanged(nameof(CanLaunch));
             Rows.Add(row);
         }
-        Title = autoUpdate ? "Updates are ready before you launch" : "Choose what to update";
+        OnPropertyChanged(nameof(CanLaunch));
     }
+
+    partial void OnApplyFrameworkChanged(bool value) => Rebuild();
 
     private string InstalledOr(string fallback) => _plan.EffectiveFramework ?? fallback;
 
     [RelayCommand]
     private void Cancel() { _tcs.TrySetResult(PreLaunchResult.Cancel); RequestClose?.Invoke(); }
+
+    // Window-manager close (title-bar X / Alt+F4) never runs the Cancel/Launch/Update commands, so
+    // ShowFor's await on Completion would hang forever without this. TrySetResult is a safe no-op if
+    // a command already completed it first.
+    public void CancelIfUnfinished() => _tcs.TrySetResult(PreLaunchResult.Cancel);
 
     // OFF-mode "Launch" (skip updates) — only offered when auto-update is off AND nothing blocks.
     [RelayCommand]

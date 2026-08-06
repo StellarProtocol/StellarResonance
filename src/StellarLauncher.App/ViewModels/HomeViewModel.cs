@@ -293,9 +293,12 @@ public partial class HomeViewModel : ObservableObject
         }
     }
 
-    // Build the pre-launch plan: fetch the registry, detect installed plugins, classify against the
-    // framework that will run. Returns null on any failure (fail-open — never trap the player offline).
-    private async Task<(PreLaunchPlan plan, IReadOnlyList<PluginEntry> registry, VersionManifest? target)?> BuildPlanAsync(bool applyFramework)
+    // Gather the raw inputs the pre-launch planner needs: fetch the registry, detect installed
+    // plugins. Classification itself now happens in PreLaunchReviewViewModel (it re-runs the planner
+    // whenever the user toggles the framework row), so this only hands back the raw ingredients —
+    // never a pre-built plan. Returns null on any failure (fail-open — never trap the player offline).
+    private async Task<(string? installedFramework, VersionManifest? target, string launcherVersion,
+        IReadOnlyList<InstalledPluginInfo> installed, IReadOnlyList<PluginEntry> registry)?> BuildPlanAsync()
     {
         if (!Modded || GameMini is not { } gm) return null;
         try
@@ -317,8 +320,7 @@ public partial class HomeViewModel : ObservableObject
                 installed.Add(new InstalledPluginInfo(e, isInstalled, _pluginInstaller.InstalledVersion(gm, e.Id)));
             }
             var target = Versions.FirstOrDefault(v => v.Version == _manifest?.Latest);
-            var plan = PreLaunchPlanner.Build(_installedFramework, target, LauncherVersion, installed, applyFramework);
-            return (plan, registry, target);
+            return (_installedFramework, target, LauncherVersion, installed, registry);
         }
         catch (Exception ex) { StatusLine = $"couldn't check plugin updates — {ex.Message}"; return null; }
     }
@@ -330,14 +332,22 @@ public partial class HomeViewModel : ObservableObject
         try
         {
             var cfgNow = _settings.Load();
-            var built = await BuildPlanAsync(applyFramework: cfgNow.AutoUpdateBeforeLaunch);
-            if (built is { } b && !b.plan.IsEmpty)
+            var built = await BuildPlanAsync();
+            if (built is { } b)
             {
-                var vm = new PreLaunchReviewViewModel(b.plan, b.registry, b.target,
-                    cfgNow.AutoUpdateBeforeLaunch, GameMini!, _installer, _pluginInstaller, _http);
-                var result = await _reviewPrompt(vm);
-                if (result == PreLaunchResult.Cancel) { StatusLine = ""; return; }
-                await RefreshAsync();   // framework version may have changed; refresh installed state
+                // Cheap check to decide whether the dialog is worth showing at all; the VM re-runs
+                // this same classifier internally (and re-runs it again on every framework-row toggle).
+                var initial = PreLaunchPlanner.Build(b.installedFramework, b.target, b.launcherVersion, b.installed,
+                    applyFrameworkUpdate: cfgNow.AutoUpdateBeforeLaunch);
+                if (!initial.IsEmpty)
+                {
+                    var vm = new PreLaunchReviewViewModel(b.installedFramework, b.target, b.launcherVersion,
+                        b.installed, b.registry, cfgNow.AutoUpdateBeforeLaunch, GameMini!,
+                        _installer, _pluginInstaller, _http);
+                    var result = await _reviewPrompt(vm);
+                    if (result == PreLaunchResult.Cancel) { StatusLine = ""; return; }
+                    await RefreshAsync();   // framework version may have changed; refresh installed state
+                }
             }
 
             var cfg = _settings.Load();   // pick up the latest Settings (esync/fsync/overlay/dxvk-nvapi)
