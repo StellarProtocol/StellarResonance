@@ -100,4 +100,28 @@ public class PreLaunchPlannerTests
         Assert.Empty(plan.Items);
         Assert.True(plan.IsEmpty);
     }
+
+    [Fact]
+    public void Unknown_version_with_no_compatible_is_unfixable()
+    {
+        var e = Entry("adopted", V("0.9.0", "1.0.0", "1.17.0"));   // only version, capped at 1.17.0
+        var plan = PreLaunchPlanner.Build("1.18.0", null, "1.3.0",
+            new[] { new InstalledPluginInfo(e, true, null) }, applyFrameworkUpdate: false);
+
+        var item = Assert.Single(plan.Items);
+        Assert.Equal(PluginPlanStatus.UnfixableIncompatible, item.Status);
+        Assert.True(plan.HasBlockers);
+    }
+
+    [Fact]
+    public void Installed_version_absent_from_registry_forces_fix()
+    {
+        var cm = Entry("combatmeter", V("1.6.1", "1.18.0"), V("1.6.0", "1.17.0", "1.17.0"));
+        var plan = PreLaunchPlanner.Build("1.18.0", null, "1.3.0",
+            new[] { new InstalledPluginInfo(cm, true, "1.5.0") }, applyFrameworkUpdate: false);  // 1.5.0 not in registry
+
+        var item = Assert.Single(plan.Items);
+        Assert.Equal(PluginPlanStatus.RequiredCompatFix, item.Status);
+        Assert.Equal("1.6.1", item.TargetVersion);
+    }
 }
