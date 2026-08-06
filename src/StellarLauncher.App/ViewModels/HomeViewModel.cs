@@ -297,7 +297,7 @@ public partial class HomeViewModel : ObservableObject
     // framework that will run. Returns null on any failure (fail-open — never trap the player offline).
     private async Task<(PreLaunchPlan plan, IReadOnlyList<PluginEntry> registry, VersionManifest? target)?> BuildPlanAsync(bool applyFramework)
     {
-        if (GameMini is not { } gm) return null;
+        if (!Modded || GameMini is not { } gm) return null;
         try
         {
             var cfg = _settings.Load();
