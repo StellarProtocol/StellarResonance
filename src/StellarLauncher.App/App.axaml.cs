@@ -50,10 +50,12 @@ public partial class App : Application
 
         // Lazily captured — mainWindow is set before the user can ever click Launch.
         MainWindow? mainWindow = null;
-        Task<ViewModels.UpdateLaunchChoice> UpdatePrompt(string current, string latest) =>
-            new Views.UpdatePromptDialog(current, latest).ShowDialog<ViewModels.UpdateLaunchChoice>(mainWindow!);
+        Task<ViewModels.PreLaunchResult> ReviewPrompt(ViewModels.PreLaunchReviewViewModel vm) =>
+            Views.PreLaunchReviewDialog.ShowFor(vm, mainWindow!);
 
-        var home = new HomeViewModel(settings, locator, doorstop, installer, launcher, version, platform, launcherUpdates, detector, selfUpdater, dxvkNvapi, bepinex, interop, UpdatePrompt);
+        var home = new HomeViewModel(settings, locator, doorstop, installer, launcher, version, platform,
+            launcherUpdates, detector, selfUpdater, dxvkNvapi, bepinex, interop,
+            pluginRegistry, pluginInstaller, http, ReviewPrompt);
         var setVm = new SettingsViewModel(settings, locator, detector, platform);
         var main = new MainWindowViewModel(home, setVm, pluginsVm);
 

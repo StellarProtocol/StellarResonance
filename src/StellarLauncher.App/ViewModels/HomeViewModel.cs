@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -39,7 +41,10 @@ public partial class HomeViewModel : ObservableObject
     private readonly IDxvkNvapiInstaller _dxvkNvapi;
     private readonly IBepInExConfig _bepinex;
     private readonly IInteropWatch _interop;
-    private readonly Func<string, string, Task<UpdateLaunchChoice>> _updatePrompt;
+    private readonly IPluginRegistryService _pluginRegistry;
+    private readonly IPluginInstaller _pluginInstaller;
+    private readonly HttpClient _http;
+    private readonly Func<PreLaunchReviewViewModel, Task<PreLaunchResult>> _reviewPrompt;
 
     [ObservableProperty] private string _gameStatus = "Detecting…";
     [ObservableProperty] private bool _needsGameSetup;   // true when no game is set — drives onboarding
@@ -85,13 +90,15 @@ public partial class HomeViewModel : ObservableObject
         IInstaller installer, IGameLauncher launcher, IVersionService version, IPlatformInfo platform,
         ILauncherUpdateService launcherUpdates, IGameDetector detector, ILauncherSelfUpdater selfUpdater,
         IDxvkNvapiInstaller dxvkNvapi, IBepInExConfig bepinex, IInteropWatch interop,
-        Func<string, string, Task<UpdateLaunchChoice>> updatePrompt)
+        IPluginRegistryService pluginRegistry, IPluginInstaller pluginInstaller, HttpClient http,
+        Func<PreLaunchReviewViewModel, Task<PreLaunchResult>> reviewPrompt)
     {
         _settings = settings; _locator = locator; _doorstop = doorstop;
         _installer = installer; _launcher = launcher; _version = version; _platform = platform;
         _launcherUpdates = launcherUpdates; _detector = detector;
         _selfUpdater = selfUpdater; _dxvkNvapi = dxvkNvapi; _bepinex = bepinex; _interop = interop;
-        _updatePrompt = updatePrompt;
+        _pluginRegistry = pluginRegistry; _pluginInstaller = pluginInstaller; _http = http;
+        _reviewPrompt = reviewPrompt;
         _ = RefreshAsync();
         _ = CheckLauncherUpdateAsync();
     }
@@ -286,26 +293,51 @@ public partial class HomeViewModel : ObservableObject
         }
     }
 
+    // Build the pre-launch plan: fetch the registry, detect installed plugins, classify against the
+    // framework that will run. Returns null on any failure (fail-open — never trap the player offline).
+    private async Task<(PreLaunchPlan plan, IReadOnlyList<PluginEntry> registry, VersionManifest? target)?> BuildPlanAsync(bool applyFramework)
+    {
+        if (GameMini is not { } gm) return null;
+        try
+        {
+            var cfg = _settings.Load();
+            var urls = new List<Uri>();
+            if (ChannelManifests.IsTesting(cfg.Channel)) urls.Add(ChannelManifests.PluginRegistry(null));
+            urls.Add(ChannelManifests.PluginRegistry(cfg.Channel));
+            foreach (var repo in cfg.ExtraPluginRepos)
+                if (Uri.TryCreate(repo, UriKind.Absolute, out var u)) urls.Add(u);
+
+            var registry = await _pluginRegistry.FetchAllAsync(urls);
+            var installed = new List<InstalledPluginInfo>();
+            foreach (var e in registry)
+            {
+                var dll = e.Versions.Count == 0 ? null
+                    : (e.Versions[0].Dll ?? Path.GetFileName(new Uri(e.Versions[0].DllUrl).LocalPath));
+                var isInstalled = dll is not null && _pluginInstaller.FindInstalledDll(gm, dll) is not null;
+                installed.Add(new InstalledPluginInfo(e, isInstalled, _pluginInstaller.InstalledVersion(gm, e.Id)));
+            }
+            var target = Versions.FirstOrDefault(v => v.Version == _manifest?.Latest);
+            var plan = PreLaunchPlanner.Build(_installedFramework, target, LauncherVersion, installed, applyFramework);
+            return (plan, registry, target);
+        }
+        catch (Exception ex) { StatusLine = $"couldn't check plugin updates — {ex.Message}"; return null; }
+    }
+
     [RelayCommand]
     private async Task LaunchAsync()
     {
         if (GameMini is null) { StatusLine = "set the game path first"; return; }
         try
         {
-            // If a framework update is available, ask the user what to do before proceeding.
-            if (UpdateAvailable && _installedFramework is not null && _manifest is not null)
+            var cfgNow = _settings.Load();
+            var built = await BuildPlanAsync(applyFramework: cfgNow.AutoUpdateBeforeLaunch);
+            if (built is { } b && !b.plan.IsEmpty)
             {
-                var latest = Versions.FirstOrDefault(v => v.Version == _manifest.Latest);
-                if (latest is not null)
-                {
-                    var choice = await _updatePrompt(_installedFramework, _manifest.Latest);
-                    if (choice == UpdateLaunchChoice.Cancel) { StatusLine = ""; return; }
-                    if (choice == UpdateLaunchChoice.UpdateAndLaunch)
-                    {
-                        try { await InstallVersionAsync(latest); }
-                        catch (Exception ex) { StatusLine = $"update failed: {ex.Message}"; return; }
-                    }
-                }
+                var vm = new PreLaunchReviewViewModel(b.plan, b.registry, b.target,
+                    cfgNow.AutoUpdateBeforeLaunch, GameMini!, _installer, _pluginInstaller, _http);
+                var result = await _reviewPrompt(vm);
+                if (result == PreLaunchResult.Cancel) { StatusLine = ""; return; }
+                await RefreshAsync();   // framework version may have changed; refresh installed state
             }
 
             var cfg = _settings.Load();   // pick up the latest Settings (esync/fsync/overlay/dxvk-nvapi)
