@@ -30,6 +30,7 @@ public partial class PluginItemViewModel : ObservableObject
     [ObservableProperty] private bool _isUpdate;
     [ObservableProperty] private bool _isReinstall;
     [ObservableProperty] private bool _isPlainInstall;
+    [ObservableProperty] private bool _isDisabled;
 
     public ObservableCollection<PluginVersion> Versions { get; } = new();
 
@@ -205,4 +206,5 @@ public partial class PluginItemViewModel : ObservableObject
     [RelayCommand] private void CancelInstall() => ConfirmVisible = false;
     [RelayCommand] private Task ConfirmInstall() { ConfirmVisible = false; return _parent.InstallAsync(this); }
     [RelayCommand] private Task Remove() => _parent.RemoveAsync(this);
+    [RelayCommand] private Task ReEnable() => _parent.EnableAsync(this);
 }

@@ -162,7 +162,8 @@ public partial class PluginsViewModel : ObservableObject
                     var dll = CanonicalDll(e);
                     var installed = gameMini is not null && dll is not null && _installer.FindInstalledDll(gameMini, dll) is not null;
                     var version = gameMini is null ? null : _installer.InstalledVersion(gameMini, e.Id);
-                    _allPlugins.Add(new PluginItemViewModel(e, installed, version, framework, this));
+                    var disabled = gameMini is not null && _installer.IsDisabled(gameMini, e.Id);
+                    _allPlugins.Add(new PluginItemViewModel(e, installed || disabled, version, framework, this) { IsDisabled = disabled });
                 }
                 catch { /* skip a malformed entry rather than failing the whole list */ }
             }
@@ -219,6 +220,14 @@ public partial class PluginsViewModel : ObservableObject
         }
         catch (Exception ex) { item.Action = $"failed: {ex.Message}"; }
         return Task.CompletedTask;
+    }
+
+    public async Task EnableAsync(PluginItemViewModel item)
+    {
+        var gameMini = _settings.Load().GameMiniDir;
+        if (gameMini is null) { Status = "set the game path in Settings first."; return; }
+        _installer.Enable(gameMini, item.Entry.Id);
+        await ReloadAsync();
     }
 
     // Canonical DLL filename for a plugin (from its newest version), for install/detect/remove.
