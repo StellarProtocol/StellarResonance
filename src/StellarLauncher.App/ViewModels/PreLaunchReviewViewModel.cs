@@ -93,7 +93,7 @@ public partial class PreLaunchReviewViewModel : ObservableObject
 
     partial void OnApplyFrameworkChanged(bool value) => Rebuild();
 
-    private string InstalledOr(string fallback) => _plan.EffectiveFramework ?? fallback;
+    private string InstalledOr(string fallback) => _installedFramework ?? fallback;
 
     [RelayCommand]
     private void Cancel() { _tcs.TrySetResult(PreLaunchResult.Cancel); RequestClose?.Invoke(); }
