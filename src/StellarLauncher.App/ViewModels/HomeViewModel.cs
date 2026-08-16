@@ -370,9 +370,25 @@ public partial class HomeViewModel : ObservableObject
                 Esync: cfg.Esync, Fsync: cfg.Fsync, Overlay: overlay,
                 // A user-maintained MangoHud.conf always wins; the preset only fills the no-config case.
                 MangoHudPreset: overlay == PerfOverlayMode.Full && !MangoHud.UserConfigExists() ? MangoHud.DefaultPreset : null,
-                DxvkNvapi: cfg.DxvkNvapi, StellarPerf: cfg.StellarPerf, SteamAppId: steamAppId);
+                DxvkNvapi: cfg.DxvkNvapi, StellarPerf: cfg.StellarPerf, SteamAppId: steamAppId,
+                WrapperCommand: cfg.WrapperCommand, GameArguments: cfg.GameArguments, ExtraEnv: cfg.ExtraEnv);
+
+            var psi = _launcher.BuildStartInfo(request);
+
+            if (!string.IsNullOrWhiteSpace(cfg.PreLaunchScript) && File.Exists(cfg.PreLaunchScript))
+            {
+                StatusLine = "running pre-launch script…";
+                var code = await LaunchScripts.RunAsync(cfg.PreLaunchScript!, psi.Environment,
+                    TimeSpan.FromSeconds(60));
+                if (code is null) StatusLine = "pre-launch script timed out — launching anyway";
+                else if (code != 0) StatusLine = $"pre-launch script exited {code} — launching anyway";
+            }
+
             StatusLine = "launching…";
-            var proc = _launcher.Launch(request);
+            var proc = System.Diagnostics.Process.Start(psi);
+
+            if (proc is not null && !string.IsNullOrWhiteSpace(cfg.PostExitScript))
+                _ = RunPostExitAsync(proc, cfg.PostExitScript!, psi.Environment);
 
             if (steamAppId is not null) { StatusLine = "launching via Steam…"; return; }   // Steam hands off — nothing to monitor
             if (proc is null) { StatusLine = "launch failed: process did not start"; return; }
@@ -392,6 +408,19 @@ public partial class HomeViewModel : ObservableObject
                 : "game running";
         }
         catch (Exception ex) { StatusLine = $"launch failed: {ex.Message}"; }
+    }
+
+    // Fire-and-forget: run the user's post-exit script once the game process ends.
+    private async Task RunPostExitAsync(System.Diagnostics.Process proc,
+        string scriptPath, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string?>> env)
+    {
+        try
+        {
+            await proc.WaitForExitAsync();
+            if (File.Exists(scriptPath))
+                await LaunchScripts.RunAsync(scriptPath, env, TimeSpan.FromSeconds(60));
+        }
+        catch (Exception ex) { StatusLine = $"post-exit script failed: {ex.Message}"; }
     }
 
     // Watch BepInEx regenerate its IL2CPP interop assemblies, driving the footer progress bar from the
