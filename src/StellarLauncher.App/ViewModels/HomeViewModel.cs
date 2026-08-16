@@ -375,19 +375,23 @@ public partial class HomeViewModel : ObservableObject
 
             var psi = _launcher.BuildStartInfo(request);
 
-            if (!string.IsNullOrWhiteSpace(cfg.PreLaunchScript) && File.Exists(cfg.PreLaunchScript))
+            // Advanced launch scripts are Linux-only; never touch psi.Environment on the Windows
+            // shell-execute path (Process.Start throws for UseShellExecute=true once Environment is read).
+            var launchStatus = "launching…";
+            if (!_platform.IsWindows &&
+                !string.IsNullOrWhiteSpace(cfg.PreLaunchScript) && File.Exists(cfg.PreLaunchScript))
             {
                 StatusLine = "running pre-launch script…";
                 var code = await LaunchScripts.RunAsync(cfg.PreLaunchScript!, psi.Environment,
                     TimeSpan.FromSeconds(60));
-                if (code is null) StatusLine = "pre-launch script timed out — launching anyway";
-                else if (code != 0) StatusLine = $"pre-launch script exited {code} — launching anyway";
+                if (code is null) launchStatus = "pre-launch script timed out — launching anyway";
+                else if (code != 0) launchStatus = $"pre-launch script exited {code} — launching anyway";
             }
 
-            StatusLine = "launching…";
+            StatusLine = launchStatus;
             var proc = System.Diagnostics.Process.Start(psi);
 
-            if (proc is not null && !string.IsNullOrWhiteSpace(cfg.PostExitScript))
+            if (!_platform.IsWindows && proc is not null && !string.IsNullOrWhiteSpace(cfg.PostExitScript))
                 _ = RunPostExitAsync(proc, cfg.PostExitScript!, psi.Environment);
 
             if (steamAppId is not null) { StatusLine = "launching via Steam…"; return; }   // Steam hands off — nothing to monitor
