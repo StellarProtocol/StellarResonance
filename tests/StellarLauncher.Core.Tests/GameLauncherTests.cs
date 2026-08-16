@@ -164,4 +164,73 @@ public class GameLauncherTests
         Assert.Equal("run", psi.ArgumentList[0]);
         Assert.Equal("/opt/game/BP2", psi.Environment["STEAM_COMPAT_DATA_PATH"]);
     }
+
+    [Fact]
+    public void Wrapper_wraps_runner_and_exe_in_order()
+    {
+        var psi = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/drive_c/Star/StarLauncher/StarLauncher.exe",
+            Runner: "/usr/bin/wine", WinePrefix: "/p",
+            WrapperCommand: "gamescope -f --"));
+        Assert.Equal("gamescope", psi.FileName);
+        Assert.Equal("-f", psi.ArgumentList[0]);
+        Assert.Equal("--", psi.ArgumentList[1]);
+        Assert.Equal("/usr/bin/wine", psi.ArgumentList[2]);
+        Assert.Contains("StarLauncher.exe", psi.ArgumentList[^1]);
+    }
+
+    [Fact]
+    public void Game_arguments_are_appended_after_the_exe()
+    {
+        var psi = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/drive_c/Star/StarLauncher/StarLauncher.exe",
+            Runner: "/usr/bin/wine", WinePrefix: "/p",
+            GameArguments: "--foo bar"));
+        Assert.Equal("/usr/bin/wine", psi.FileName);
+        Assert.Equal("bar", psi.ArgumentList[^1]);
+        Assert.Equal("--foo", psi.ArgumentList[^2]);
+    }
+
+    [Fact]
+    public void User_env_overrides_builtin()
+    {
+        var psi = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/drive_c/Star/StarLauncher/StarLauncher.exe",
+            Runner: "/usr/bin/wine", WinePrefix: "/p",
+            Overlay: PerfOverlayMode.Full,
+            ExtraEnv: new[] { new EnvVar { Name = "MANGOHUD", Value = "0" }, new EnvVar { Name = "MY_VAR", Value = "42" } }));
+        Assert.Equal("0", psi.Environment["MANGOHUD"]);
+        Assert.Equal("42", psi.Environment["MY_VAR"]);
+    }
+
+    [Fact]
+    public void Winhttp_override_is_protected()
+    {
+        var psi = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/drive_c/Star/StarLauncher/StarLauncher.exe",
+            Runner: "/usr/bin/wine", WinePrefix: "/p",
+            ExtraEnv: new[] { new EnvVar { Name = "WINEDLLOVERRIDES", Value = "d3d11=n,b" } }));
+        var ov = psi.Environment["WINEDLLOVERRIDES"]!;
+        Assert.Contains("d3d11=n,b", ov);
+        Assert.Contains("winhttp=n,b", ov);
+    }
+
+    [Fact]
+    public void Empty_named_env_var_is_skipped()
+    {
+        var psi = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/drive_c/Star/StarLauncher/StarLauncher.exe",
+            Runner: "/usr/bin/wine", WinePrefix: "/p",
+            ExtraEnv: new[] { new EnvVar { Name = "", Value = "x" } }));
+        Assert.False(psi.Environment.ContainsKey(""));
+    }
+
+    [Fact]
+    public void No_advanced_fields_leaves_filename_as_runner()
+    {
+        var psi = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/drive_c/Star/StarLauncher/StarLauncher.exe",
+            Runner: "/usr/bin/wine", WinePrefix: "/p"));
+        Assert.Equal("/usr/bin/wine", psi.FileName);   // wrapper not applied
+    }
 }
