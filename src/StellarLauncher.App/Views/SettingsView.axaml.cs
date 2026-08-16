@@ -48,4 +48,28 @@ public partial class SettingsView : UserControl
         });
         return folders.Count > 0 ? folders[0].Path.LocalPath : null;
     }
+
+    private async void BrowsePreScript(object? sender, RoutedEventArgs e)
+    {
+        var path = await PickFileAsync("Select the pre-launch script");
+        if (path is not null && Vm is not null) Vm.PreLaunchScript = path;
+    }
+
+    private async void BrowsePostScript(object? sender, RoutedEventArgs e)
+    {
+        var path = await PickFileAsync("Select the post-exit script");
+        if (path is not null && Vm is not null) Vm.PostExitScript = path;
+    }
+
+    private async Task<string?> PickFileAsync(string title)
+    {
+        var top = TopLevel.GetTopLevel(this);
+        if (top is null) return null;
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+        });
+        return files.Count > 0 ? files[0].Path.LocalPath : null;
+    }
 }

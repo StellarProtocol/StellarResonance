@@ -62,6 +62,48 @@
                  Text="MangoHud not detected — install your distro's 'mangohud' package (the setting is kept and activates once installed)."/>
       <CheckBox IsChecked="{Binding StellarPerf}" Content="Stellar Perf overlay (advanced)"
                 ToolTip.Tip="Enables the framework's in-game Stellar Perf overlay sampling (STELLAR_PERFHUD) — frame &amp; CPU times for debugging. Has a small overhead."/>
+
+      <Expander Header="Advanced (power user)" Margin="0,8,0,0">
+        <StackPanel Spacing="10" Margin="0,8,0,0">
+          <TextBlock Text="Wrapper command" Foreground="#8a93b2"/>
+          <TextBox Text="{Binding WrapperCommand}"
+                   PlaceholderText="e.g. gamemoderun   or   gamescope -f --"
+                   ToolTip.Tip="Prefixes the launch command. First token is the wrapper binary, the rest are its arguments."/>
+
+          <TextBlock Text="Game arguments" Foreground="#8a93b2"/>
+          <TextBox Text="{Binding GameArguments}"
+                   PlaceholderText="extra arguments appended to the game invocation"/>
+
+          <TextBlock Text="Pre-launch script" Foreground="#8a93b2"/>
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0" Text="{Binding PreLaunchScript}" PlaceholderText="/path/to/pre.sh (run &amp; waited-on before launch)"/>
+            <Button Grid.Column="1" Content="Browse…" Click="BrowsePreScript" Margin="8,0,0,0"/>
+          </Grid>
+
+          <TextBlock Text="Post-exit script" Foreground="#8a93b2"/>
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0" Text="{Binding PostExitScript}" PlaceholderText="/path/to/post.sh (run after the game exits)"/>
+            <Button Grid.Column="1" Content="Browse…" Click="BrowsePostScript" Margin="8,0,0,0"/>
+          </Grid>
+
+          <TextBlock Text="Environment variables" Foreground="#8a93b2" Margin="0,4,0,0"/>
+          <ItemsControl ItemsSource="{Binding EnvVars}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:EnvVarRowViewModel">
+                <Grid ColumnDefinitions="*,*,Auto" Margin="0,0,0,6">
+                  <TextBox Grid.Column="0" Text="{Binding Name}" PlaceholderText="NAME"/>
+                  <TextBox Grid.Column="1" Text="{Binding Value}" PlaceholderText="VALUE" Margin="8,0,0,0"/>
+                  <Button Grid.Column="2" Content="🗑" Command="{Binding RemoveCommand}" Margin="8,0,0,0"
+                          ToolTip.Tip="Remove this variable"/>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Content="+ Add variable" Command="{Binding AddEnvVarCommand}" HorizontalAlignment="Left"/>
+          <TextBlock Foreground="#7e88a8" FontSize="11" TextWrapping="Wrap"
+                     Text="Your variables are applied last and override the launcher's defaults. WINEDLLOVERRIDES is managed — winhttp=n,b is always kept so the mod loads."/>
+        </StackPanel>
+      </Expander>
     </StackPanel>
 
     <TextBlock Text="Update channel" Foreground="#8a93b2"/>
