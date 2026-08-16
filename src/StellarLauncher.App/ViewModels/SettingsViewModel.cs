@@ -1,3 +1,4 @@
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StellarLauncher.Core.Platform;
@@ -31,6 +32,13 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _stellarPerf;
     [ObservableProperty] private bool _dxvkNvapi;
 
+    // Advanced (Linux power-user) launch options
+    [ObservableProperty] private string? _wrapperCommand;
+    [ObservableProperty] private string? _gameArguments;
+    [ObservableProperty] private string? _preLaunchScript;
+    [ObservableProperty] private string? _postExitScript;
+    public System.Collections.ObjectModel.ObservableCollection<EnvVarRowViewModel> EnvVars { get; } = new();
+
     public SettingsViewModel(ISettingsStore settings, IGameLocator locator, IGameDetector detector, IPlatformInfo platform)
     {
         _settings = settings; _locator = locator; _detector = detector;
@@ -44,6 +52,12 @@ public partial class SettingsViewModel : ObservableObject
         _perfOverlayIndex = (int)cfg.EffectiveOverlay();
         _mangoHudMissing = _perfOverlayIndex == (int)PerfOverlayMode.Full && !MangoHud.IsInstalled();
         _stellarPerf = cfg.StellarPerf; _dxvkNvapi = cfg.DxvkNvapi;
+        _wrapperCommand = cfg.WrapperCommand;
+        _gameArguments = cfg.GameArguments;
+        _preLaunchScript = cfg.PreLaunchScript;
+        _postExitScript = cfg.PostExitScript;
+        foreach (var e in cfg.ExtraEnv)
+            EnvVars.Add(new EnvVarRowViewModel(e, Persist, RemoveEnvVar));
         if (string.IsNullOrWhiteSpace(_gameMiniDir)) RunDetect();   // auto-detect on first open
     }
 
@@ -97,6 +111,23 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnTestingChannelChanged(bool value) => Persist();
     partial void OnDebugLoggingChanged(bool value) => Persist();
     partial void OnAutoUpdateBeforeLaunchChanged(bool value) => Persist();
+    partial void OnWrapperCommandChanged(string? value) => Persist();
+    partial void OnGameArgumentsChanged(string? value) => Persist();
+    partial void OnPreLaunchScriptChanged(string? value) => Persist();
+    partial void OnPostExitScriptChanged(string? value) => Persist();
+
+    [RelayCommand]
+    private void AddEnvVar()
+    {
+        EnvVars.Add(new EnvVarRowViewModel(new EnvVar(), Persist, RemoveEnvVar));
+        Persist();
+    }
+
+    private void RemoveEnvVar(EnvVarRowViewModel row)
+    {
+        EnvVars.Remove(row);
+        Persist();
+    }
 
     private void Persist()
     {
@@ -108,6 +139,14 @@ public partial class SettingsViewModel : ObservableObject
         cfg.Esync = Esync; cfg.Fsync = Fsync;
         cfg.SetOverlay((PerfOverlayMode)PerfOverlayIndex);
         cfg.StellarPerf = StellarPerf; cfg.DxvkNvapi = DxvkNvapi;
+        cfg.WrapperCommand = string.IsNullOrWhiteSpace(WrapperCommand) ? null : WrapperCommand;
+        cfg.GameArguments = string.IsNullOrWhiteSpace(GameArguments) ? null : GameArguments;
+        cfg.PreLaunchScript = string.IsNullOrWhiteSpace(PreLaunchScript) ? null : PreLaunchScript;
+        cfg.PostExitScript = string.IsNullOrWhiteSpace(PostExitScript) ? null : PostExitScript;
+        cfg.ExtraEnv = EnvVars
+            .Where(r => !string.IsNullOrWhiteSpace(r.Name))
+            .Select(r => r.ToModel())
+            .ToList();
         _settings.Save(cfg);
     }
 
