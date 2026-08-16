@@ -216,6 +216,30 @@ public class GameLauncherTests
     }
 
     [Fact]
+    public void Winhttp_disable_attempt_is_overridden()
+    {
+        var psi = Linux().BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: "/p/drive_c/Star/StarLauncher/StarLauncher.exe",
+            Runner: "/usr/bin/wine", WinePrefix: "/p",
+            ExtraEnv: new[] { new EnvVar { Name = "WINEDLLOVERRIDES", Value = "winhttp=b" } }));
+        Assert.Equal("winhttp=n,b", psi.Environment["WINEDLLOVERRIDES"]);
+    }
+
+    [Fact]
+    public void Windows_ignores_advanced_fields()
+    {
+        var l = new GameLauncher(new FakePlatform { IsWindows = true });
+        var psi = l.BuildStartInfo(new LaunchRequest(
+            StarLauncherExe: @"C:\Star\StarLauncher\StarLauncher.exe",
+            WrapperCommand: "gamemoderun", GameArguments: "--foo",
+            ExtraEnv: new[] { new EnvVar { Name = "X", Value = "1" } }));
+        Assert.Equal(@"C:\Star\StarLauncher\StarLauncher.exe", psi.FileName);
+        Assert.True(psi.UseShellExecute);
+        Assert.Empty(psi.ArgumentList);
+        Assert.False(psi.Environment.ContainsKey("X"));
+    }
+
+    [Fact]
     public void Empty_named_env_var_is_skipped()
     {
         var psi = Linux().BuildStartInfo(new LaunchRequest(

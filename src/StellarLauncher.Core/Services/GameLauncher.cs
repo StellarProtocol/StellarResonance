@@ -107,10 +107,16 @@ public sealed class GameLauncher : IGameLauncher
                 psi.Environment[e.Name] = e.Value;            // user value wins over built-ins
             }
 
-            // Never let a user WINEDLLOVERRIDES silently disable the mod loader.
-            if (psi.Environment.TryGetValue("WINEDLLOVERRIDES", out var ov) &&
-                ov is not null && !ov.Contains("winhttp", StringComparison.OrdinalIgnoreCase))
-                psi.Environment["WINEDLLOVERRIDES"] = ov + ";winhttp=n,b";
+            // Never let a user WINEDLLOVERRIDES disable the mod loader: strip any user-supplied
+            // winhttp token and force winhttp=n,b (native-first) so the BepInEx doorstop always loads.
+            if (psi.Environment.TryGetValue("WINEDLLOVERRIDES", out var ov) && ov is not null)
+            {
+                var kept = new System.Collections.Generic.List<string>();
+                foreach (var seg in ov.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    if (!seg.StartsWith("winhttp", StringComparison.OrdinalIgnoreCase)) kept.Add(seg);
+                kept.Add("winhttp=n,b");
+                psi.Environment["WINEDLLOVERRIDES"] = string.Join(";", kept);
+            }
         }
 
         foreach (var arg in CommandLine.Split(r.GameArguments))

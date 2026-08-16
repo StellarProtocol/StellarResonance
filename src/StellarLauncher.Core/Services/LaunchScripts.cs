@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace StellarLauncher.Core.Services;
 
-/// <summary>Runs a user pre/post-launch shell script via /bin/sh (Linux advanced launch options).</summary>
+/// <summary>Runs a user pre/post-launch script via <c>/bin/sh &lt;path&gt;</c> (Linux only). The file is executed as a POSIX sh script — a non-sh shebang is not honored and no execute bit is required.</summary>
 public static class LaunchScripts
 {
     public static async Task<int?> RunAsync(string scriptPath, IEnumerable<KeyValuePair<string, string?>> env,
