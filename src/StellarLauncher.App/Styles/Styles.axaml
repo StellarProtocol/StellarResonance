@@ -74,6 +74,9 @@
   </Style>
   <!-- the underline (BorderBrush) is bound per tab in the view: accent when active, Transparent otherwise -->
   <Style Selector="Button.tab.active"><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  <!-- accent swatches (Settings tab): the border is the selection ring — a class, so Classes.selected can win -->
+  <Style Selector="Button.swatch"><Setter Property="BorderBrush" Value="Transparent"/></Style>
+  <Style Selector="Button.swatch.selected"><Setter Property="BorderBrush" Value="White"/></Style>
   <!-- rail rows -->
   <Style Selector="Border.railItem">
     <Setter Property="CornerRadius" Value="8"/><Setter Property="Padding" Value="7,7,8,7"/>
