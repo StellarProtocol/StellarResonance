@@ -8,7 +8,7 @@ using StellarLauncher.Core.Services;
 
 namespace StellarLauncher.Core.Logs;
 
-public sealed record CollapseResult(string KeptDir, IReadOnlyList<string> MovedDirs, string BackupDir);
+public sealed record CollapseResult(string KeptDir, IReadOnlyList<string> MovedDirs, string BackupDir, IReadOnlyList<string> FailedDirs);
 
 /// <summary>Keep the newest copy of a duplicated plugin slot, move the rest OUTSIDE every scan path.</summary>
 public static class DuplicateSlotFix
@@ -20,12 +20,20 @@ public static class DuplicateSlotFix
         var backup = fs.Path.Combine(gameMini, "stellar-backups", $"duplicate-slot-{stamp}");
         fs.Directory.CreateDirectory(backup);
         var moved = new List<string>();
+        var failed = new List<string>();
         foreach (var d in slot.Dirs.Where(d => d != keep))
         {
-            fs.Directory.Move(d, fs.Path.Combine(backup, fs.Path.GetFileName(d)));
-            moved.Add(d);
+            try
+            {
+                fs.Directory.Move(d, fs.Path.Combine(backup, fs.Path.GetFileName(d)));
+                moved.Add(d);
+            }
+            catch (Exception)
+            {
+                failed.Add(d);
+            }
         }
-        return new CollapseResult(keep, moved, backup);
+        return new CollapseResult(keep, moved, backup, failed);
     }
 
     private static string? MarkerVersion(IFileSystem fs, string dir)

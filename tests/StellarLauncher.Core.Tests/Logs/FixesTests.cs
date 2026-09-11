@@ -22,6 +22,7 @@ public class FixesTests
         Assert.Equal($"{G}/stellar/plugins/CombatMeter", r.KeptDir);
         Assert.Equal($"{G}/stellar-backups/duplicate-slot-20260911-0234", r.BackupDir);
         Assert.Single(r.MovedDirs);
+        Assert.Empty(r.FailedDirs);
         Assert.False(fs.Directory.Exists($"{G}/stellar/plugins/combatmeter"));
         Assert.True(fs.File.Exists($"{G}/stellar-backups/duplicate-slot-20260911-0234/combatmeter/Stellar.CombatMeter.dll"));
         Assert.True(fs.File.Exists($"{G}/stellar/plugins/CombatMeter/Stellar.CombatMeter.dll"));
@@ -35,6 +36,37 @@ public class FixesTests
         fs.AddFile($"{G}/stellar/plugins/A/X.dll", new MockFileData("2") { LastWriteTime = new System.DateTime(2026, 6, 1) });
         var r = DuplicateSlotFix.Collapse(fs, G, new DuplicateSlot("a", new[] { $"{G}/stellar/plugins/A", $"{G}/stellar/plugins/a" }), "s");
         Assert.Equal($"{G}/stellar/plugins/A", r.KeptDir);
+        Assert.Empty(r.FailedDirs);
+    }
+
+    [Fact]
+    public void Collapse_with_a_single_dir_keeps_it_and_moves_nothing()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile($"{G}/stellar/plugins/combatmeter/Stellar.CombatMeter.dll", new MockFileData("a"));
+        var r = DuplicateSlotFix.Collapse(fs, G, new DuplicateSlot("combatmeter", new[] { $"{G}/stellar/plugins/combatmeter" }), "s");
+        Assert.Equal($"{G}/stellar/plugins/combatmeter", r.KeptDir);
+        Assert.Empty(r.MovedDirs);
+        Assert.Empty(r.FailedDirs);
+        Assert.True(fs.File.Exists($"{G}/stellar/plugins/combatmeter/Stellar.CombatMeter.dll"));
+    }
+
+    [Fact]
+    public void Collapse_records_a_dir_that_cannot_be_moved_and_keeps_going()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile($"{G}/stellar/plugins/CombatMeter/.plugin-version", new MockFileData("2.10.0"));
+        fs.AddFile($"{G}/stellar/plugins/combatmeter/.plugin-version", new MockFileData("2.9.1"));
+        fs.AddFile($"{G}/stellar/plugins/Combatmeter/.plugin-version", new MockFileData("2.8.0"));
+        // pre-create the destination of the 2.9.1 dir so its move fails (destination exists)
+        fs.AddFile($"{G}/stellar-backups/duplicate-slot-s/combatmeter/.plugin-version", new MockFileData("old"));
+        var slot = new DuplicateSlot("combatmeter", new[] { $"{G}/stellar/plugins/CombatMeter", $"{G}/stellar/plugins/combatmeter", $"{G}/stellar/plugins/Combatmeter" });
+        var r = DuplicateSlotFix.Collapse(fs, G, slot, "s");
+        Assert.Equal($"{G}/stellar/plugins/CombatMeter", r.KeptDir);
+        Assert.Equal(new[] { $"{G}/stellar/plugins/Combatmeter" }, r.MovedDirs);
+        Assert.Equal(new[] { $"{G}/stellar/plugins/combatmeter" }, r.FailedDirs);
+        Assert.True(fs.Directory.Exists($"{G}/stellar/plugins/combatmeter"));           // still in place, not lost
+        Assert.False(fs.Directory.Exists($"{G}/stellar/plugins/Combatmeter"));
     }
 
     [Fact]

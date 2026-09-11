@@ -25,7 +25,19 @@ public static class ShadowCopyFix
         if (shadows.Count == 0) return shadows;
         var backup = fs.Path.Combine(gameMini, "stellar-backups", $"framework-shadow-{stamp}");
         fs.Directory.CreateDirectory(backup);
-        foreach (var d in shadows) fs.Directory.Move(d, fs.Path.Combine(backup, fs.Path.GetFileName(d)));
-        return shadows;
+        var moved = new List<string>();
+        foreach (var d in shadows)
+        {
+            try
+            {
+                fs.Directory.Move(d, fs.Path.Combine(backup, fs.Path.GetFileName(d)));
+                moved.Add(d);
+            }
+            catch (Exception)
+            {
+                // skip failed moves; the next inventory scan will show what is left
+            }
+        }
+        return moved;
     }
 }
