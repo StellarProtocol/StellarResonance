@@ -40,7 +40,7 @@
                     <Button Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right">
                       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Rectangle Width="9" Height="9" Fill="White" VerticalAlignment="Center"/>
-                        <TextBlock Text="Stop" VerticalAlignment="Center"/>
+                        <TextBlock Text="STOP" VerticalAlignment="Center"/>
                       </StackPanel>
                     </Button>
                     <Button Classes="link" Content="Install framework" Command="{Binding OpenCommand}" IsVisible="{Binding ShowInstallFramework}" HorizontalAlignment="Right"/>

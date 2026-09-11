@@ -37,7 +37,7 @@
           <Button Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" Padding="30,12" FontSize="13.5" MinWidth="150" HorizontalAlignment="Right">
             <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
               <Rectangle Width="10" Height="10" Fill="White" VerticalAlignment="Center"/>
-              <TextBlock Text="Stop" VerticalAlignment="Center"/>
+              <TextBlock Text="STOP" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
         </StackPanel>
