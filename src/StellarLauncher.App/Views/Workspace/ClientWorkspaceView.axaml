@@ -28,8 +28,18 @@
                        Minimum="0" Maximum="100" Height="4" Width="420" HorizontalAlignment="Left" Foreground="{Binding AccentBrush}" Background="#1c2740"/>
         </StackPanel>
         <StackPanel Grid.Column="1" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
-          <Button Classes="primary" Content="▶  LAUNCH" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}"/>
-          <Button Classes="stop" Content="◼  Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" Padding="30,12" FontSize="13.5" MinWidth="150" HorizontalAlignment="Right"/>
+          <Button Classes="primary" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}">
+            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+              <Path Data="M0,0 L9,5 L0,10 Z" Fill="White" Stretch="None" VerticalAlignment="Center"/>
+              <TextBlock Text="LAUNCH" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
+          <Button Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" Padding="30,12" FontSize="13.5" MinWidth="150" HorizontalAlignment="Right">
+            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+              <Rectangle Width="10" Height="10" Fill="White" VerticalAlignment="Center"/>
+              <TextBlock Text="Stop" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
         </StackPanel>
       </Grid>
     </Border>

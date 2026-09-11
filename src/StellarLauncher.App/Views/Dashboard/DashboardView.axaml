@@ -31,8 +31,18 @@
                     <Border Classes="tag tag-blue" Margin="0,2,0,0" IsVisible="{Binding IsPrepVisible}"><TextBlock Text="● PREPARING"/></Border>
                   </WrapPanel>
                   <StackPanel Grid.Row="0" Grid.Column="1" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Button Classes="primary sm" Content="▶  LAUNCH" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}"/>
-                    <Button Classes="stop" Content="◼  Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right"/>
+                    <Button Classes="primary sm" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Path Data="M0,0 L8,4.5 L0,9 Z" Fill="White" Stretch="None" VerticalAlignment="Center"/>
+                        <TextBlock Text="LAUNCH" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right">
+                      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Rectangle Width="9" Height="9" Fill="White" VerticalAlignment="Center"/>
+                        <TextBlock Text="Stop" VerticalAlignment="Center"/>
+                      </StackPanel>
+                    </Button>
                     <Button Classes="link" Content="Install framework" Command="{Binding OpenCommand}" IsVisible="{Binding ShowInstallFramework}" HorizontalAlignment="Right"/>
                   </StackPanel>
                   <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Spacing="4" Margin="0,6,0,0">
