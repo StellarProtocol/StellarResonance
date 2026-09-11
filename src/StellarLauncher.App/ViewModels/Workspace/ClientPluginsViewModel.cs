@@ -27,6 +27,7 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     [ObservableProperty] private PluginFilter _filter = PluginFilter.All;
     [ObservableProperty] private string _search = "";
     [ObservableProperty] private string _status = "";
+    [ObservableProperty] private bool _gridView;               // false = row list, true = card grid (persisted launcher-wide)
     [ObservableProperty] private PluginItemViewModel? _selectedPlugin;
     [ObservableProperty] private Bitmap? _lightboxImage;
 
@@ -38,13 +39,25 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     public string TargetLine => $"installing to {System.IO.Path.Combine(_ws.Client.GameMiniDir, "stellar", "plugins")} · framework {_ws.Inventory.FrameworkVersion ?? "none"} · registry: {(_ws.IsTesting ? "testing over stable" : "stable")}";
     public bool IsAll => Filter == PluginFilter.All; public bool IsInstalledFilter => Filter == PluginFilter.Installed;
     public bool IsUpdatesFilter => Filter == PluginFilter.Updates; public bool IsDisabledFilter => Filter == PluginFilter.Disabled;
+    public bool IsListView => !GridView;
 
     public ClientPluginsViewModel(ClientWorkspaceViewModel ws)
     {
         _ws = ws;
+        _gridView = ws.Shell.Config.Launcher.PluginsGridView;
         _ws.Refreshed += () => _ = ReloadAsync();   // released by the workspace's Dispose (Refreshed = null)
         _ = ReloadAsync();
     }
+
+    partial void OnGridViewChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsListView));
+        _ws.Shell.Config.Launcher.PluginsGridView = value;
+        _ws.Shell.SaveConfig();
+    }
+
+    [RelayCommand] private void ShowList() => GridView = false;
+    [RelayCommand] private void ShowGrid() => GridView = true;
 
     [RelayCommand]
     public async Task ReloadAsync()

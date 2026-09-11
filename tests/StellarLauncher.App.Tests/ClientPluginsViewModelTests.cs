@@ -48,6 +48,18 @@ public class ClientPluginsViewModelTests
     }
 
     [Fact]
+    public async Task View_mode_toggles_and_persists_launcher_wide()
+    {
+        var (f, vm) = await Open();
+        Assert.False(vm.GridView); Assert.True(vm.IsListView);      // default = list
+        vm.ShowGridCommand.Execute(null);
+        Assert.True(vm.GridView); Assert.False(vm.IsListView);
+        Assert.True(f.Store.Load().Launcher.PluginsGridView);        // persisted
+        vm.ShowListCommand.Execute(null);
+        Assert.False(f.Store.Load().Launcher.PluginsGridView);
+    }
+
+    [Fact]
     public async Task Filters_and_search()
     {
         var (_, vm) = await Open();

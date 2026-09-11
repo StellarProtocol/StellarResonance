@@ -12,6 +12,7 @@ public sealed class LauncherOptions
     public bool KeepOpen { get; set; } = true;
     public string StartOn { get; set; } = "dashboard";        // "dashboard" | "lastClient"
     public bool ShowMatrix { get; set; } = true;
+    public bool PluginsGridView { get; set; } = false;        // Plugins tab: false = row list, true = card grid
     public string? LastSelectedClientId { get; set; }
     public List<string> DismissedDetections { get; set; } = new();
 }

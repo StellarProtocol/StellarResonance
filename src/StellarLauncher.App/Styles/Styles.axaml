@@ -18,6 +18,9 @@
   <!-- body = default readable text; amber is toggled on top via Classes.amber — never set Foreground locally on such an element -->
   <Style Selector="TextBlock.body"><Setter Property="Foreground" Value="#c5cce0"/></Style>
   <Style Selector="TextBlock.amber"><Setter Property="Foreground" Value="#ffcf6b"/></Style>
+  <!-- plugin grid card -->
+  <Style Selector="Border.pluginCard"><Setter Property="Cursor" Value="Hand"/></Style>
+  <Style Selector="Border.pluginCard:pointerover"><Setter Property="BorderBrush" Value="#4a7c5cff"/></Style>
   <!-- tags -->
   <Style Selector="Border.tag">
     <Setter Property="Background" Value="#2E7c5cff"/><Setter Property="CornerRadius" Value="20"/><Setter Property="Padding" Value="9,2"/>

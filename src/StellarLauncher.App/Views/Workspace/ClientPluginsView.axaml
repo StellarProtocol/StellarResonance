@@ -13,13 +13,20 @@
           <Button Classes="tiny ghost2" Classes.ghost="{Binding IsUpdatesFilter}" Content="{Binding UpdateCount, StringFormat='Updates {0}'}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Updates}"/>
           <Button Classes="tiny ghost2" Classes.ghost="{Binding IsDisabledFilter}" Content="{Binding DisabledCount, StringFormat='Disabled {0}'}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Disabled}"/>
         </StackPanel>
-        <ComboBox Grid.Column="2" ItemsSource="{Binding CopySources}" PlaceholderText="Copy set from…" SelectionChanged="OnCopySourcePicked" MinWidth="160">
-          <ComboBox.ItemTemplate><DataTemplate x:DataType="clients:ClientProfile"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
-        </ComboBox>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+          <!-- view mode: rows vs a grid of plugin cards -->
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsListView}" Content="☰ List" Command="{Binding ShowListCommand}" ToolTip.Tip="List view"/>
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding GridView}" Content="▦ Grid" Command="{Binding ShowGridCommand}" ToolTip.Tip="Card grid"/>
+          <ComboBox ItemsSource="{Binding CopySources}" PlaceholderText="Copy set from…" SelectionChanged="OnCopySourcePicked" MinWidth="160">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="clients:ClientProfile"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
       </Grid>
       <TextBlock DockPanel.Dock="Top" Text="{Binding Status}" Foreground="#ffcf6b" FontSize="11.5" Margin="0,0,0,6" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
       <ScrollViewer>
-        <ItemsControl ItemsSource="{Binding Rows}">
+        <Panel>
+        <!-- LIST view -->
+        <ItemsControl ItemsSource="{Binding Rows}" IsVisible="{Binding IsListView}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:PluginRowViewModel">
               <Border Classes="card" Padding="10" Margin="0,0,0,6">
@@ -51,6 +58,42 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- GRID view: a card per plugin (cover image + details) -->
+        <ItemsControl ItemsSource="{Binding Rows}" IsVisible="{Binding GridView}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PluginRowViewModel">
+              <Border Classes="card pluginCard" Width="212" Margin="0,0,10,10" Padding="0">
+                <StackPanel>
+                  <Border Height="112" CornerRadius="12,12,0,0" ClipToBounds="True" Background="{Binding BadgeBrush}">
+                    <Panel>
+                      <Image Source="{Binding Item.Thumbnail}" Stretch="UniformToFill"/>
+                      <TextBlock Text="{Binding Initials}" IsVisible="{Binding Item.ShowMonogram}" Foreground="White" FontWeight="ExtraBold" FontSize="30" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Panel>
+                  </Border>
+                  <StackPanel Margin="12,10,12,12" Spacing="5">
+                    <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="White" FontSize="13" FontWeight="Bold" Padding="0" HorizontalAlignment="Left"/>
+                    <TextBlock Text="{Binding Description}" Classes="sub" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" Height="30"/>
+                    <TextBlock Text="{Binding VersionLine}" Classes="mono body" FontSize="11.5" Classes.amber="{Binding HasUpdate}"/>
+                    <ItemsControl ItemsSource="{Binding AlsoOn}">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:AlsoOnChip">
+                        <Border Classes="tag" Classes.tag-mint="{Binding IsPresent}" Margin="0,0,4,4"><TextBlock Text="{Binding Text}" FontSize="10"/></Border>
+                      </DataTemplate></ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
+                      <Button Classes="amber tiny" Content="Update" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"/>
+                      <Button Classes="ghost tiny" Content="Install" Command="{Binding InstallCommand}" IsVisible="{Binding !IsPresent}"/>
+                      <ToggleSwitch IsChecked="{Binding Enabled}" OnContent="Enabled" OffContent="Disabled" IsVisible="{Binding IsPresent}" FontSize="11"/>
+                    </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        </Panel>
       </ScrollViewer>
     </DockPanel>
     <v:PluginDetailView IsVisible="{Binding IsDetailOpen}"/>
