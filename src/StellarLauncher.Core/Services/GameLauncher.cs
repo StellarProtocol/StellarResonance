@@ -92,7 +92,46 @@ public sealed class GameLauncher : IGameLauncher
             psi.Environment["WINEPREFIX"] = r.WinePrefix;
         }
 
+        ApplyAdvanced(psi, r);
         return psi;
+    }
+
+    // Linux power-user options, applied last: user env wins; game args append; wrapper wraps all.
+    private static void ApplyAdvanced(ProcessStartInfo psi, LaunchRequest r)
+    {
+        if (r.ExtraEnv is { } env)
+        {
+            foreach (var e in env)
+            {
+                if (string.IsNullOrEmpty(e.Name)) continue;   // blank editor row
+                psi.Environment[e.Name] = e.Value;            // user value wins over built-ins
+            }
+
+            // Never let a user WINEDLLOVERRIDES disable the mod loader: strip any user-supplied
+            // winhttp token and force winhttp=n,b (native-first) so the BepInEx doorstop always loads.
+            if (psi.Environment.TryGetValue("WINEDLLOVERRIDES", out var ov) && ov is not null)
+            {
+                var kept = new System.Collections.Generic.List<string>();
+                foreach (var seg in ov.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    if (!seg.StartsWith("winhttp", StringComparison.OrdinalIgnoreCase)) kept.Add(seg);
+                kept.Add("winhttp=n,b");
+                psi.Environment["WINEDLLOVERRIDES"] = string.Join(";", kept);
+            }
+        }
+
+        foreach (var arg in CommandLine.Split(r.GameArguments))
+            psi.ArgumentList.Add(arg);
+
+        var wrapper = CommandLine.Split(r.WrapperCommand);
+        if (wrapper.Count > 0)
+        {
+            var inner = new System.Collections.Generic.List<string> { psi.FileName };
+            inner.AddRange(psi.ArgumentList);
+            psi.FileName = wrapper[0];
+            psi.ArgumentList.Clear();
+            for (var i = 1; i < wrapper.Count; i++) psi.ArgumentList.Add(wrapper[i]);
+            foreach (var a in inner) psi.ArgumentList.Add(a);
+        }
     }
 
     public Process? Launch(LaunchRequest request) => Process.Start(BuildStartInfo(request));

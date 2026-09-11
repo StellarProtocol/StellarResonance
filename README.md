@@ -30,8 +30,9 @@ keeps itself up to date automatically.
 3. Run **`StellarLauncher.App.exe`**.
    - If Windows SmartScreen warns ("Windows protected your PC"), click **More info → Run anyway** — the
      app is unsigned, not malicious.
-4. In the launcher: let it **detect your game** (or point it at your `game_mini` folder), click **Install**
-   to deploy the framework, then **Launch**.
+4. In the launcher: it lists every game install it found — tick the ones you want as **clients**, click
+   **Add**, then **Launch** any of them. Each client keeps its own framework, plugins and settings and they
+   can run at the same time. (Not found? **Browse…** to your `game_mini` folder.)
 
 ### Linux
 
@@ -49,8 +50,10 @@ keeps itself up to date automatically.
    application menu/dock with its icon (Linux executables can't embed an icon like a Windows `.exe`,
    so a bare binary file shows a generic icon in the file manager). Undo with `./uninstall.sh`.
 
-3. In the launcher: detect the game (or point it at your Wine/Proton prefix's
-   `…/drive_c/Star/StarLauncher/game/release_<ver>/game_mini/`), **Install** the framework, then **Launch**.
+3. In the launcher: it lists every game install it found (Wine/Proton prefixes under `/opt/game`, Heroic,
+   Steam) — tick the ones you want as **clients**, click **Add**, then **Launch** any of them. Each client
+   keeps its own framework, plugins and settings and they can run at the same time. (Not found? **Browse…**
+   to the prefix's `…/drive_c/Star/StarLauncher/game/release_<ver>/game_mini/`.)
    Set `WINEDLLOVERRIDES=winhttp=n,b` in your game launcher's per-game env vars if you launch the game
    outside this tool.
 
@@ -68,8 +71,11 @@ dotnet build StellarLauncher.slnx -c Release
 Fully CI/CD — the launcher has no game dependency, so `ci.yml` builds it and `release.yml` ships it:
 
 ```bash
-gh workflow run release.yml -R StellarProtocol/StellarResonance -f version=<v> -f channel=stable
+gh workflow run release.yml -R StellarProtocol/StellarResonance -f version=2.0.0 -f channel=testing
 ```
+
+2.0.0 changes the settings file to v2 (one client per game install; the old file is imported one-way and kept
+as `settings.v1.json` beside it) — publish to `testing` first, then to `stable` once the testers confirm.
 
 The dispatch `version` is the single source of truth — it's stamped into the assembly (the in-app
 `LauncherVersion` reads it back), so no code edit is needed to bump the version. CI builds Win + Linux,

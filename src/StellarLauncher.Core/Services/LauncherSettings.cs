@@ -25,6 +25,13 @@ public sealed class LauncherSettings
     public bool StellarPerf { get; set; } = false;     // STELLAR_PERFHUD=1 (framework's in-game perf overlay)
     public bool DxvkNvapi { get; set; } = true;        // auto install/update DXVK-NVAPI into the prefix
 
+    // --- Advanced (Linux power-user) launch options ---
+    public string? WrapperCommand { get; set; }   // e.g. "gamemoderun" or "gamescope -f --"
+    public string? GameArguments { get; set; }     // appended to the StarLauncher.exe invocation
+    public string? PreLaunchScript { get; set; }    // absolute path; run & waited-on before launch
+    public string? PostExitScript { get; set; }     // absolute path; run after the game process exits
+    public List<EnvVar> ExtraEnv { get; set; } = new();   // ordered user env vars, merged last (win)
+
     /// <summary>Resolve the overlay mode: the new tri-state key wins; an unset key falls back to
     /// the legacy <see cref="FpsOverlay"/> checkbox so pre-1.2.26 settings keep their behavior.</summary>
     public PerfOverlayMode EffectiveOverlay() => PerfOverlay switch

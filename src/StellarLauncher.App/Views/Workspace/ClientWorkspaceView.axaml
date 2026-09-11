@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StellarLauncher.App.ViewModels.Workspace" xmlns:v="using:StellarLauncher.App.Views.Workspace"
+             x:Class="StellarLauncher.App.Views.Workspace.ClientWorkspaceView" x:DataType="vm:ClientWorkspaceViewModel">
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Background="{Binding AccentSoftBrush}" Padding="24,18,24,14">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <StackPanel Spacing="6">
+          <WrapPanel>
+            <Border Width="10" Height="10" CornerRadius="3" Background="{Binding AccentBrush}" Margin="0,8,10,0"/>
+            <TextBlock Text="{Binding Name}" Foreground="White" FontSize="22" FontWeight="ExtraBold" Margin="0,0,10,0"/>
+            <Border Classes="tag" Classes.tag-gold="{Binding IsTesting}" Margin="0,6,6,0"><TextBlock Text="{Binding ChannelTag}"/></Border>
+            <Border Classes="tag tag-blue" Margin="0,6,6,0" IsVisible="{Binding HasRegion}"><TextBlock Text="{Binding RegionTag}"/></Border>
+            <Border Classes="tag" Margin="0,6,6,0" IsVisible="{Binding HasEdition}"><TextBlock Text="{Binding EditionTag}"/></Border>
+            <Border Classes="tag" Margin="0,6,6,0"><TextBlock Text="{Binding ModeTag}"/></Border>
+            <Border Classes="tag" Margin="0,6,6,0"><TextBlock Text="{Binding RuntimeTag}"/></Border>
+            <Border Classes="tag tag-mint" Margin="0,6,0,0" IsVisible="{Binding IsRunningVisible}"><TextBlock Text="● RUNNING"/></Border>
+            <Border Classes="tag tag-blue" Margin="0,6,0,0" IsVisible="{Binding IsPrepVisible}"><TextBlock Text="● PREPARING"/></Border>
+          </WrapPanel>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="{Binding Path}" Classes="sub mono" Foreground="#8f97c2"/>
+            <Button Classes="link" Content="⧉" Click="CopyPath" Padding="2,0" ToolTip.Tip="Copy path"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Ellipse Width="7" Height="7" Fill="{Binding StateBrush}" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding StateLine}" Foreground="{Binding StateBrush}" FontSize="12"/>
+          </StackPanel>
+          <ProgressBar IsVisible="{Binding ShowProgress}" Value="{Binding Progress}" IsIndeterminate="{Binding ProgressIndeterminate}"
+                       Minimum="0" Maximum="100" Height="4" Width="420" HorizontalAlignment="Left" Foreground="{Binding AccentBrush}" Background="#1c2740"/>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <Button Classes="primary" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}">
+            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+              <Path Data="M0,0 L9,5 L0,10 Z" Fill="White" Stretch="None" VerticalAlignment="Center"/>
+              <TextBlock Text="LAUNCH" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
+          <Button Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" Padding="30,12" FontSize="13.5" MinWidth="150" HorizontalAlignment="Right">
+            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+              <Rectangle Width="10" Height="10" Fill="White" VerticalAlignment="Center"/>
+              <TextBlock Text="STOP" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+    <Border DockPanel.Dock="Top" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="24,10,24,0">
+      <StackPanel Orientation="Horizontal" Spacing="22">
+        <Button Classes="tab" Classes.active="{Binding IsOverview}" Content="Overview" Command="{Binding ShowOverviewCommand}" BorderBrush="{Binding OverviewUnderline}"/>
+        <Button Classes="tab" Classes.active="{Binding IsPlugins}" Command="{Binding ShowPluginsCommand}" BorderBrush="{Binding PluginsUnderline}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Plugins"/>
+            <Border Background="{Binding AccentSoftBrush}" CornerRadius="10" Padding="6,0"><TextBlock Text="{Binding PluginsBadge}" Foreground="{Binding AccentBrush}" FontSize="10" FontWeight="Bold"/></Border>
+            <Border Background="#29ffcf6b" CornerRadius="10" Padding="6,0" IsVisible="{Binding HasUpdates}"><TextBlock Text="{Binding UpdatesBadge, StringFormat='{}{0}↑'}" Foreground="#ffcf6b" FontSize="10" FontWeight="Bold"/></Border>
+          </StackPanel>
+        </Button>
+        <Button Classes="tab" Classes.active="{Binding IsSettings}" Content="Settings" Command="{Binding ShowSettingsCommand}" BorderBrush="{Binding SettingsUnderline}"/>
+        <Button Classes="tab" Classes.active="{Binding IsLogs}" Command="{Binding ShowLogsCommand}" BorderBrush="{Binding LogsUnderline}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="Logs"/>
+            <Border Background="#29ffcf6b" CornerRadius="10" Padding="6,0" IsVisible="{Binding HasCallouts}"><TextBlock Text="{Binding LogsBadge}" Foreground="#ffcf6b" FontSize="10" FontWeight="Bold"/></Border>
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Border>
+    <TextBlock DockPanel.Dock="Top" Text="{Binding Status}" Foreground="#ffcf6b" FontSize="11.5" Margin="24,6,24,0" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    <ContentControl Content="{Binding TabContent}" Margin="24,14,24,0">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:OverviewViewModel"><v:OverviewView/></DataTemplate>
+        <DataTemplate DataType="vm:ClientPluginsViewModel"><v:ClientPluginsView/></DataTemplate>
+        <DataTemplate DataType="vm:ClientSettingsViewModel"><v:ClientSettingsView/></DataTemplate>
+        <DataTemplate DataType="vm:LogsViewModel"><v:LogsView/></DataTemplate>
+        <DataTemplate DataType="vm:TabPlaceholder"><TextBlock Text="{Binding Name}" Classes="muted"/></DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+  </DockPanel>
+</UserControl>

@@ -14,7 +14,7 @@ namespace StellarLauncher.App.ViewModels;
 
 public partial class PluginItemViewModel : ObservableObject
 {
-    private readonly PluginsViewModel _parent;
+    private readonly IPluginActions _parent;
     private readonly string? _framework;     // installed framework version (null = not installed)
     public PluginEntry Entry { get; }
 
@@ -35,7 +35,7 @@ public partial class PluginItemViewModel : ObservableObject
     public ObservableCollection<PluginVersion> Versions { get; } = new();
 
     public PluginItemViewModel(PluginEntry entry, bool installed, string? installedVersion,
-                               string? installedFramework, PluginsViewModel parent)
+                               string? installedFramework, IPluginActions parent)
     {
         Entry = entry; _parent = parent; _framework = installedFramework;
         _installed = installed;                 // may be true with a null version (adopted, unmanaged install)

@@ -1,0 +1,42 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- brand -->
+  <SolidColorBrush x:Key="BrandVioletBrush" Color="#7c5cff"/>
+  <SolidColorBrush x:Key="BrandCyanBrush" Color="#37c8e0"/>
+  <LinearGradientBrush x:Key="BrandGradient" StartPoint="0%,0%" EndPoint="100%,100%">
+    <GradientStop Color="#7c5cff" Offset="0"/><GradientStop Color="#37c8e0" Offset="1"/>
+  </LinearGradientBrush>
+  <!-- STOP mirrors the brand gradient's geometry so it matches LAUNCH's style, in danger red (owner 2026-09-11). -->
+  <LinearGradientBrush x:Key="DangerGradient" StartPoint="0%,0%" EndPoint="100%,100%">
+    <GradientStop Color="#ff6f6b" Offset="0"/><GradientStop Color="#d64550" Offset="1"/>
+  </LinearGradientBrush>
+  <!-- state (semantic, fixed) -->
+  <SolidColorBrush x:Key="StateRunningBrush" Color="#54e3a0"/>
+  <SolidColorBrush x:Key="StatePreparingBrush" Color="#5b8cff"/>
+  <SolidColorBrush x:Key="StateUpdateBrush" Color="#ffcf6b"/>
+  <SolidColorBrush x:Key="StateFailedBrush" Color="#ff6b6b"/>
+  <SolidColorBrush x:Key="StateIdleBrush" Color="#2a3050"/>
+  <!-- text + surfaces -->
+  <SolidColorBrush x:Key="TextPrimaryBrush" Color="#e6e9f5"/>
+  <SolidColorBrush x:Key="TextMutedBrush" Color="#8a93b2"/>
+  <SolidColorBrush x:Key="TextSubBrush" Color="#697297"/>
+  <SolidColorBrush x:Key="TextDimBrush" Color="#4a5273"/>
+  <SolidColorBrush x:Key="PanelBrush" Color="#121729"/>
+  <SolidColorBrush x:Key="PanelGlassBrush" Color="#0DFFFFFF"/>
+  <SolidColorBrush x:Key="LineBrush" Color="#222a44"/>
+  <SolidColorBrush x:Key="LineSoftBrush" Color="#17FFFFFF"/>
+  <SolidColorBrush x:Key="InputBrush" Color="#0b0f1e"/>
+  <LinearGradientBrush x:Key="RailBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+    <GradientStop Color="#121840" Offset="0"/><GradientStop Color="#0c1026" Offset="0.45"/><GradientStop Color="#080a16" Offset="1"/>
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="WindowGroundBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+    <GradientStop Color="#0c1024" Offset="0"/><GradientStop Color="#080a14" Offset="1"/>
+  </LinearGradientBrush>
+  <RadialGradientBrush x:Key="GroundVioletGlow" Center="88%,-12%" GradientOrigin="88%,-12%" RadiusX="0.7" RadiusY="0.7">
+    <GradientStop Color="#427c5cff" Offset="0"/><GradientStop Color="#007c5cff" Offset="1"/>
+  </RadialGradientBrush>
+  <RadialGradientBrush x:Key="GroundCyanGlow" Center="-8%,108%" GradientOrigin="-8%,108%" RadiusX="0.6" RadiusY="0.6">
+    <GradientStop Color="#2937c8e0" Offset="0"/><GradientStop Color="#0037c8e0" Offset="1"/>
+  </RadialGradientBrush>
+  <FontFamily x:Key="MonoFont">Consolas, DejaVu Sans Mono, Menlo, monospace</FontFamily>
+</ResourceDictionary>

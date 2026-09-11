@@ -62,4 +62,28 @@ public class SettingsStoreTests
         store.Save(cfg);
         Assert.False(store.Load().AutoUpdateBeforeLaunch);
     }
+
+    [Fact]
+    public void Round_trips_advanced_fields()
+    {
+        var fs = new MockFileSystem();
+        var store = new SettingsStore(fs, new FakePlatform());
+
+        var cfg = store.Load();
+        cfg.WrapperCommand = "gamemoderun";
+        cfg.GameArguments = "--foo bar";
+        cfg.PreLaunchScript = "/pre.sh";
+        cfg.PostExitScript = "/post.sh";
+        cfg.ExtraEnv.Add(new EnvVar { Name = "MY_VAR", Value = "42" });
+        store.Save(cfg);
+
+        var loaded = store.Load();
+        Assert.Equal("gamemoderun", loaded.WrapperCommand);
+        Assert.Equal("--foo bar", loaded.GameArguments);
+        Assert.Equal("/pre.sh", loaded.PreLaunchScript);
+        Assert.Equal("/post.sh", loaded.PostExitScript);
+        Assert.Single(loaded.ExtraEnv);
+        Assert.Equal("MY_VAR", loaded.ExtraEnv[0].Name);
+        Assert.Equal("42", loaded.ExtraEnv[0].Value);
+    }
 }

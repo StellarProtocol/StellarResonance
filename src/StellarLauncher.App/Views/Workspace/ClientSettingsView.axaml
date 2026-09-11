@@ -1,0 +1,133 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StellarLauncher.App.ViewModels.Workspace" xmlns:vms="using:StellarLauncher.App.ViewModels"
+             x:Class="StellarLauncher.App.Views.Workspace.ClientSettingsView" x:DataType="vm:ClientSettingsViewModel">
+  <!-- HorizontalScrollBarVisibility=Disabled: the two-column card grid fits the width instead of scrolling sideways
+       (owner 2026-09-11: a stray horizontal scroll pushed the vertical bar off the window edge). -->
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Spacing="0">
+      <UniformGrid Columns="2">
+
+        <!-- Identity -->
+        <Border Classes="card" Margin="0,0,12,12">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#7c5cff"/><TextBlock Classes="h4" Text="IDENTITY" Margin="0"/></StackPanel>
+            <TextBlock Text="Name — shown in the rail and the Dashboard" Classes="sub"/>
+            <TextBox Text="{Binding Name}" PlaceholderText="Client name"/>
+            <TextBlock Text="Accent" Classes="sub"/>
+            <ItemsControl ItemsSource="{Binding Swatches}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:SwatchViewModel">
+                <Button Command="{Binding PickCommand}" Padding="0" Width="22" Height="22" CornerRadius="7" Background="{Binding Brush}"
+                        BorderThickness="2" Classes="swatch" Classes.selected="{Binding IsSelected}"/>
+              </DataTemplate></ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding Status}" Foreground="#ffcf6b" FontSize="11.5" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Install -->
+        <Border Classes="card" Margin="0,0,0,12">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#37c8e0"/><TextBlock Classes="h4" Text="INSTALL" Margin="0"/></StackPanel>
+            <TextBlock Text="game_mini folder" Classes="sub"/>
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+              <TextBox Text="{Binding GameMiniDir}" Classes="mono"/>
+              <Button Grid.Column="1" Classes="ghost2 tiny" Content="Detect" Command="{Binding DetectCommand}"/>
+              <Button Grid.Column="2" Classes="ghost2 tiny" Content="Browse…" Click="BrowseGame"/>
+            </Grid>
+            <TextBlock Text="{Binding LayoutLine}" Classes="sub" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Updates -->
+        <Border Classes="card" Margin="0,0,12,12">
+          <StackPanel Spacing="9">
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#ffcf6b"/><TextBlock Classes="h4" Text="UPDATES" Margin="0"/></StackPanel>
+            <ToggleSwitch IsChecked="{Binding TestingChannel}" OnContent="Testing (pre-release) — stable releases included" OffContent="Stable"/>
+            <CheckBox IsChecked="{Binding AutoUpdate}" Content="Auto-update framework + plugins before launch"/>
+            <CheckBox IsChecked="{Binding DebugLogging}" Content="Debug logging (console + crash flush)"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Linux runtime -->
+        <Border Classes="card" Margin="0,0,0,12" IsVisible="{Binding IsLinux}">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#2dd4bf"/><TextBlock Classes="h4" Text="LINUX RUNTIME" Margin="0"/></StackPanel>
+            <TextBlock Text="Proton / Wine runner" Classes="sub"/>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <TextBox Text="{Binding Runner}" Classes="mono" PlaceholderText="/path/to/GE-Proton/proton"/>
+              <Button Grid.Column="1" Classes="ghost2 tiny" Content="Browse…" Click="BrowseRunner"/>
+            </Grid>
+            <TextBlock Text="WINEPREFIX" Classes="sub"/>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <TextBox Text="{Binding WinePrefix}" Classes="mono" PlaceholderText="/path/to/prefix"/>
+              <Button Grid.Column="1" Classes="ghost2 tiny" Content="Browse…" Click="BrowsePrefix"/>
+            </Grid>
+            <TextBlock Text="{Binding UmuLine}" Classes="sub" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Linux tweaks -->
+        <Border Classes="card" Margin="0,0,12,12" IsVisible="{Binding IsLinux}">
+          <StackPanel Spacing="9">
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#a3e635"/><TextBlock Classes="h4" Text="LINUX TWEAKS" Margin="0"/></StackPanel>
+            <CheckBox IsChecked="{Binding DxvkNvapi}" Content="Auto install/update DXVK-NVAPI on the prefix"/>
+            <CheckBox IsChecked="{Binding Esync}" Content="Esync"/>
+            <CheckBox IsChecked="{Binding Fsync}" Content="Fsync"/>
+            <TextBlock Text="Performance overlay" Classes="sub"/>
+            <ComboBox SelectedIndex="{Binding PerfOverlayIndex}" MinWidth="220">
+              <ComboBoxItem Content="Off"/>
+              <ComboBoxItem Content="FPS counter (DXVK)"/>
+              <ComboBoxItem Content="Full overlay (MangoHud)"/>
+            </ComboBox>
+            <TextBlock Text="⚠ MangoHud is not installed — the full overlay will not appear." Foreground="#ffcf6b" FontSize="11.5" TextWrapping="Wrap" IsVisible="{Binding MangoHudMissing}"/>
+            <CheckBox IsChecked="{Binding StellarPerf}" Content="Stellar Perf overlay (advanced)"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Advanced -->
+        <Border Classes="card" Margin="0,0,0,12">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#ff6ec7"/><TextBlock Classes="h4" Text="ADVANCED" Margin="0"/></StackPanel>
+            <TextBlock Text="Wrapper command (e.g. gamemoderun)" Classes="sub"/>
+            <TextBox Text="{Binding Wrapper}" Classes="mono"/>
+            <TextBlock Text="Extra game arguments" Classes="sub"/>
+            <TextBox Text="{Binding GameArgs}" Classes="mono"/>
+            <TextBlock Text="Pre-launch script" Classes="sub"/>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <TextBox Text="{Binding PreLaunch}" Classes="mono"/>
+              <Button Grid.Column="1" Classes="ghost2 tiny" Content="Browse…" Click="BrowsePre"/>
+            </Grid>
+            <CheckBox IsChecked="{Binding PreLaunchParallel}" Content="Run it alongside the game instead of waiting — closed when the game exits"/>
+            <TextBlock Text="Post-exit script" Classes="sub"/>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <TextBox Text="{Binding PostExit}" Classes="mono"/>
+              <Button Grid.Column="1" Classes="ghost2 tiny" Content="Browse…" Click="BrowsePost"/>
+            </Grid>
+            <TextBlock Text="Environment variables" Classes="sub" Margin="0,4,0,0"/>
+            <ItemsControl ItemsSource="{Binding EnvVars}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vms:EnvVarRowViewModel">
+                  <Grid ColumnDefinitions="*,*,Auto" Margin="0,0,0,6">
+                    <TextBox Grid.Column="0" Text="{Binding Name}" PlaceholderText="NAME" Classes="mono"/>
+                    <TextBox Grid.Column="1" Text="{Binding Value}" PlaceholderText="VALUE" Classes="mono" Margin="8,0,0,0"/>
+                    <Button Grid.Column="2" Classes="ghost2 tiny" Content="🗑" Command="{Binding RemoveCommand}" Margin="8,0,0,0" ToolTip.Tip="Remove this variable"/>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Classes="ghost2 tiny" Content="＋ Add variable" Command="{Binding AddEnvVarCommand}" HorizontalAlignment="Left"/>
+            <TextBlock Classes="sub" TextWrapping="Wrap"
+                       Text="Your variables are applied last and override the launcher's defaults. WINEDLLOVERRIDES is managed — winhttp=n,b is always kept so the mod loads."/>
+          </StackPanel>
+        </Border>
+      </UniformGrid>
+
+      <!-- Footer -->
+      <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,18">
+        <Button Classes="link link-red" Content="Remove this client from the launcher" Command="{Binding RemoveClientCommand}"/>
+        <TextBlock Classes="sub" Text="forgets the entry only — nothing on disk is deleted" VerticalAlignment="Center"/>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

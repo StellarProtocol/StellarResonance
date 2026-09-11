@@ -18,11 +18,16 @@ namespace StellarLauncher.Core.Services;
 /// <param name="SteamAppId">Windows + Steam install: launch via steam://rungameid/&lt;id&gt; so the game
 /// gets a real Steam session (fixes "file not found" and restores combat traffic). The doorstop proxy
 /// already in the game folder still injects the mod. Null = launch the exe directly.</param>
+/// <param name="WrapperCommand">Linux only: command to wrap the runner + exe (e.g. "gamescope -f --"; tokenized and wrapped).</param>
+/// <param name="GameArguments">Linux only: arguments to append after the exe (e.g. "--foo bar"; tokenized and appended).</param>
+/// <param name="ExtraEnv">Linux only: environment variables applied last (user values override built-ins; WINEDLLOVERRIDES is protected).</param>
 public sealed record LaunchRequest(
     string StarLauncherExe, string? Runner = null, string? WinePrefix = null, string? UmuRun = null,
     bool Esync = false, bool Fsync = false, PerfOverlayMode Overlay = PerfOverlayMode.Off,
     string? MangoHudPreset = null, bool DxvkNvapi = false,
-    bool StellarPerf = false, string? SteamAppId = null);
+    bool StellarPerf = false, string? SteamAppId = null,
+    string? WrapperCommand = null, string? GameArguments = null,
+    System.Collections.Generic.IReadOnlyList<EnvVar>? ExtraEnv = null);
 
 public interface IGameLauncher
 {
