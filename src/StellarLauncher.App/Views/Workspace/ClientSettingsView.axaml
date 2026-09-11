@@ -1,7 +1,9 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StellarLauncher.App.ViewModels.Workspace" xmlns:vms="using:StellarLauncher.App.ViewModels"
              x:Class="StellarLauncher.App.Views.Workspace.ClientSettingsView" x:DataType="vm:ClientSettingsViewModel">
-  <ScrollViewer>
+  <!-- HorizontalScrollBarVisibility=Disabled: the two-column card grid fits the width instead of scrolling sideways
+       (owner 2026-09-11: a stray horizontal scroll pushed the vertical bar off the window edge). -->
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
     <StackPanel Spacing="0">
       <UniformGrid Columns="2">
 

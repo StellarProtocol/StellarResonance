@@ -17,14 +17,23 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:ClientTileViewModel">
               <Border Classes="card" Margin="0,0,12,12" Background="{Binding AccentSoftBrush}" BorderBrush="{Binding AccentLineBrush}" BorderThickness="3,1,1,1" Padding="14,10">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                  <StackPanel Spacing="4">
-                    <WrapPanel>
-                      <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="{Binding AccentBrush}" FontSize="14" FontWeight="Bold" Padding="0,0,8,0"/>
-                      <Border Classes="tag" Classes.tag-gold="{Binding IsTesting}" Margin="0,2,6,0"><TextBlock Text="{Binding ChannelTag}"/></Border>
-                      <Border Classes="tag" Margin="0,2,6,0"><TextBlock Text="{Binding ModeTag}"/></Border>
-                      <Border Classes="tag" Margin="0,2,0,0"><TextBlock Text="{Binding RunnerTag}"/></Border>
-                    </WrapPanel>
+                <!-- Name + tags top-left, action button top-right; the detail lines span the FULL width below the
+                     button so the install path trims at the tile edge, never under the button (owner 2026-09-11). -->
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                  <WrapPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
+                    <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="{Binding AccentBrush}" FontSize="14" FontWeight="Bold" Padding="0,0,8,0"/>
+                    <Border Classes="tag" Classes.tag-gold="{Binding IsTesting}" Margin="0,2,6,0"><TextBlock Text="{Binding ChannelTag}"/></Border>
+                    <Border Classes="tag" Margin="0,2,6,0"><TextBlock Text="{Binding ModeTag}"/></Border>
+                    <Border Classes="tag" Margin="0,2,0,0"><TextBlock Text="{Binding RunnerTag}"/></Border>
+                  </WrapPanel>
+                  <StackPanel Grid.Row="0" Grid.Column="1" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Classes="primary sm" Content="▶  LAUNCH" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}"/>
+                    <Button Classes="running" Content="● RUNNING" IsEnabled="False" IsVisible="{Binding IsRunningVisible}"/>
+                    <Button Classes="prep" Content="PREPARING…" IsEnabled="False" IsVisible="{Binding IsPrepVisible}"/>
+                    <Button Classes="stop" Content="◼  Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right"/>
+                    <Button Classes="link" Content="Install framework" Command="{Binding OpenCommand}" IsVisible="{Binding ShowInstallFramework}" HorizontalAlignment="Right"/>
+                  </StackPanel>
+                  <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Spacing="4" Margin="0,6,0,0">
                     <TextBlock Text="{Binding Path}" Classes="sub mono" TextTrimming="CharacterEllipsis"/>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <TextBlock Text="{Binding FrameworkLine}" Classes="body" FontSize="11.5" Classes.amber="{Binding FrameworkNeedsAttention}"/>
@@ -37,13 +46,6 @@
                     </StackPanel>
                     <ProgressBar IsVisible="{Binding ShowProgress}" Value="{Binding Progress}" IsIndeterminate="{Binding ProgressIndeterminate}"
                                  Minimum="0" Maximum="100" Height="4" Foreground="{Binding AccentBrush}" Background="#1c2740"/>
-                  </StackPanel>
-                  <StackPanel Grid.Column="1" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Button Classes="primary sm" Content="▶  LAUNCH" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}"/>
-                    <Button Classes="running" Content="● RUNNING" IsEnabled="False" IsVisible="{Binding IsRunningVisible}"/>
-                    <Button Classes="prep" Content="PREPARING…" IsEnabled="False" IsVisible="{Binding IsPrepVisible}"/>
-                    <Button Classes="link link-red" Content="Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right"/>
-                    <Button Classes="link" Content="Install framework" Command="{Binding OpenCommand}" IsVisible="{Binding ShowInstallFramework}" HorizontalAlignment="Right"/>
                   </StackPanel>
                 </Grid>
               </Border>

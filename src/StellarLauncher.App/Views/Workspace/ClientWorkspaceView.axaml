@@ -27,7 +27,7 @@
           <Button Classes="primary" Content="▶  LAUNCH" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}"/>
           <Button Classes="running" Content="● RUNNING" IsEnabled="False" IsVisible="{Binding IsRunningVisible}" Padding="28,12" FontSize="13.5"/>
           <Button Classes="prep" Content="PREPARING…" IsEnabled="False" IsVisible="{Binding IsPrepVisible}" Padding="28,12" FontSize="13.5"/>
-          <Button Classes="link link-red" Content="Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right"/>
+          <Button Classes="stop" Content="◼  Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right"/>
         </StackPanel>
       </Grid>
     </Border>
