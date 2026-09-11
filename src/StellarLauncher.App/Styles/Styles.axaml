@@ -76,12 +76,13 @@
   <!-- Stop: a solid danger button the SAME size/shape as LAUNCH (owner 2026-09-11: obvious + same size/style),
        differing only in colour. The .sm form matches Button.primary.sm on the Dashboard tile. -->
   <Style Selector="Button.stop">
-    <Setter Property="Background" Value="#e0554d"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Background" Value="{StaticResource DangerGradient}"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderThickness" Value="0"/>
     <Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="12"/>
     <Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="18,9"/><Setter Property="MinWidth" Value="120"/>
     <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/>
   </Style>
-  <Style Selector="Button.stop:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="#ec6a63"/></Style>
+  <Style Selector="Button.stop:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{StaticResource DangerGradient}"/></Style>
+  <Style Selector="Button.stop:pointerover"><Setter Property="Opacity" Value="0.92"/></Style>
   <!-- workspace tabs -->
   <Style Selector="Button.tab">
     <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0,0,0,2"/>

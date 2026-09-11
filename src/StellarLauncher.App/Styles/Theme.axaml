@@ -6,6 +6,10 @@
   <LinearGradientBrush x:Key="BrandGradient" StartPoint="0%,0%" EndPoint="100%,100%">
     <GradientStop Color="#7c5cff" Offset="0"/><GradientStop Color="#37c8e0" Offset="1"/>
   </LinearGradientBrush>
+  <!-- STOP mirrors the brand gradient's geometry so it matches LAUNCH's style, in danger red (owner 2026-09-11). -->
+  <LinearGradientBrush x:Key="DangerGradient" StartPoint="0%,0%" EndPoint="100%,100%">
+    <GradientStop Color="#ff6f6b" Offset="0"/><GradientStop Color="#d64550" Offset="1"/>
+  </LinearGradientBrush>
   <!-- state (semantic, fixed) -->
   <SolidColorBrush x:Key="StateRunningBrush" Color="#54e3a0"/>
   <SolidColorBrush x:Key="StatePreparingBrush" Color="#5b8cff"/>
