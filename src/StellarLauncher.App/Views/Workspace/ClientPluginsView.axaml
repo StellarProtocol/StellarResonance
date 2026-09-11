@@ -24,7 +24,12 @@
             <DataTemplate x:DataType="vm:PluginRowViewModel">
               <Border Classes="card" Padding="10" Margin="0,0,0,6">
                 <Grid ColumnDefinitions="34,*,160,150,Auto" ColumnSpacing="12">
-                  <Border Width="34" Height="34" CornerRadius="8" Background="{Binding BadgeBrush}"><TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="ExtraBold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                  <Border Width="34" Height="34" CornerRadius="8" ClipToBounds="True" Background="{Binding BadgeBrush}">
+                    <Panel>
+                      <Image Source="{Binding Item.Thumbnail}" Stretch="UniformToFill"/>
+                      <TextBlock Text="{Binding Initials}" IsVisible="{Binding Item.ShowMonogram}" Foreground="White" FontWeight="ExtraBold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Panel>
+                  </Border>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="White" FontSize="12.5" Padding="0" HorizontalAlignment="Left"/>
                     <TextBlock Classes="sub" TextTrimming="CharacterEllipsis"><Run Text="{Binding Author}"/><Run Text=" · "/><Run Text="{Binding Description}"/></TextBlock>
