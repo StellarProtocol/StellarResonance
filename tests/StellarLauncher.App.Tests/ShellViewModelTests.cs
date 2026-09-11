@@ -93,6 +93,23 @@ public class ShellViewModelTests
     }
 
     [Fact]
+    public void ClientEdited_keeps_profile_instances_live_so_repeated_edits_persist()
+    {
+        var (shell, store, _) = Build(C("c1", "Main"));
+        shell.Start();
+        shell.ShowClientCommand.Execute(shell.Clients[0]);
+        var profile = shell.SelectedClient!.Client;           // the reference a workspace page holds
+
+        profile.Name = "First"; shell.ClientEdited();
+        profile.Name = "Second"; shell.ClientEdited();
+
+        Assert.Same(profile, shell.Config.Clients[0]);
+        Assert.Same(profile, shell.Clients[0].Client);
+        Assert.Equal("Second", store.Load().FindById("c1")!.Name);
+        Assert.True(shell.Clients[0].IsSelected);
+    }
+
+    [Fact]
     public void Session_changes_refresh_the_rail_row()
     {
         var (shell, _, sessions) = Build(C("c1", "Main"));

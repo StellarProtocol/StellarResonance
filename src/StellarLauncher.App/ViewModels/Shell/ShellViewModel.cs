@@ -51,6 +51,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     public void Start()
     {
+        Config = _store.Load();
         Reload();
         _sessions.Reattach(Config.Clients);
         if (Config.Clients.Count == 0) { ShowAddClient(); return; }
@@ -59,9 +60,13 @@ public sealed partial class ShellViewModel : ObservableObject
         else ShowDashboard();
     }
 
+    /// <summary>
+    /// Rebuild the rail rows from the in-memory <see cref="Config"/> (the shell is its sole writer), keeping the
+    /// selection. Never re-reads the store: pages hold <see cref="ClientProfile"/> references into this graph, and a
+    /// fresh deserialised graph would detach them so their next edit is silently lost.
+    /// </summary>
     public void Reload()
     {
-        Config = _store.Load();
         var selectedId = SelectedClient?.Client.Id;
         Clients.Clear();
         foreach (var c in Config.Clients) Clients.Add(new RailClientItem(c, _sessions.For(c)));
