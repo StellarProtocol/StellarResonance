@@ -155,7 +155,7 @@ public class ClientSessionsTests
     }
 
     [Fact]
-    public async Task Double_launch_race_orchestrator_called_once()
+    public async Task Second_launch_during_review_is_ignored()
     {
         var fs = new MockFileSystem();
         var store = new ConfigStore(fs, new Platform());
@@ -163,21 +163,33 @@ public class ClientSessionsTests
         var c = new ClientProfile { Id = "c1", Name = "Main", GameMiniDir = "/opt/game/P/drive_c/Star/StarLauncher/game/release_3.7/game_mini", LastInteropCount = 0 };
         cfg.Clients.Add(c);
         store.Save(cfg);
-        var tcs = new TaskCompletionSource<LaunchOutcome>();
-        var delayedOrch = new DelayedOrchestrator(tcs);
-        var sut = new ClientSessions(store, delayedOrch, new Scanner(), new Factory(), () => T0, run => run());
+        var orch = new FakeOrchestrator();
+        var sut = new ClientSessions(store, orch, new Scanner(), new Factory(), () => T0, run => run());
+
+        // Review TCS to control the review timing
+        var reviewTcs = new TaskCompletionSource<bool>();
+        var delayedReview = new DelayedReview(reviewTcs);
 
         // Start two launches without awaiting
-        var task1 = sut.LaunchAsync(c, new Review(true), CancellationToken.None);
-        var task2 = sut.LaunchAsync(c, new Review(true), CancellationToken.None);
+        var task1 = sut.LaunchAsync(c, delayedReview, CancellationToken.None);
+        var task2 = sut.LaunchAsync(c, delayedReview, CancellationToken.None);
 
-        // Complete the delayed orchestrator
-        tcs.SetResult(new LaunchOutcome(LaunchOutcomeKind.Started, 193));
+        // Verify review was invoked only once (second launch blocked by _pending)
+        Assert.Equal(1, delayedReview.Calls);
+
+        // Complete the review to allow first launch to proceed
+        reviewTcs.SetResult(true);
         await task1;
         await task2;
 
         // Orchestrator should have launched exactly once
-        Assert.Equal(1, delayedOrch.LaunchCount);
+        Assert.Single(orch.Launched);
+    }
+
+    private sealed class DelayedReview(TaskCompletionSource<bool> tcs) : IPreLaunchReview
+    {
+        public int Calls;
+        public Task<bool> ReviewAsync(ClientProfile c, CancellationToken ct) { Calls++; return tcs.Task; }
     }
 
     private sealed class CancellingOrchestrator : ILaunchOrchestrator
