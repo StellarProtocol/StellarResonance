@@ -107,7 +107,7 @@ public class ConfigStoreTests
     public void V1_on_windows_has_no_linux_block()
     {
         var fs = new MockFileSystem();
-        fs.AddFile(@"C:\cfg\stellar-launcher\settings.json",
+        fs.AddFile(fs.Path.Combine(@"C:\cfg", "stellar-launcher", "settings.json"),
             new MockFileData("""{ "GameMiniDir": "E:\\bpsr\\StarLauncher\\game\\release_3.7\\game_mini", "Channel": "stable" }"""));
         var cfg = new ConfigStore(fs, new Windows()).Load();
         var c = Assert.Single(cfg.Clients);

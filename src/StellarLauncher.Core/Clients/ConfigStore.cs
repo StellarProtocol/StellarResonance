@@ -20,7 +20,6 @@ public sealed class ConfigStore : IConfigStore
 
     private readonly IFileSystem _fs;
     private readonly IPlatformInfo _platform;
-    private readonly string _dir;
     private readonly string _backupPath;
 
     public string SettingsPath { get; }
@@ -28,16 +27,9 @@ public sealed class ConfigStore : IConfigStore
     public ConfigStore(IFileSystem fs, IPlatformInfo platform)
     {
         _fs = fs; _platform = platform;
-        // Built with a target-platform separator rather than _fs.Path.Combine/GetDirectoryName:
-        // those resolve against the HOST OS's path rules, so a MockFileSystem exercising a
-        // Windows AppDataDir ("C:\cfg") from a Linux test process would mix '\' and '/' and
-        // silently fail to match a literal Windows path (and GetDirectoryName on a full
-        // backslash path returns "" on a Unix host). Manual joining keeps this correct for both
-        // the real OS (IsWindows always matches the running host there) and the mocked tests.
-        var sep = platform.IsWindows ? '\\' : '/';
-        _dir = platform.AppDataDir.TrimEnd('\\', '/') + sep + "stellar-launcher";
-        SettingsPath = _dir + sep + "settings.json";
-        _backupPath = _dir + sep + "settings.v1.json";
+        var dir = _fs.Path.Combine(platform.AppDataDir, "stellar-launcher");
+        SettingsPath = _fs.Path.Combine(dir, "settings.json");
+        _backupPath = _fs.Path.Combine(dir, "settings.v1.json");
     }
 
     public LauncherConfig Load()
@@ -58,7 +50,7 @@ public sealed class ConfigStore : IConfigStore
 
     public void Save(LauncherConfig cfg)
     {
-        _fs.Directory.CreateDirectory(_dir);
+        _fs.Directory.CreateDirectory(_fs.Path.GetDirectoryName(SettingsPath)!);
         _fs.File.WriteAllText(SettingsPath, JsonSerializer.Serialize(cfg, Json));
     }
 
