@@ -73,11 +73,10 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
     public string ModeTag => Client.Modded ? "Modded" : "Vanilla";
     public string RuntimeTag => Client.Linux?.Runner is { } r
         ? $"Linux · {System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(r) ?? r)}" : "Windows";
-    private ClientLayout Layout => ClientNaming.DetectLayout(Client.GameMiniDir);
-    public string RegionTag => ClientNaming.RegionTag(Layout);          // "SEA" / "JP" / ""
-    public string EditionTag => ClientNaming.EditionTag(Layout);        // "Standalone" / "Steam" / ""
-    public bool HasRegion => RegionTag.Length > 0;
-    public bool HasEdition => EditionTag.Length > 0;
+    public string RegionTag => Inventory.Region;                        // "SEA" / "JP" / "" (from the game's data folder)
+    public string EditionTag => Inventory.Edition;                      // "Standalone" / "Steam" / ""
+    public bool HasRegion => Inventory.Region.Length > 0;
+    public bool HasEdition => Inventory.Edition.Length > 0;
     public string StateLine => SessionPresenter.StateLine(Session, Inventory, Client.Modded);
     public IBrush StateBrush => SessionPresenter.StateBrush(Session, Inventory);
     public bool ShowProgress => Session.State is SessionState.Launching or SessionState.Preparing;
@@ -177,7 +176,8 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
     private void RaiseHeader()
     {
         foreach (var p in new[] { nameof(Name), nameof(AccentBrush), nameof(AccentSoftBrush), nameof(AccentGlowBrush), nameof(ChannelTag), nameof(IsTesting),
-                     nameof(ModeTag), nameof(RuntimeTag), nameof(StateLine), nameof(StateBrush), nameof(ShowProgress), nameof(Progress),
+                     nameof(ModeTag), nameof(RuntimeTag), nameof(RegionTag), nameof(EditionTag), nameof(HasRegion), nameof(HasEdition),
+                     nameof(StateLine), nameof(StateBrush), nameof(ShowProgress), nameof(Progress),
                      nameof(ProgressIndeterminate), nameof(IsLaunchVisible), nameof(IsRunningVisible), nameof(IsPrepVisible), nameof(CanStop),
                      nameof(PluginsBadge), nameof(UpdatesBadge), nameof(HasUpdates), nameof(LogsBadge), nameof(HasCallouts) })
             OnPropertyChanged(p);

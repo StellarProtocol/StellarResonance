@@ -19,7 +19,9 @@ public sealed record InventorySnapshot(
     bool? DoorstopEnabled,
     IReadOnlyList<InstalledPlugin> Plugins,
     IReadOnlyList<DuplicateSlot> DuplicateSlots,
-    long LogBytes)
+    long LogBytes,
+    string Region = "",     // "SEA" / "JP" / "" — from the game's data folder (see GameBuild)
+    string Edition = "")    // "Standalone" / "Steam" / ""
 {
     public static readonly InventorySnapshot Missing =
         new(false, null, null, Array.Empty<InstalledPlugin>(), Array.Empty<DuplicateSlot>(), 0);

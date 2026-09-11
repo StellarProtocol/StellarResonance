@@ -34,7 +34,8 @@ public sealed class ClientInventory
         var log = _fs.Path.Combine(dir, "BepInEx", "LogOutput.log");
         var logBytes = _fs.File.Exists(log) ? _fs.FileInfo.New(log).Length : 0;
 
-        return new InventorySnapshot(true, _installer.ReadInstalledVersion(dir), doorstop, plugins, dups, logBytes);
+        var (region, edition) = GameBuild.Detect(_fs, dir);
+        return new InventorySnapshot(true, _installer.ReadInstalledVersion(dir), doorstop, plugins, dups, logBytes, region, edition);
     }
 
     private List<InstalledPlugin> ReadPlugins(string dir, IReadOnlyList<PluginEntry> registry)
