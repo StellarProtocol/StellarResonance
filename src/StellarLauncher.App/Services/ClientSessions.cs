@@ -18,6 +18,7 @@ public sealed class ClientSessions
     private readonly Func<DateTimeOffset> _now;
     private readonly Action<Action> _marshal;
     private readonly Dictionary<string, LaunchSession> _sessions = new();
+    private readonly HashSet<string> _pending = new();  // UI thread only
 
     public event Action<LaunchSession>? SessionChanged;
 
@@ -43,11 +44,29 @@ public sealed class ClientSessions
     public async Task LaunchAsync(ClientProfile c, IPreLaunchReview review, CancellationToken ct)
     {
         var s = For(c);
-        if (!s.CanLaunch) return;
-        if (!await review.ReviewAsync(c, ct)) return;
-        s.Begin(_now());
-        var outcome = await _orchestrator.LaunchAsync(c, new Relay(e => _marshal(() => s.Apply(e))), ct);
-        if (outcome.InteropCount is { } n && n != c.LastInteropCount) PersistInteropCount(c, n);
+        if (!s.CanLaunch || !_pending.Add(c.Id)) return;
+        try
+        {
+            if (!await review.ReviewAsync(c, ct)) return;
+            s.Begin(_now());
+            try
+            {
+                var outcome = await _orchestrator.LaunchAsync(c, new Relay(e => _marshal(() => s.Apply(e))), ct);
+                if (outcome.InteropCount is { } n && n != c.LastInteropCount) PersistInteropCount(c, n);
+            }
+            catch (OperationCanceledException)
+            {
+                _marshal(() => s.Apply(new FailedEvent("Launch cancelled")));
+            }
+            catch (Exception ex)
+            {
+                _marshal(() => s.Apply(new FailedEvent(ex.Message)));
+            }
+        }
+        finally
+        {
+            _pending.Remove(c.Id);
+        }
     }
 
     public void Stop(ClientProfile c) => For(c).Stop();

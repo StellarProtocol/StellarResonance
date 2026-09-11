@@ -115,4 +115,90 @@ public class ClientSessionsTests
         sut.Forget("c1");
         Assert.Null(sut.TryGet("c1"));
     }
+
+    [Fact]
+    public async Task Launch_cancelled_sets_failed_state_and_recovers_canlaunch()
+    {
+        var cancellingOrch = new CancellingOrchestrator();
+        var fs = new MockFileSystem();
+        var store = new ConfigStore(fs, new Platform());
+        var cfg = new LauncherConfig();
+        var c = new ClientProfile { Id = "c1", Name = "Main", GameMiniDir = "/opt/game/P/drive_c/Star/StarLauncher/game/release_3.7/game_mini", LastInteropCount = 0 };
+        cfg.Clients.Add(c);
+        store.Save(cfg);
+        var sut = new ClientSessions(store, cancellingOrch, new Scanner(), new Factory(), () => T0, run => run());
+
+        await sut.LaunchAsync(c, new Review(true), CancellationToken.None);
+
+        var s = sut.For(c);
+        Assert.False(s.IsBusy);
+        Assert.True(s.CanLaunch);
+    }
+
+    [Fact]
+    public async Task Launch_exception_sets_failed_state_and_recovers_canlaunch()
+    {
+        var failingOrch = new FailingOrchestrator();
+        var fs = new MockFileSystem();
+        var store = new ConfigStore(fs, new Platform());
+        var cfg = new LauncherConfig();
+        var c = new ClientProfile { Id = "c1", Name = "Main", GameMiniDir = "/opt/game/P/drive_c/Star/StarLauncher/game/release_3.7/game_mini", LastInteropCount = 0 };
+        cfg.Clients.Add(c);
+        store.Save(cfg);
+        var sut = new ClientSessions(store, failingOrch, new Scanner(), new Factory(), () => T0, run => run());
+
+        await sut.LaunchAsync(c, new Review(true), CancellationToken.None);
+
+        var s = sut.For(c);
+        Assert.Equal(SessionState.Failed, s.State);
+        Assert.True(s.CanLaunch);
+    }
+
+    [Fact]
+    public async Task Double_launch_race_orchestrator_called_once()
+    {
+        var fs = new MockFileSystem();
+        var store = new ConfigStore(fs, new Platform());
+        var cfg = new LauncherConfig();
+        var c = new ClientProfile { Id = "c1", Name = "Main", GameMiniDir = "/opt/game/P/drive_c/Star/StarLauncher/game/release_3.7/game_mini", LastInteropCount = 0 };
+        cfg.Clients.Add(c);
+        store.Save(cfg);
+        var tcs = new TaskCompletionSource<LaunchOutcome>();
+        var delayedOrch = new DelayedOrchestrator(tcs);
+        var sut = new ClientSessions(store, delayedOrch, new Scanner(), new Factory(), () => T0, run => run());
+
+        // Start two launches without awaiting
+        var task1 = sut.LaunchAsync(c, new Review(true), CancellationToken.None);
+        var task2 = sut.LaunchAsync(c, new Review(true), CancellationToken.None);
+
+        // Complete the delayed orchestrator
+        tcs.SetResult(new LaunchOutcome(LaunchOutcomeKind.Started, 193));
+        await task1;
+        await task2;
+
+        // Orchestrator should have launched exactly once
+        Assert.Equal(1, delayedOrch.LaunchCount);
+    }
+
+    private sealed class CancellingOrchestrator : ILaunchOrchestrator
+    {
+        public Task<LaunchOutcome> LaunchAsync(ClientProfile c, IProgress<LaunchEvent> ev, CancellationToken ct)
+            => throw new OperationCanceledException("cancelled");
+    }
+
+    private sealed class FailingOrchestrator : ILaunchOrchestrator
+    {
+        public Task<LaunchOutcome> LaunchAsync(ClientProfile c, IProgress<LaunchEvent> ev, CancellationToken ct)
+            => throw new InvalidOperationException("something went wrong");
+    }
+
+    private sealed class DelayedOrchestrator(TaskCompletionSource<LaunchOutcome> tcs) : ILaunchOrchestrator
+    {
+        public int LaunchCount;
+        public async Task<LaunchOutcome> LaunchAsync(ClientProfile c, IProgress<LaunchEvent> ev, CancellationToken ct)
+        {
+            LaunchCount++;
+            return await tcs.Task;
+        }
+    }
 }

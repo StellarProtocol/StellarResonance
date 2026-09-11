@@ -30,23 +30,29 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
     public async Task<bool> ReviewAsync(ClientProfile client, CancellationToken ct)
     {
         if (!client.Modded) return true;
-        IReadOnlyList<PluginEntry> registry;
-        FrameworkManifest? manifest;
         try
         {
-            registry = await _registry.ForChannelAsync(client.Channel, ct);
-            manifest = await _versions.FetchAsync(ChannelManifests.FrameworkVersion(client.Channel), ct);
+            IReadOnlyList<PluginEntry> registry;
+            FrameworkManifest? manifest;
+            try
+            {
+                registry = await _registry.ForChannelAsync(client.Channel, ct);
+                manifest = await _versions.FetchAsync(ChannelManifests.FrameworkVersion(client.Channel), ct);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception) { return true; }   // offline — never trap the player
+
+            var inv = _inventory.Read(client, registry);
+            var target = manifest?.Versions.FirstOrDefault(v => v.Version == manifest.Latest);
+            var installed = inv.Plugins.Select(p => new InstalledPluginInfo(p.Entry, p.Installed, p.Version)).ToList();
+            var plan = PreLaunchPlanner.Build(inv.FrameworkVersion, target, AppInfo.LauncherVersion, installed, client.AutoUpdateBeforeLaunch);
+            if (plan.IsEmpty) return true;
+
+            var vm = new PreLaunchReviewViewModel(inv.FrameworkVersion, target, AppInfo.LauncherVersion, installed, registry,
+                client.AutoUpdateBeforeLaunch, client.GameMiniDir, _deps.Installer, _deps.Plugins, _deps.Http);
+            return await _prompt(vm) != PreLaunchResult.Cancel;
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception) { return true; }   // offline — never trap the player
-
-        var inv = _inventory.Read(client, registry);
-        var target = manifest.Versions.FirstOrDefault(v => v.Version == manifest.Latest);
-        var installed = inv.Plugins.Select(p => new InstalledPluginInfo(p.Entry, p.Installed, p.Version)).ToList();
-        var plan = PreLaunchPlanner.Build(inv.FrameworkVersion, target, AppInfo.LauncherVersion, installed, client.AutoUpdateBeforeLaunch);
-        if (plan.IsEmpty) return true;
-
-        var vm = new PreLaunchReviewViewModel(inv.FrameworkVersion, target, AppInfo.LauncherVersion, installed, registry,
-            client.AutoUpdateBeforeLaunch, client.GameMiniDir, _deps.Installer, _deps.Plugins, _deps.Http);
-        return await _prompt(vm) != PreLaunchResult.Cancel;
     }
 }
