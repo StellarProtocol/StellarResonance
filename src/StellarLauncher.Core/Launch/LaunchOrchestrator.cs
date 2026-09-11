@@ -11,10 +11,15 @@ namespace StellarLauncher.Core.Launch;
 public enum LaunchOutcomeKind { Started, SteamHandoff, Failed }
 public sealed record LaunchOutcome(LaunchOutcomeKind Kind, int? InteropCount);
 
+public interface ILaunchOrchestrator
+{
+    Task<LaunchOutcome> LaunchAsync(ClientProfile c, IProgress<LaunchEvent> events, CancellationToken ct);
+}
+
 /// <summary>The launch pipeline for ONE client (spec § 7): BepInEx cfg → DXVK-NVAPI → pre script →
 /// Process.Start → interop monitor → (later) exit + post script. No static state; N clients run independently.
 /// The pre-launch review dialog runs BEFORE this (App-side).</summary>
-public sealed class LaunchOrchestrator
+public sealed class LaunchOrchestrator : ILaunchOrchestrator
 {
     private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan EarlyExitGrace = TimeSpan.FromSeconds(2.5);
