@@ -80,6 +80,8 @@
   <!-- log tail lines: highlighted rows (duplicate-id / shadow-load warnings) get a faint amber wash -->
   <Style Selector="Border.logline"><Setter Property="Background" Value="Transparent"/></Style>
   <Style Selector="Border.logline.hl"><Setter Property="Background" Value="#1Affcf6b"/></Style>
+  <!-- Add client rows: an install that is already configured is shown, but dimmed -->
+  <Style Selector="Border.dim"><Setter Property="Opacity" Value="0.55"/></Style>
   <!-- rail rows -->
   <Style Selector="Border.railItem">
     <Setter Property="CornerRadius" Value="8"/><Setter Property="Padding" Value="7,7,8,7"/>

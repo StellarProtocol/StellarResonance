@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StellarLauncher.App.ViewModels.AddClient"
+             x:Class="StellarLauncher.App.Views.AddClient.AddClientView" x:DataType="vm:AddClientViewModel">
+  <DockPanel Margin="24,18,24,0">
+    <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
+      <TextBlock Text="Add client" Foreground="White" FontSize="22" FontWeight="ExtraBold"/>
+      <TextBlock Classes="sub" TextWrapping="Wrap"
+                 Text="A client is one game install. Each keeps its own framework, plugins, channel and launch settings — and can run alongside the others."/>
+      <Border Classes="card" Padding="12,10" IsVisible="{Binding IsFirstRun}">
+        <TextBlock Classes="body" TextWrapping="Wrap" FontSize="12.5"
+                   Text="Welcome. Pick the installs below to manage them from here — you can add more later from the rail."/>
+      </Border>
+    </StackPanel>
+
+    <!-- footer -->
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,10,0,18">
+      <Button Classes="ghost2" Content="Skip for now" Command="{Binding SkipCommand}"/>
+      <Button Classes="green" Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsEnabled="{Binding CanAdd}"/>
+    </StackPanel>
+    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Status}" Foreground="#ffcf6b" FontSize="11.5" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+    <ScrollViewer>
+      <StackPanel Spacing="8">
+        <TextBlock Text="{Binding FoundLine}" Classes="sub"/>
+        <ItemsControl ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:CandidateRowViewModel">
+              <Border Classes="card" Classes.dim="{Binding !IsAvailable}" Padding="10,12" Margin="0,0,0,6" BorderThickness="3,1,1,1" BorderBrush="{Binding AccentBrush}">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                  <CheckBox IsChecked="{Binding Selected}" IsEnabled="{Binding IsAvailable}" VerticalAlignment="Center"/>
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBox Text="{Binding Name}" Width="140" IsEnabled="{Binding IsAvailable}"/>
+                      <Border Classes="tag" IsVisible="{Binding HasLayoutTag}" VerticalAlignment="Center"><TextBlock Text="{Binding LayoutTag}"/></Border>
+                      <Border Classes="tag tag-blue" IsVisible="{Binding IsWinePrefix}" VerticalAlignment="Center"><TextBlock Text="Linux prefix"/></Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding Path}" Classes="sub mono"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right">
+                    <TextBlock Text="{Binding RunnerLine}" Classes="sub" HorizontalAlignment="Right" IsVisible="{Binding RunnerLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <TextBlock Text="{Binding PrefixLine}" Classes="sub" HorizontalAlignment="Right" IsVisible="{Binding PrefixLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <TextBlock Text="{Binding AlreadyLine}" Classes="sub" HorizontalAlignment="Right" IsVisible="{Binding AlreadyLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <Button Classes="link" Content="hide" HorizontalAlignment="Right" IsVisible="{Binding IsAvailable}"
+                            Command="{Binding $parent[ItemsControl].((vm:AddClientViewModel)DataContext).HideCommand}" CommandParameter="{Binding}"/>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Classes="link" Content="{Binding HiddenCount, StringFormat='hidden ({0}) — show'}" Command="{Binding ShowHiddenCommand}" IsVisible="{Binding HasHidden}" HorizontalAlignment="Left"/>
+
+        <TextBlock Text="Somewhere else?" Classes="h4" Margin="0,10,0,0"/>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBox IsReadOnly="True" PlaceholderText="Browse… to a game_mini folder, a StarLauncher\game folder, or a Steam &quot;Blue Protocol Star Resonance&quot; folder"/>
+          <Button Grid.Column="1" Classes="ghost2 tiny" Content="Browse…" Click="Browse"/>
+        </Grid>
+
+        <Border Classes="card" Padding="12,10" IsVisible="{Binding IsWindows}">
+          <TextBlock Classes="body" TextWrapping="Wrap" FontSize="12"
+                     Text="Windows: the launcher looks for StarLauncher installs under the usual Star folder and Steam library; if yours is elsewhere, use Browse and point at the game_mini folder."/>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

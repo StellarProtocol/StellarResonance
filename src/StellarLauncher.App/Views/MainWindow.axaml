@@ -5,6 +5,8 @@
         xmlns:dashv="using:StellarLauncher.App.Views.Dashboard"
         xmlns:ws="using:StellarLauncher.App.ViewModels.Workspace"
         xmlns:wsv="using:StellarLauncher.App.Views.Workspace"
+        xmlns:add="using:StellarLauncher.App.ViewModels.AddClient"
+        xmlns:addv="using:StellarLauncher.App.Views.AddClient"
         x:Class="StellarLauncher.App.Views.MainWindow"
         x:DataType="shell:ShellViewModel"
         Width="1000" Height="700" MinWidth="900" MinHeight="600" Title="Stellar Launcher"
@@ -97,6 +99,7 @@
           <!-- page templates are added by Tasks 4–10 -->
           <DataTemplate DataType="dash:DashboardViewModel"><dashv:DashboardView/></DataTemplate>
           <DataTemplate DataType="ws:ClientWorkspaceViewModel"><wsv:ClientWorkspaceView/></DataTemplate>
+          <DataTemplate DataType="add:AddClientViewModel"><addv:AddClientView/></DataTemplate>
         </ContentControl.DataTemplates>
       </ContentControl>
     </Grid>
