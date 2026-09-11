@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using StellarLauncher.Core.Clients;
@@ -42,12 +43,11 @@ public sealed class LaunchOrchestrator
             var steam = _env.IsWindows ? GameExeResolver.TryGetSteamAppId(_env.Fs, c.GameMiniDir) : null;
             var psi = _launcher.BuildStartInfo(LaunchRequestBuilder.Build(c, exe, _env.UmuRun, steam, _env.MangoHudUserConfig()));
 
-            if (steam is not null) { events.Report(new SteamHandoffEvent()); events.Report(new StatusEvent("launching via Steam…")); return new LaunchOutcome(LaunchOutcomeKind.SteamHandoff, null); }
-
             var status = await RunPreScriptAsync(c, psi, events, ct);
             events.Report(new StatusEvent(status));
             var proc = _processes.Start(psi);
 
+            if (steam is not null) { events.Report(new SteamHandoffEvent()); events.Report(new StatusEvent("launching via Steam…")); return new LaunchOutcome(LaunchOutcomeKind.SteamHandoff, null); }
             if (proc is null) { events.Report(new FailedEvent("launch failed: process did not start")); return new LaunchOutcome(LaunchOutcomeKind.Failed, null); }
 
             events.Report(new StartedEvent(proc));
@@ -67,6 +67,7 @@ public sealed class LaunchOrchestrator
         if (_env.IsWindows || c.Linux is not { DxvkNvapi: true, WinePrefix: { } prefix } || string.IsNullOrWhiteSpace(prefix)) return;
         events.Report(new StatusEvent("checking DXVK-NVAPI…"));
         try { events.Report(new StatusEvent(await _dxvk.EnsureAsync(prefix, ct))); }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex) { events.Report(new StatusEvent($"DXVK-NVAPI skipped: {ex.Message}")); }
     }
 
@@ -115,6 +116,6 @@ public sealed class LaunchOrchestrator
             events.Report(new ExitedEvent(proc.ExitCode));
             if (proc.ExitCode != 0) events.Report(new StatusEvent($"exited with code {proc.ExitCode} — check Runner / WINEPREFIX in Settings"));
         }
-        catch (Exception ex) { events.Report(new StatusEvent($"post-exit failed: {ex.Message}")); }
+        catch (Exception ex) { events.Report(new StatusEvent($"post-exit script failed: {ex.Message}")); }
     }
 }

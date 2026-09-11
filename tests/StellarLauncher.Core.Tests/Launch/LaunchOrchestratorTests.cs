@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO.Abstractions.TestingHelpers;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using StellarLauncher.Core.Clients;
@@ -144,6 +145,7 @@ public class LaunchOrchestratorTests
         var outcome = await sut.LaunchAsync(new ClientProfile { Id = "w", GameMiniDir = steam }, sink, CancellationToken.None);
 
         Assert.Equal(LaunchOutcomeKind.SteamHandoff, outcome.Kind);
+        Assert.Equal(1, factory.Starts);
         Assert.Equal("2358720", launcher.Last!.SteamAppId);
         Assert.Contains(sink.Events, e => e is SteamHandoffEvent);
         Assert.DoesNotContain(sink.Events, e => e is StartedEvent);
@@ -158,7 +160,7 @@ public class LaunchOrchestratorTests
         await sut.LaunchAsync(Linux(), sink, CancellationToken.None);
 
         proc.Exit(0);
-        await Task.Delay(50);   // the exit waiter is fire-and-forget
+        for (var i = 0; i < 100 && !sink.Events.Any(e => e is ExitedEvent); i++) await Task.Delay(10);
 
         Assert.Contains(sink.Events, e => e is ExitedEvent { ExitCode: 0 });
     }
