@@ -41,6 +41,11 @@ public sealed partial class ClientTileViewModel : ObservableObject
     public string RunnerTag => Client.Linux?.Runner is { } r
         ? System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(r) ?? r)
         : "Windows";
+    private ClientLayout Layout => ClientNaming.DetectLayout(Client.GameMiniDir);
+    public string RegionTag => ClientNaming.RegionTag(Layout);          // "SEA" / "JP" / ""
+    public string EditionTag => ClientNaming.EditionTag(Layout);        // "Standalone" / "Steam" / ""
+    public bool HasRegion => RegionTag.Length > 0;
+    public bool HasEdition => EditionTag.Length > 0;
 
     public string FrameworkLine => _inv.FrameworkVersion is null ? "fw not installed"
         : _latest is not null && Core.Services.VersionService.IsNewer(_latest, _inv.FrameworkVersion) ? $"fw {_inv.FrameworkVersion} · {_latest} available"

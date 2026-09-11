@@ -73,6 +73,11 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
     public string ModeTag => Client.Modded ? "Modded" : "Vanilla";
     public string RuntimeTag => Client.Linux?.Runner is { } r
         ? $"Linux · {System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(r) ?? r)}" : "Windows";
+    private ClientLayout Layout => ClientNaming.DetectLayout(Client.GameMiniDir);
+    public string RegionTag => ClientNaming.RegionTag(Layout);          // "SEA" / "JP" / ""
+    public string EditionTag => ClientNaming.EditionTag(Layout);        // "Standalone" / "Steam" / ""
+    public bool HasRegion => RegionTag.Length > 0;
+    public bool HasEdition => EditionTag.Length > 0;
     public string StateLine => SessionPresenter.StateLine(Session, Inventory, Client.Modded);
     public IBrush StateBrush => SessionPresenter.StateBrush(Session, Inventory);
     public bool ShowProgress => Session.State is SessionState.Launching or SessionState.Preparing;

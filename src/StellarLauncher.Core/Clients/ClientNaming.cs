@@ -48,6 +48,22 @@ public static class ClientNaming
         _ => "",
     };
 
+    /// <summary>Detected region: SEA (Star/StarLauncher or the StarSEA_STEAM build) vs JP (StarASIA). "" if unknown.</summary>
+    public static string RegionTag(ClientLayout layout) => layout switch
+    {
+        ClientLayout.SeaStarLauncher or ClientLayout.SteamFlat => "SEA",
+        ClientLayout.JpStarLauncher => "JP",
+        _ => "",
+    };
+
+    /// <summary>Detected distribution: the standalone StarLauncher install vs a Steam library install. "" if unknown.</summary>
+    public static string EditionTag(ClientLayout layout) => layout switch
+    {
+        ClientLayout.SteamFlat => "Steam",
+        ClientLayout.SeaStarLauncher or ClientLayout.JpStarLauncher => "Standalone",
+        _ => "",
+    };
+
     private static List<string> Segments(string path) =>
         path.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries).ToList();
 

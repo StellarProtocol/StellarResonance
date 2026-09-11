@@ -32,4 +32,15 @@ public class ClientNamingTests
         Assert.Equal("Steam", ClientNaming.LayoutTag(ClientLayout.SteamFlat));
         Assert.Equal("", ClientNaming.LayoutTag(ClientLayout.Unknown));
     }
+
+    [Theory]
+    [InlineData(ClientLayout.SeaStarLauncher, "SEA", "Standalone")]
+    [InlineData(ClientLayout.JpStarLauncher, "JP", "Standalone")]
+    [InlineData(ClientLayout.SteamFlat, "SEA", "Steam")]
+    [InlineData(ClientLayout.Unknown, "", "")]
+    public void Region_and_edition_tags(ClientLayout layout, string region, string edition)
+    {
+        Assert.Equal(region, ClientNaming.RegionTag(layout));
+        Assert.Equal(edition, ClientNaming.EditionTag(layout));
+    }
 }
