@@ -58,9 +58,9 @@
                         <Button Grid.Column="2" Classes="quickLaunch" IsVisible="{Binding ShowQuickLaunch}"
                                 ToolTip.Tip="Launch this client"
                                 Command="{Binding $parent[Window].((shell:ShellViewModel)DataContext).QuickLaunchCommand}" CommandParameter="{Binding}">
-                          <!-- vector triangle centres deterministically; its mass tapers right, so nudge +3px x for
-                               the optical centre (a bare ▶ glyph sits low-left) -->
-                          <Path Data="M0,0 L8,5 L0,10 Z" Fill="White" Stretch="None" Margin="3,0,0,0"
+                          <!-- vector triangle centres deterministically; its mass tapers right, so +2px x lands the
+                               optical centre (a bare ▶ glyph sits low-left) -->
+                          <Path Data="M0,0 L8,5 L0,10 Z" Fill="White" Stretch="None" Margin="2,0,0,0"
                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Button>
                       </Grid>

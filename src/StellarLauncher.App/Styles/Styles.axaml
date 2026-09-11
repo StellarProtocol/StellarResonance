@@ -40,6 +40,7 @@
   <Style Selector="Button.primary">
     <Setter Property="Background" Value="{StaticResource BrandGradient}"/><Setter Property="Foreground" Value="White"/>
     <Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="30,12"/><Setter Property="FontSize" Value="13.5"/><Setter Property="MinWidth" Value="150"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/>
   </Style>
   <Style Selector="Button.primary.sm"><Setter Property="Padding" Value="18,9"/><Setter Property="FontSize" Value="12"/><Setter Property="MinWidth" Value="120"/></Style>
   <Style Selector="Button.ghost">
@@ -78,6 +79,7 @@
     <Setter Property="Background" Value="#e0554d"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderThickness" Value="0"/>
     <Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="12"/>
     <Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="18,9"/><Setter Property="MinWidth" Value="120"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/>
   </Style>
   <Style Selector="Button.stop:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="#ec6a63"/></Style>
   <!-- workspace tabs -->
