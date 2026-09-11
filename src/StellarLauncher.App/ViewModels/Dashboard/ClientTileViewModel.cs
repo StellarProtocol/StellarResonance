@@ -57,23 +57,8 @@ public sealed partial class ClientTileViewModel : ObservableObject
         }
     }
 
-    public string StateLine => Session.State switch
-    {
-        SessionState.Running when Session.StartedAt is { } t => $"running · {Elapsed(t)}",
-        SessionState.Running => "running",
-        SessionState.Launching or SessionState.Preparing => Session.StatusText,
-        SessionState.SteamHandoff => "launched via Steam",
-        SessionState.Failed => Session.StatusText.Length > 0 ? Session.StatusText : "failed",
-        SessionState.Exited => "exited",
-        _ => !_inv.FolderExists ? "folder missing" : Client.Modded ? "idle" : "idle · launches vanilla until the framework is installed",
-    };
-    public IBrush StateBrush => Session.State switch
-    {
-        SessionState.Running or SessionState.SteamHandoff => new SolidColorBrush(Color.Parse("#54e3a0")),
-        SessionState.Launching or SessionState.Preparing => new SolidColorBrush(Color.Parse("#9ec2ff")),
-        SessionState.Failed => new SolidColorBrush(Color.Parse("#ff9a9a")),
-        _ => !_inv.FolderExists ? new SolidColorBrush(Color.Parse("#ff9a9a")) : new SolidColorBrush(Color.Parse("#697297")),
-    };
+    public string StateLine => SessionPresenter.StateLine(Session, _inv, Client.Modded);
+    public IBrush StateBrush => SessionPresenter.StateBrush(Session, _inv);
 
     public bool ShowProgress => Session.State is SessionState.Launching or SessionState.Preparing;
     public double Progress => (Session.Progress ?? 0) * 100;
@@ -99,10 +84,4 @@ public sealed partial class ClientTileViewModel : ObservableObject
     [RelayCommand] private Task Launch() => _launch(Client);
     [RelayCommand] private void Stop() => _stop(Client);
     [RelayCommand] private void Open() => _open(Client);
-
-    private static string Elapsed(DateTimeOffset since)
-    {
-        var d = DateTimeOffset.UtcNow - since;
-        return d.TotalHours >= 1 ? $"{(int)d.TotalHours} h {d.Minutes} min" : $"{Math.Max(0, (int)d.TotalMinutes)} min";
-    }
 }

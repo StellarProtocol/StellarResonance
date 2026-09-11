@@ -70,6 +70,7 @@
     <Setter Property="Padding" Value="0,0,0,9"/><Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
     <Setter Property="FontWeight" Value="Normal"/>
   </Style>
+  <Style Selector="Button.tab:not(.active)"><Setter Property="BorderBrush" Value="Transparent"/></Style>
   <Style Selector="Button.tab.active"><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
   <!-- rail rows -->
   <Style Selector="Border.railItem">
