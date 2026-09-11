@@ -9,6 +9,8 @@
             <Border Width="10" Height="10" CornerRadius="3" Background="{Binding AccentBrush}" Margin="0,8,10,0"/>
             <TextBlock Text="{Binding Name}" Foreground="White" FontSize="22" FontWeight="ExtraBold" Margin="0,0,10,0"/>
             <Border Classes="tag" Classes.tag-gold="{Binding IsTesting}" Margin="0,6,6,0"><TextBlock Text="{Binding ChannelTag}"/></Border>
+            <Border Classes="tag tag-blue" Margin="0,6,6,0" IsVisible="{Binding HasRegion}"><TextBlock Text="{Binding RegionTag}"/></Border>
+            <Border Classes="tag" Margin="0,6,6,0" IsVisible="{Binding HasEdition}"><TextBlock Text="{Binding EditionTag}"/></Border>
             <Border Classes="tag" Margin="0,6,6,0"><TextBlock Text="{Binding ModeTag}"/></Border>
             <Border Classes="tag" Margin="0,6,6,0"><TextBlock Text="{Binding RuntimeTag}"/></Border>
             <Border Classes="tag tag-mint" Margin="0,6,0,0" IsVisible="{Binding IsRunningVisible}"><TextBlock Text="● RUNNING"/></Border>
@@ -27,7 +29,7 @@
         </StackPanel>
         <StackPanel Grid.Column="1" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
           <Button Classes="primary" Content="▶  LAUNCH" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}"/>
-          <Button Classes="stop" Content="◼  Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" Padding="28,12" FontSize="13.5" HorizontalAlignment="Right"/>
+          <Button Classes="stop" Content="◼  Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" Padding="30,12" FontSize="13.5" MinWidth="150" HorizontalAlignment="Right"/>
         </StackPanel>
       </Grid>
     </Border>

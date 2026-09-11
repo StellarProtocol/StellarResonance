@@ -36,11 +36,12 @@
     <Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="16,8"/>
     <Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="12.5"/>
   </Style>
+  <!-- LAUNCH and Stop are the same size/shape (owner 2026-09-11): a tile flipping idle↔running keeps one footprint. -->
   <Style Selector="Button.primary">
     <Setter Property="Background" Value="{StaticResource BrandGradient}"/><Setter Property="Foreground" Value="White"/>
-    <Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="30,12"/><Setter Property="FontSize" Value="13.5"/>
+    <Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="30,12"/><Setter Property="FontSize" Value="13.5"/><Setter Property="MinWidth" Value="150"/>
   </Style>
-  <Style Selector="Button.primary.sm"><Setter Property="Padding" Value="18,9"/><Setter Property="FontSize" Value="12"/></Style>
+  <Style Selector="Button.primary.sm"><Setter Property="Padding" Value="18,9"/><Setter Property="FontSize" Value="12"/><Setter Property="MinWidth" Value="120"/></Style>
   <Style Selector="Button.ghost">
     <Setter Property="Background" Value="#427c5cff"/><Setter Property="BorderBrush" Value="#807c5cff"/>
     <Setter Property="BorderThickness" Value="1"/><Setter Property="Foreground" Value="#e9e3ff"/>
@@ -71,15 +72,14 @@
     <Setter Property="Foreground" Value="#b7a8ff"/><Setter Property="FontSize" Value="11.5"/><Setter Property="FontWeight" Value="SemiBold"/>
   </Style>
   <Style Selector="Button.link-red"><Setter Property="Foreground" Value="#ff9a9a"/></Style>
-  <!-- Stop: an unmistakable danger button, not a faint text link (owner 2026-09-11: "must be more obvious") -->
+  <!-- Stop: a solid danger button the SAME size/shape as LAUNCH (owner 2026-09-11: obvious + same size/style),
+       differing only in colour. The .sm form matches Button.primary.sm on the Dashboard tile. -->
   <Style Selector="Button.stop">
-    <Setter Property="Background" Value="#33ff6b6b"/><Setter Property="BorderBrush" Value="#99ff6b6b"/><Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Foreground" Value="#ffbcbc"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="12"/>
-    <Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="18,8"/>
+    <Setter Property="Background" Value="#e0554d"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="12"/>
+    <Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="18,9"/><Setter Property="MinWidth" Value="120"/>
   </Style>
-  <Style Selector="Button.stop:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#4dff6b6b"/><Setter Property="BorderBrush" Value="#ccff6b6b"/><Setter Property="TextElement.Foreground" Value="#ffffff"/>
-  </Style>
+  <Style Selector="Button.stop:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="#ec6a63"/></Style>
   <!-- workspace tabs -->
   <Style Selector="Button.tab">
     <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0,0,0,2"/>
