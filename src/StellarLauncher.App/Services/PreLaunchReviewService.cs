@@ -32,15 +32,8 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
         if (!client.Modded) return true;
         try
         {
-            IReadOnlyList<PluginEntry> registry;
-            FrameworkManifest? manifest;
-            try
-            {
-                registry = await _registry.ForChannelAsync(client.Channel, ct);
-                manifest = await _versions.FetchAsync(ChannelManifests.FrameworkVersion(client.Channel), ct);
-            }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception) { return true; }   // offline — never trap the player
+            var registry = await _registry.ForChannelAsync(client.Channel, ct);
+            var manifest = await _versions.FetchAsync(ChannelManifests.FrameworkVersion(client.Channel), ct);
 
             var inv = _inventory.Read(client, registry);
             var target = manifest?.Versions.FirstOrDefault(v => v.Version == manifest.Latest);
@@ -52,7 +45,9 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
                 client.AutoUpdateBeforeLaunch, client.GameMiniDir, _deps.Installer, _deps.Plugins, _deps.Http);
             return await _prompt(vm) != PreLaunchResult.Cancel;
         }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception) { return true; }   // offline — never trap the player
+        catch (OperationCanceledException) { throw; }   // a cancelled review never answers "proceed"
+        // Fail-open over the WHOLE review path (registry/manifest offline, inventory read, planner, dialog):
+        // the pre-launch review is advisory and must never trap the player out of their game.
+        catch (Exception) { return true; }
     }
 }

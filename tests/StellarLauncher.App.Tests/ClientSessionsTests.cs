@@ -204,13 +204,22 @@ public class ClientSessionsTests
             => throw new InvalidOperationException("something went wrong");
     }
 
-    private sealed class DelayedOrchestrator(TaskCompletionSource<LaunchOutcome> tcs) : ILaunchOrchestrator
+    private sealed class CancellingReview : IPreLaunchReview
     {
-        public int LaunchCount;
-        public async Task<LaunchOutcome> LaunchAsync(ClientProfile c, IProgress<LaunchEvent> ev, CancellationToken ct)
-        {
-            LaunchCount++;
-            return await tcs.Task;
-        }
+        public Task<bool> ReviewAsync(ClientProfile c, CancellationToken ct) => throw new OperationCanceledException("review cancelled");
+    }
+
+    [Fact]
+    public async Task Cancelled_review_launches_nothing_and_a_later_launch_proceeds()
+    {
+        var (sut, _, orch, c) = Build();
+
+        await sut.LaunchAsync(c, new CancellingReview(), CancellationToken.None);   // must not fault the UI command
+
+        Assert.Equal(SessionState.Idle, sut.For(c).State);
+        Assert.Empty(orch.Launched);
+
+        await sut.LaunchAsync(c, new Review(true), CancellationToken.None);          // latch was released
+        Assert.Single(orch.Launched);
     }
 }

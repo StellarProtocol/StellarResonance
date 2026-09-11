@@ -47,7 +47,10 @@ public sealed class ClientSessions
         if (!s.CanLaunch || !_pending.Add(c.Id)) return;
         try
         {
-            if (!await review.ReviewAsync(c, ct)) return;
+            bool proceed;
+            try { proceed = await review.ReviewAsync(c, ct); }
+            catch (OperationCanceledException) { return; }   // cancelled review = no launch; session stays Idle
+            if (!proceed) return;
             s.Begin(_now());
             try
             {

@@ -28,28 +28,40 @@ public class PreLaunchReviewServiceTests
         return new PreLaunchReviewService(new RegistryCache(new Registry(), () => new LauncherConfig()), inventory, versions, deps, prompt);
     }
 
+    // "Must not prompt" is asserted by COUNTING prompt calls. A throwing prompt delegate would be swallowed by the
+    // service's whole-path fail-open and read as "true" — exactly the outcome these tests must be able to refute.
+    private sealed class CountingPrompt
+    {
+        public int Calls;
+        public Task<PreLaunchResult> Show(PreLaunchReviewViewModel _) { Calls++; return Task.FromResult(PreLaunchResult.Proceed); }
+    }
+
     [Fact]
     public async Task Vanilla_client_skips_everything()
     {
-        var versions = new Offline();
-        var sut = Sut(versions, _ => throw new Exception("must not prompt"));
+        var versions = new Offline(); var prompt = new CountingPrompt();
+        var sut = Sut(versions, prompt.Show);
         Assert.True(await sut.ReviewAsync(new ClientProfile { Modded = false, GameMiniDir = "/g" }, CancellationToken.None));
         Assert.Equal(0, versions.Calls);
+        Assert.Equal(0, prompt.Calls);
     }
 
     [Fact]
     public async Task Offline_fails_open_without_prompting()
     {
-        var sut = Sut(new Offline(), _ => throw new Exception("must not prompt"));
+        var prompt = new CountingPrompt();
+        var sut = Sut(new Offline(), prompt.Show);
         Assert.True(await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g" }, CancellationToken.None));
+        Assert.Equal(0, prompt.Calls);
     }
 
     [Fact]
     public async Task Empty_plan_fails_open_without_prompting()
     {
-        var versions = new Online();
-        var sut = Sut(versions, _ => throw new Exception("must not prompt"));
+        var prompt = new CountingPrompt();
+        var sut = Sut(new Online(), prompt.Show);
         Assert.True(await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g" }, CancellationToken.None));
+        Assert.Equal(0, prompt.Calls);
     }
 
     [Fact]
