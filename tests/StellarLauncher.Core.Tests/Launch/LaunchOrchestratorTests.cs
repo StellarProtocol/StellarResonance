@@ -164,4 +164,69 @@ public class LaunchOrchestratorTests
 
         Assert.Contains(sink.Events, e => e is ExitedEvent { ExitCode: 0 });
     }
+
+    // ---- pre-launch script: wait vs. run-alongside (owner 2026-09-11) ----
+    private sealed class FakeScripts : IScriptRunner
+    {
+        public int RunCalls, StartCalls;
+        public readonly FakeHandle Handle = new();
+        public Task<int?> RunAsync(string p, IEnumerable<KeyValuePair<string, string?>> env, TimeSpan t, CancellationToken ct = default) { RunCalls++; return Task.FromResult<int?>(0); }
+        public IScriptHandle? Start(string p, IEnumerable<KeyValuePair<string, string?>> env) { StartCalls++; return Handle; }
+    }
+    private sealed class FakeHandle : IScriptHandle
+    {
+        public bool Killed, Disposed;
+        public bool HasExited => Killed;
+        public void Kill() => Killed = true;
+        public void Dispose() => Disposed = true;
+    }
+
+    private static (LaunchOrchestrator sut, FakeScripts scripts, LaunchSessionTests.FakeProcess proc) BuildWithScripts()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile("/opt/game/P/drive_c/Star/StarLauncher/StarLauncher.exe", new MockFileData("mz"));
+        fs.AddDirectory(G);
+        fs.AddFile("/opt/game/P/pre.sh", new MockFileData("echo hi\n"));
+        var scripts = new FakeScripts();
+        var clock = T0;
+        var env = new LaunchEnvironment(fs, new Platform(false), new Detector(),
+            now: () => clock, delay: (d, ct) => { clock += d; return Task.CompletedTask; }) { MangoHudUserConfig = () => false, Scripts = scripts };
+        var proc = new LaunchSessionTests.FakeProcess();
+        var watch = new Watch(false, new Queue<InteropSnapshot>(new[] { new InteropSnapshot(0, null) }));
+        var sut = new LaunchOrchestrator(new Launcher(), new Factory(proc), new BepInEx(), new Dxvk(), new InteropMonitor(watch, env), env);
+        return (sut, scripts, proc);
+    }
+
+    private static ClientProfile LinuxWithPre(bool wait) => new()
+    {
+        Id = "c1", GameMiniDir = G, LastInteropCount = 190,
+        Linux = new LinuxRuntime { Runner = "/p/proton", WinePrefix = "/opt/game/P", DxvkNvapi = false },
+        Advanced = new AdvancedOptions { PreLaunch = "/opt/game/P/pre.sh", PreLaunchWait = wait },
+    };
+
+    [Fact]
+    public async Task Pre_launch_script_waits_by_default()
+    {
+        var (sut, scripts, _) = BuildWithScripts();
+        await sut.LaunchAsync(LinuxWithPre(wait: true), new Sink(), CancellationToken.None);
+        Assert.Equal(1, scripts.RunCalls);
+        Assert.Equal(0, scripts.StartCalls);
+    }
+
+    [Fact]
+    public async Task Pre_launch_parallel_starts_alongside_and_is_killed_when_the_game_exits()
+    {
+        var (sut, scripts, proc) = BuildWithScripts();
+        var sink = new Sink();
+        await sut.LaunchAsync(LinuxWithPre(wait: false), sink, CancellationToken.None);
+
+        Assert.Equal(1, scripts.StartCalls);        // started alongside
+        Assert.Equal(0, scripts.RunCalls);          // not waited on
+        Assert.False(scripts.Handle.Killed);        // still running while the game runs
+
+        proc.Exit(0);
+        for (var i = 0; i < 100 && !scripts.Handle.Killed; i++) await Task.Delay(10);
+        Assert.True(scripts.Handle.Killed);          // closed when the game closed
+        Assert.True(scripts.Handle.Disposed);
+    }
 }

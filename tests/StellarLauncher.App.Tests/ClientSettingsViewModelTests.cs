@@ -66,6 +66,17 @@ public class ClientSettingsViewModelTests
     }
 
     [Fact]
+    public async Task Pre_launch_parallel_toggle_persists_as_PreLaunchWait()
+    {
+        var (f, vm, _) = await Open();
+        Assert.False(vm.PreLaunchParallel);                                  // default = wait
+        vm.PreLaunchParallel = true;
+        Assert.False(f.Store.Load().Clients[1].Advanced.PreLaunchWait);      // now runs alongside
+        vm.PreLaunchParallel = false;
+        Assert.True(f.Store.Load().Clients[1].Advanced.PreLaunchWait);       // back to wait
+    }
+
+    [Fact]
     public async Task Remove_client_forgets_the_entry_after_confirm_and_returns_to_dashboard()
     {
         var (f, vm, _) = await Open();

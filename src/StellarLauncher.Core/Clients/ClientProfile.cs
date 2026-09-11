@@ -28,6 +28,7 @@ public sealed class AdvancedOptions
     public string? Wrapper { get; set; }
     public string? GameArgs { get; set; }
     public string? PreLaunch { get; set; }
+    public bool PreLaunchWait { get; set; } = true;   // true = block launch until the script exits; false = run it alongside the game (killed on exit)
     public string? PostExit { get; set; }
     public List<EnvVar> Env { get; set; } = new();
 }

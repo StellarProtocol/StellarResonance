@@ -23,6 +23,7 @@ public sealed partial class ClientSettingsViewModel : ObservableObject
     [ObservableProperty] private string _name = "";
     [ObservableProperty] private string _gameMiniDir = "";
     [ObservableProperty] private string? _runner, _winePrefix, _wrapper, _gameArgs, _preLaunch, _postExit;
+    [ObservableProperty] private bool _preLaunchParallel;   // checked = run alongside the game (killed on exit); unchecked = wait (default)
     [ObservableProperty] private bool _testingChannel, _autoUpdate, _debugLogging, _dxvkNvapi, _esync, _fsync, _stellarPerf, _mangoHudMissing;
     [ObservableProperty] private int _perfOverlayIndex;
     [ObservableProperty] private string _status = "";
@@ -56,6 +57,7 @@ public sealed partial class ClientSettingsViewModel : ObservableObject
         PerfOverlayIndex = (int)(lx?.OverlayMode() ?? PerfOverlayMode.Off); StellarPerf = lx?.StellarPerf ?? false;
         MangoHudMissing = PerfOverlayIndex == (int)PerfOverlayMode.Full && !MangoHud.IsInstalled();
         Wrapper = C.Advanced.Wrapper; GameArgs = C.Advanced.GameArgs; PreLaunch = C.Advanced.PreLaunch; PostExit = C.Advanced.PostExit;
+        PreLaunchParallel = !C.Advanced.PreLaunchWait;
         EnvVars.Clear();
         foreach (var e in C.Advanced.Env) EnvVars.Add(new EnvVarRowViewModel(e, Persist, RemoveEnvVar));
         Swatches.Clear();
@@ -99,6 +101,7 @@ public sealed partial class ClientSettingsViewModel : ObservableObject
     partial void OnWrapperChanged(string? value) { if (!_loading) { C.Advanced.Wrapper = Blank(value); Persist(); } }
     partial void OnGameArgsChanged(string? value) { if (!_loading) { C.Advanced.GameArgs = Blank(value); Persist(); } }
     partial void OnPreLaunchChanged(string? value) { if (!_loading) { C.Advanced.PreLaunch = Blank(value); Persist(); } }
+    partial void OnPreLaunchParallelChanged(bool value) { if (!_loading) { C.Advanced.PreLaunchWait = !value; Persist(); } }
     partial void OnPostExitChanged(string? value) { if (!_loading) { C.Advanced.PostExit = Blank(value); Persist(); } }
 
     private LinuxRuntime Linux() => C.Linux ??= new LinuxRuntime();

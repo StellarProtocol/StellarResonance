@@ -33,4 +33,24 @@ public static class LaunchScripts
             return null;
         }
     }
+
+    /// <summary>Start the script without waiting and return a handle whose Kill ends it (and its tree) when the
+    /// game exits. Linux only, via <c>/bin/sh &lt;path&gt;</c>. Null if the process could not be started.</summary>
+    public static IScriptHandle? Start(string scriptPath, IEnumerable<KeyValuePair<string, string?>> env)
+    {
+        var psi = new ProcessStartInfo { FileName = "/bin/sh", UseShellExecute = false };
+        psi.ArgumentList.Add(scriptPath);
+        foreach (var kv in env)
+            if (kv.Value is not null) psi.Environment[kv.Key] = kv.Value;
+
+        var proc = Process.Start(psi);
+        return proc is null ? null : new ProcessHandle(proc);
+    }
+
+    private sealed class ProcessHandle(Process proc) : IScriptHandle
+    {
+        public bool HasExited { get { try { return proc.HasExited; } catch { return true; } } }
+        public void Kill() { try { if (!proc.HasExited) proc.Kill(entireProcessTree: true); } catch { /* best effort */ } }
+        public void Dispose() { try { proc.Dispose(); } catch { /* best effort */ } }
+    }
 }

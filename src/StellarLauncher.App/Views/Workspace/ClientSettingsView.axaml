@@ -98,6 +98,7 @@
               <TextBox Text="{Binding PreLaunch}" Classes="mono"/>
               <Button Grid.Column="1" Classes="ghost2 tiny" Content="Browse…" Click="BrowsePre"/>
             </Grid>
+            <CheckBox IsChecked="{Binding PreLaunchParallel}" Content="Run it alongside the game instead of waiting — closed when the game exits"/>
             <TextBlock Text="Post-exit script" Classes="sub"/>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
               <TextBox Text="{Binding PostExit}" Classes="mono"/>

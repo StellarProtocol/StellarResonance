@@ -17,6 +17,8 @@ public sealed class LaunchEnvironment
 
     public IFileSystem Fs { get; }
     public Func<bool> MangoHudUserConfig { get; init; } = MangoHud.UserConfigExists;
+    // Init property (not a ctor param) so it stays within the ≤5-param guardrail; tests override with a fake.
+    public IScriptRunner Scripts { get; init; } = new DefaultScriptRunner();
 
     public LaunchEnvironment(IFileSystem fs, IPlatformInfo platform, IGameDetector detector,
         Func<DateTimeOffset>? now = null, Func<TimeSpan, CancellationToken, Task>? delay = null)
