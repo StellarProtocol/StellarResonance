@@ -139,26 +139,25 @@ public class ShellViewModelTests
     }
 
     [Fact]
-    public void Page_disposal_disposes_disposable_pages_on_navigation()
+    public void Navigating_away_disposes_the_outgoing_page_only()
     {
-        var disposed = false;
-        var disposableMarker = new DisposableMarker { Disposed = () => disposed = true };
+        int disposedDash = 0, disposedAdd = 0;
         var pages = new ShellPages(
-            Dashboard: _ => disposableMarker,
+            Dashboard: _ => new DisposableMarker { Disposed = () => disposedDash++ },
             Workspace: (_, c) => new Marker("workspace", c.Id),
-            AddClient: _ => new Marker("add"),
+            AddClient: _ => new DisposableMarker { Disposed = () => disposedAdd++ },
             LauncherSettings: _ => new Marker("launcher"));
+        var store = new ConfigStore(new MockFileSystem(), new Platform());
+        var cfg = new LauncherConfig(); cfg.Clients.Add(C("c1", "Main")); store.Save(cfg);
+        var sessions = new ClientSessions(store, new NoOrch(), new NoScan(), new NoProc(), () => DateTimeOffset.UnixEpoch, a => a());
+        var shell = new ShellViewModel(store, sessions, pages);
 
-        var (shell, _, _) = Build(C("c1", "Main"));
-        shell.Start();
-
-        // Set current to the disposable marker
-        shell.Current = disposableMarker;
-        Assert.False(disposed);
-
-        // Navigate away and verify disposal
-        shell.Current = new Marker("add");
-        Assert.True(disposed);
+        shell.Start();                                   // → Dashboard
+        Assert.Equal(0, disposedDash);
+        shell.ShowAddClientCommand.Execute(null);        // Dashboard disposed, Add client alive
+        Assert.Equal(1, disposedDash); Assert.Equal(0, disposedAdd);
+        shell.ShowDashboardCommand.Execute(null);        // Add client disposed, the new Dashboard alive
+        Assert.Equal(1, disposedAdd); Assert.Equal(1, disposedDash);
     }
 
     private sealed class DisposableMarker : IDisposable

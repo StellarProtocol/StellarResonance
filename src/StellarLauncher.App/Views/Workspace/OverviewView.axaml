@@ -73,7 +73,7 @@
           <Grid ColumnDefinitions="*,Auto"><StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#a3e635"/><TextBlock Classes="h4" Text="HEALTH" Margin="0"/></StackPanel><Button Grid.Column="1" Classes="link" Content="Logs →" Command="{Binding OpenLogsCommand}"/></Grid>
           <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="14" RowSpacing="3">
             <TextBlock Text="Framework marker" Classes="sub"/><TextBlock Grid.Column="1" Text="{Binding MarkerLine}" Foreground="#9affd0"/>
-            <TextBlock Grid.Row="1" Text="Plugin folders" Classes="sub"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DuplicateLine}" Foreground="#c5cce0" Classes.amber="{Binding HasDuplicates}" TextWrapping="Wrap"/>
+            <TextBlock Grid.Row="1" Text="Plugin folders" Classes="sub"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DuplicateLine}" Classes="body" Classes.amber="{Binding HasDuplicates}" TextWrapping="Wrap"/>
             <TextBlock Grid.Row="2" Text="BepInEx log" Classes="sub"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding LogSizeLine}" Foreground="#c5cce0"/>
             <TextBlock Grid.Row="3" Text="Previous exit" Classes="sub"/><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding PreviousExitLabel}" Foreground="#c5cce0"/>
           </Grid>

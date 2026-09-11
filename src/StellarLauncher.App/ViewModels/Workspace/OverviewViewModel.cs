@@ -67,25 +67,30 @@ public sealed partial class OverviewViewModel : ObservableObject
     // Plugins other clients have that this one lacks (spec § 5.3).
     private async Task LoadOnOthersAsync()
     {
-        var here = _ws.Inventory.Plugins.Where(p => p.Present).Select(p => p.Entry.Id).ToHashSet();
-        var names = new SortedSet<string>();
-        foreach (var other in _ws.Shell.Config.Clients.Where(c => c.Id != _ws.Client.Id))
+        try
         {
-            var reg = await _ws.Services.Core.Registry.ForChannelAsync(other.Channel, CancellationToken.None);
-            foreach (var p in _ws.Services.Core.Inventory.Read(other, reg).Plugins.Where(p => p.Present && !here.Contains(p.Entry.Id)))
-                names.Add(p.Entry.Name);
+            var here = _ws.Inventory.Plugins.Where(p => p.Present).Select(p => p.Entry.Id).ToHashSet();
+            var names = new SortedSet<string>();
+            foreach (var other in _ws.Shell.Config.Clients.Where(c => c.Id != _ws.Client.Id))
+            {
+                var reg = await _ws.Services.Core.Registry.ForChannelAsync(other.Channel, CancellationToken.None);
+                foreach (var p in _ws.Services.Core.Inventory.Read(other, reg).Plugins.Where(p => p.Present && !here.Contains(p.Entry.Id)))
+                    names.Add(p.Entry.Name);
+            }
+            OnOthersLine = names.Count == 0 ? "nothing" : string.Join(", ", names);
         }
-        OnOthersLine = names.Count == 0 ? "nothing" : string.Join(", ", names);
+        catch (Exception) { OnOthersLine = "unavailable"; }   // fire-and-forget from Load(): never leave an unobserved fault
     }
 
     partial void OnSelectedVersionChanged(VersionManifest? value)
     {
         ConfirmVisible = false;
         var installed = _ws.Inventory.FrameworkVersion;
+        (IsInstall, IsUpdate, IsReinstall, IsDowngrade) = (false, false, false, false);
         if (value is null) { CanChangeFramework = false; ActionLabel = "Install"; return; }
         CanChangeFramework = VersionService.LauncherSupported(value.MinLauncherVersion, AppInfo.LauncherVersion);
-        if (!CanChangeFramework) { ActionLabel = "Update launcher first"; return; }
-        (IsInstall, IsUpdate, IsReinstall, IsDowngrade) = (false, false, false, false);
+        // Too-old launcher: keep ONE (disabled) button visible so the label explains why nothing can be installed.
+        if (!CanChangeFramework) { ActionLabel = "Update launcher first"; IsReinstall = true; return; }
         if (installed is null) { ActionLabel = $"Install v{value.Version}"; IsInstall = true; }
         else if (VersionService.IsNewer(value.Version, installed)) { ActionLabel = $"Update to v{value.Version}"; IsUpdate = true; }
         else if (VersionService.IsNewer(installed, value.Version)) { ActionLabel = $"Downgrade to v{value.Version}"; IsReinstall = true; IsDowngrade = true; }

@@ -130,6 +130,22 @@ public class DashboardViewModelTests
     }
 
     [Fact]
+    public async Task Disposed_dashboard_no_longer_refreshes_its_tiles()
+    {
+        var (dash, shell, _) = Build();
+        await dash.RefreshAsync();
+        dash.Dispose();
+        var eventCount = 0;
+        dash.Tiles[0].PropertyChanged += (_, _) => eventCount++;
+
+        var session = shell.Sessions.For(shell.Config.Clients[0]);
+        session.Begin(DateTimeOffset.UnixEpoch);
+        session.Apply(new PreparingEvent());
+
+        Assert.Equal(0, eventCount);
+    }
+
+    [Fact]
     public async Task Offline_framework_manifest_shows_in_summary()
     {
         var fs = new MockFileSystem();

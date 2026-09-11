@@ -15,7 +15,8 @@
   <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/></Style>
   <Style Selector="TextBlock.sub"><Setter Property="Foreground" Value="{StaticResource TextSubBrush}"/><Setter Property="FontSize" Value="11.5"/></Style>
   <Style Selector="TextBlock.mono"><Setter Property="FontFamily" Value="{StaticResource MonoFont}"/><Setter Property="FontSize" Value="10.5"/></Style>
-  <Style Selector="TextBlock.fwline"><Setter Property="Foreground" Value="#c5cce0"/></Style>
+  <!-- body = default readable text; amber is toggled on top via Classes.amber — never set Foreground locally on such an element -->
+  <Style Selector="TextBlock.body"><Setter Property="Foreground" Value="#c5cce0"/></Style>
   <Style Selector="TextBlock.amber"><Setter Property="Foreground" Value="#ffcf6b"/></Style>
   <!-- tags -->
   <Style Selector="Border.tag">
@@ -71,7 +72,7 @@
     <Setter Property="Padding" Value="0,0,0,9"/><Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
     <Setter Property="FontWeight" Value="Normal"/>
   </Style>
-  <Style Selector="Button.tab:not(.active)"><Setter Property="BorderBrush" Value="Transparent"/></Style>
+  <!-- the underline (BorderBrush) is bound per tab in the view: accent when active, Transparent otherwise -->
   <Style Selector="Button.tab.active"><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
   <!-- rail rows -->
   <Style Selector="Border.railItem">

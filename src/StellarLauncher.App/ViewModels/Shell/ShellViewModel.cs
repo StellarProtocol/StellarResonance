@@ -30,7 +30,8 @@ public sealed partial class ShellViewModel : ObservableObject
     public ClientSessions Sessions => _sessions;
     public string LauncherVersionLabel => AppInfo.LauncherVersionLabel;
 
-    /// <summary>Set by the Dashboard (Task 4) so the rail's quick ▶ launches through the same path.</summary>
+    /// <summary>The rail's quick ▶. Wired by the composition root (Task 11) to the ONE launch path
+    /// (<see cref="ClientSessions.LaunchAsync"/>) so it works from the first frame, even when no Dashboard was ever shown.</summary>
     public Func<ClientProfile, Task>? QuickLaunchHandler { get; set; }
 
     [ObservableProperty] private object? _current;

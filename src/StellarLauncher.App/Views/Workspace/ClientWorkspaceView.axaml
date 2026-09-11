@@ -33,16 +33,16 @@
     </Border>
     <Border DockPanel.Dock="Top" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="24,10,24,0">
       <StackPanel Orientation="Horizontal" Spacing="22">
-        <Button Classes="tab" Classes.active="{Binding IsOverview}" Content="Overview" Command="{Binding ShowOverviewCommand}" BorderBrush="{Binding AccentBrush}"/>
-        <Button Classes="tab" Classes.active="{Binding IsPlugins}" Command="{Binding ShowPluginsCommand}" BorderBrush="{Binding AccentBrush}">
+        <Button Classes="tab" Classes.active="{Binding IsOverview}" Content="Overview" Command="{Binding ShowOverviewCommand}" BorderBrush="{Binding OverviewUnderline}"/>
+        <Button Classes="tab" Classes.active="{Binding IsPlugins}" Command="{Binding ShowPluginsCommand}" BorderBrush="{Binding PluginsUnderline}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="Plugins"/>
             <Border Background="{Binding AccentSoftBrush}" CornerRadius="10" Padding="6,0"><TextBlock Text="{Binding PluginsBadge}" Foreground="{Binding AccentBrush}" FontSize="10" FontWeight="Bold"/></Border>
             <Border Background="#29ffcf6b" CornerRadius="10" Padding="6,0" IsVisible="{Binding HasUpdates}"><TextBlock Text="{Binding UpdatesBadge, StringFormat='{}{0}↑'}" Foreground="#ffcf6b" FontSize="10" FontWeight="Bold"/></Border>
           </StackPanel>
         </Button>
-        <Button Classes="tab" Classes.active="{Binding IsSettings}" Content="Settings" Command="{Binding ShowSettingsCommand}" BorderBrush="{Binding AccentBrush}"/>
-        <Button Classes="tab" Classes.active="{Binding IsLogs}" Command="{Binding ShowLogsCommand}" BorderBrush="{Binding AccentBrush}">
+        <Button Classes="tab" Classes.active="{Binding IsSettings}" Content="Settings" Command="{Binding ShowSettingsCommand}" BorderBrush="{Binding SettingsUnderline}"/>
+        <Button Classes="tab" Classes.active="{Binding IsLogs}" Command="{Binding ShowLogsCommand}" BorderBrush="{Binding LogsUnderline}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="Logs"/>
             <Border Background="#29ffcf6b" CornerRadius="10" Padding="6,0" IsVisible="{Binding HasCallouts}"><TextBlock Text="{Binding LogsBadge}" Foreground="#ffcf6b" FontSize="10" FontWeight="Bold"/></Border>

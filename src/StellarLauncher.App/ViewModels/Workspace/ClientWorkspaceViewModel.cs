@@ -51,11 +51,15 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
         _ = RefreshAsync();
     }
 
+    /// <summary>Called by the shell when this page is navigated away from. Cascades to every tab VM built so far.</summary>
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
         Shell.Sessions.SessionChanged -= _onSession;
+        foreach (var d in _tabCache.Values.OfType<IDisposable>()) d.Dispose();
+        _tabCache.Clear();
+        Refreshed = null;   // tab VMs subscribe Load() here; drop them so nothing stays rooted through this page
     }
 
     // ---- header ----
@@ -89,6 +93,13 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
     public bool IsPlugins => Tab == WorkspaceTab.Plugins;
     public bool IsSettings => Tab == WorkspaceTab.Settings;
     public bool IsLogs => Tab == WorkspaceTab.Logs;
+    // The active tab's underline is the client accent; the view binds these (a Style setter could not win over a
+    // local BorderBrush binding, so the VM decides).
+    public IBrush OverviewUnderline => Underline(WorkspaceTab.Overview);
+    public IBrush PluginsUnderline => Underline(WorkspaceTab.Plugins);
+    public IBrush SettingsUnderline => Underline(WorkspaceTab.Settings);
+    public IBrush LogsUnderline => Underline(WorkspaceTab.Logs);
+    private IBrush Underline(WorkspaceTab tab) => Tab == tab ? AccentBrush : Brushes.Transparent;
 
     [RelayCommand] private void ShowOverview() => ShowTab(WorkspaceTab.Overview);
     [RelayCommand] private void ShowPlugins() => ShowTab(WorkspaceTab.Plugins);
@@ -110,7 +121,9 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
             _tabCache[tab] = content;
         }
         TabContent = content;
-        foreach (var p in new[] { nameof(IsOverview), nameof(IsPlugins), nameof(IsSettings), nameof(IsLogs) }) OnPropertyChanged(p);
+        foreach (var p in new[] { nameof(IsOverview), nameof(IsPlugins), nameof(IsSettings), nameof(IsLogs),
+                     nameof(OverviewUnderline), nameof(PluginsUnderline), nameof(SettingsUnderline), nameof(LogsUnderline) })
+            OnPropertyChanged(p);
     }
 
     // ---- data ----
