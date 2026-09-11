@@ -1,0 +1,99 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StellarLauncher.App.ViewModels.Dashboard"
+             x:Class="StellarLauncher.App.Views.Dashboard.DashboardView" x:DataType="vm:DashboardViewModel">
+  <DockPanel Margin="24,18,24,0">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+      <StackPanel>
+        <TextBlock Text="Dashboard" Foreground="White" FontSize="22" FontWeight="ExtraBold"/>
+        <TextBlock Text="{Binding SummaryLine}" Classes="sub" Margin="0,4,0,0"/>
+        <TextBlock Text="{Binding Status}" Foreground="#ffcf6b" FontSize="11.5" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+      </StackPanel>
+      <Button Grid.Column="1" Classes="ghost" Content="＋ Add client" Command="{Binding AddClientCommand}" VerticalAlignment="Top"/>
+    </Grid>
+    <ScrollViewer>
+      <StackPanel Spacing="12">
+        <ItemsControl ItemsSource="{Binding Tiles}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ClientTileViewModel">
+              <Border Classes="card" Margin="0,0,12,12" Background="{Binding AccentSoftBrush}" BorderBrush="{Binding AccentLineBrush}" BorderThickness="3,1,1,1" Padding="14,10">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                  <StackPanel Spacing="4">
+                    <WrapPanel>
+                      <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="{Binding AccentBrush}" FontSize="14" FontWeight="Bold" Padding="0,0,8,0"/>
+                      <Border Classes="tag" Classes.tag-gold="{Binding IsTesting}" Margin="0,2,6,0"><TextBlock Text="{Binding ChannelTag}"/></Border>
+                      <Border Classes="tag" Margin="0,2,6,0"><TextBlock Text="{Binding ModeTag}"/></Border>
+                      <Border Classes="tag" Margin="0,2,0,0"><TextBlock Text="{Binding RunnerTag}"/></Border>
+                    </WrapPanel>
+                    <TextBlock Text="{Binding Path}" Classes="sub mono" TextTrimming="CharacterEllipsis"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding FrameworkLine}" Foreground="#c5cce0" FontSize="11.5" Classes.amber="{Binding FrameworkNeedsAttention}"/>
+                      <TextBlock Text="·" Classes="sub"/>
+                      <TextBlock Text="{Binding PluginsLine}" Foreground="#c5cce0" FontSize="11.5"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Ellipse Width="7" Height="7" Fill="{Binding StateBrush}" VerticalAlignment="Center"/>
+                      <TextBlock Text="{Binding StateLine}" Foreground="{Binding StateBrush}" FontSize="11.5" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <ProgressBar IsVisible="{Binding ShowProgress}" Value="{Binding Progress}" IsIndeterminate="{Binding ProgressIndeterminate}"
+                                 Minimum="0" Maximum="100" Height="4" Foreground="{Binding AccentBrush}" Background="#1c2740"/>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Classes="primary sm" Content="▶  LAUNCH" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}"/>
+                    <Button Classes="running" Content="● RUNNING" IsEnabled="False" IsVisible="{Binding IsRunningVisible}"/>
+                    <Button Classes="prep" Content="PREPARING…" IsEnabled="False" IsVisible="{Binding IsPrepVisible}"/>
+                    <Button Classes="link link-red" Content="Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right"/>
+                    <Button Classes="link" Content="Install framework" Command="{Binding OpenCommand}" IsVisible="{Binding ShowInstallFramework}" HorizontalAlignment="Right"/>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Border Classes="card" IsVisible="{Binding ShowMatrix}">
+          <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="h4" Text="PLUGINS ACROSS CLIENTS"/>
+              <Button Grid.Column="1" Classes="link" Content="show all / present only" Command="{Binding ToggleAllRowsCommand}"/>
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Columns}" Margin="170,0,0,4">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MatrixColumnViewModel">
+                  <StackPanel Width="170">
+                    <TextBlock Text="{Binding Name}" Foreground="{Binding AccentBrush}" FontSize="11" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding Subtitle}" Foreground="#7f86ad" FontSize="10"/>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ItemsControl ItemsSource="{Binding Rows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MatrixRowViewModel">
+                  <Border BorderBrush="#1a2035" BorderThickness="0,0,0,1" Padding="0,5">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding Name}" Width="170" Foreground="White" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                      <ItemsControl ItemsSource="{Binding Cells}">
+                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:MatrixCellViewModel">
+                            <Panel Width="170">
+                              <Button Classes="tiny" Content="{Binding Label}" Command="{Binding ClickCommand}" IsEnabled="{Binding IsClickable}"
+                                      Background="{Binding BackgroundBrush}" Foreground="{Binding ForegroundBrush}" BorderBrush="{Binding BorderBrush}" BorderThickness="1"
+                                      FontFamily="{StaticResource MonoFont}" FontSize="11" HorizontalAlignment="Left"/>
+                            </Panel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

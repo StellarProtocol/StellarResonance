@@ -1,6 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="using:StellarLauncher.App.ViewModels.Shell"
+        xmlns:dash="using:StellarLauncher.App.ViewModels.Dashboard"
+        xmlns:dashv="using:StellarLauncher.App.Views.Dashboard"
         x:Class="StellarLauncher.App.Views.MainWindow"
         x:DataType="shell:ShellViewModel"
         Width="1000" Height="700" MinWidth="900" MinHeight="600" Title="Stellar Launcher"
@@ -91,6 +93,7 @@
       <ContentControl Grid.Column="1" Content="{Binding Current}">
         <ContentControl.DataTemplates>
           <!-- page templates are added by Tasks 4–10 -->
+          <DataTemplate DataType="dash:DashboardViewModel"><dashv:DashboardView/></DataTemplate>
         </ContentControl.DataTemplates>
       </ContentControl>
     </Grid>

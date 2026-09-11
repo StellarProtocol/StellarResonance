@@ -46,6 +46,7 @@ public sealed partial class RailClientItem : ObservableObject
     };
 
     public string Summary => $"{Client.Channel} · fw {_framework ?? "none"} · {StateLabel}";
+    public string? SummaryFramework => _framework;
 
     public void SetFramework(string? version) { _framework = version; OnPropertyChanged(nameof(Summary)); }
 
