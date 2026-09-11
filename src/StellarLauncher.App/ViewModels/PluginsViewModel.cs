@@ -13,7 +13,7 @@ namespace StellarLauncher.App.ViewModels;
 
 public enum PluginTab { Available, Installed, Updates }
 
-public partial class PluginsViewModel : ObservableObject
+public partial class PluginsViewModel : ObservableObject, IPluginActions
 {
     private readonly IPluginRegistryService _registry;
     private readonly IPluginInstaller _installer;

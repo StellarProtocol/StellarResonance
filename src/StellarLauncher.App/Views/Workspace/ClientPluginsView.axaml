@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StellarLauncher.App.ViewModels.Workspace" xmlns:v="using:StellarLauncher.App.Views.Workspace"
+             xmlns:clients="using:StellarLauncher.Core.Clients"
+             x:Class="StellarLauncher.App.Views.Workspace.ClientPluginsView" x:DataType="vm:ClientPluginsViewModel">
+  <Panel>
+    <DockPanel IsVisible="{Binding !IsDetailOpen}">
+      <TextBlock DockPanel.Dock="Top" Text="{Binding TargetLine}" Classes="sub mono" Margin="0,0,0,8"/>
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Margin="0,0,0,10">
+        <TextBox Text="{Binding Search}" PlaceholderText="🔍 Search plugins"/>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsAll}" Content="All" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.All}"/>
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsInstalledFilter}" Content="{Binding InstalledCount, StringFormat='Installed {0}'}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Installed}"/>
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsUpdatesFilter}" Content="{Binding UpdateCount, StringFormat='Updates {0}'}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Updates}"/>
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsDisabledFilter}" Content="{Binding DisabledCount, StringFormat='Disabled {0}'}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Disabled}"/>
+        </StackPanel>
+        <ComboBox Grid.Column="2" ItemsSource="{Binding CopySources}" PlaceholderText="Copy set from…" SelectionChanged="OnCopySourcePicked" MinWidth="160">
+          <ComboBox.ItemTemplate><DataTemplate x:DataType="clients:ClientProfile"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
+        </ComboBox>
+      </Grid>
+      <TextBlock DockPanel.Dock="Top" Text="{Binding Status}" Foreground="#ffcf6b" FontSize="11.5" Margin="0,0,0,6" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PluginRowViewModel">
+              <Border Classes="card" Padding="10" Margin="0,0,0,6">
+                <Grid ColumnDefinitions="34,*,160,150,Auto" ColumnSpacing="12">
+                  <Border Width="34" Height="34" CornerRadius="8" Background="{Binding BadgeBrush}"><TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="ExtraBold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="White" FontSize="12.5" Padding="0" HorizontalAlignment="Left"/>
+                    <TextBlock Classes="sub" TextTrimming="CharacterEllipsis"><Run Text="{Binding Author}"/><Run Text=" · "/><Run Text="{Binding Description}"/></TextBlock>
+                  </StackPanel>
+                  <TextBlock Grid.Column="2" Text="{Binding VersionLine}" Classes="mono body" FontSize="11.5" VerticalAlignment="Center" Classes.amber="{Binding HasUpdate}"/>
+                  <ItemsControl Grid.Column="3" ItemsSource="{Binding AlsoOn}" VerticalAlignment="Center">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:AlsoOnChip">
+                      <Border Classes="tag" Classes.tag-mint="{Binding IsPresent}" Margin="0,0,4,4"><TextBlock Text="{Binding Text}" FontSize="10"/></Border>
+                    </DataTemplate></ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Button Classes="amber tiny" Content="Update" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"/>
+                    <Button Classes="ghost tiny" Content="Install" Command="{Binding InstallCommand}" IsVisible="{Binding !IsPresent}"/>
+                    <ToggleSwitch IsChecked="{Binding Enabled}" OnContent="Enabled" OffContent="Disabled" IsVisible="{Binding IsPresent}" FontSize="11"/>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </DockPanel>
+    <v:PluginDetailView IsVisible="{Binding IsDetailOpen}"/>
+  </Panel>
+</UserControl>

@@ -54,6 +54,7 @@
     <ContentControl Content="{Binding TabContent}" Margin="24,14,24,0">
       <ContentControl.DataTemplates>
         <DataTemplate DataType="vm:OverviewViewModel"><v:OverviewView/></DataTemplate>
+        <DataTemplate DataType="vm:ClientPluginsViewModel"><v:ClientPluginsView/></DataTemplate>
         <DataTemplate DataType="vm:TabPlaceholder"><TextBlock Text="{Binding Name}" Classes="muted"/></DataTemplate>
       </ContentControl.DataTemplates>
     </ContentControl>
