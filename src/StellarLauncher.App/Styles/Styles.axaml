@@ -60,6 +60,20 @@
     <Setter Property="Foreground" Value="#b9ccff"/><Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="18,9"/>
   </Style>
   <Style Selector="Button.tiny"><Setter Property="Padding" Value="10,5"/><Setter Property="FontSize" Value="11"/><Setter Property="CornerRadius" Value="7"/></Style>
+  <!-- Plugin-matrix cells: a non-clickable ("up to date") cell is a disabled Button, and Fluent's disabled state
+       washes its bound mint text + fill out to grey (owner 2026-09-11: "hard to read"). Keep the cell's own colours
+       and full opacity on hover/press/disabled so every state stays legible; only clickable cells get a hover cue. -->
+  <Style Selector="Button.cell:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{Binding $parent[Button].Background}"/>
+    <Setter Property="TextElement.Foreground" Value="{Binding $parent[Button].Foreground}"/>
+    <Setter Property="BorderBrush" Value="{Binding $parent[Button].BorderBrush}"/>
+    <Setter Property="Opacity" Value="1"/>
+  </Style>
+  <Style Selector="Button.cell:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{Binding $parent[Button].Background}"/>
+    <Setter Property="TextElement.Foreground" Value="{Binding $parent[Button].Foreground}"/>
+  </Style>
+  <Style Selector="Button.cell:not(:disabled):pointerover"><Setter Property="Opacity" Value="0.82"/></Style>
   <Style Selector="Button.link">
     <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="2"/>
     <Setter Property="Foreground" Value="#b7a8ff"/><Setter Property="FontSize" Value="11.5"/><Setter Property="FontWeight" Value="SemiBold"/>
@@ -99,4 +113,14 @@
     <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="CornerRadius" Value="8"/>
   </Style>
   <Style Selector="Button.railBtn:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+  <!-- rail quick-launch: a clean circular ▶ (the glyph nudged right to sit optically centred) -->
+  <Style Selector="Button.quickLaunch">
+    <Setter Property="Width" Value="24"/><Setter Property="Height" Value="24"/><Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="0"/><Setter Property="FontSize" Value="10"/>
+    <Setter Property="Background" Value="{StaticResource BrandGradient}"/><Setter Property="Foreground" Value="White"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/>
+  </Style>
+  <Style Selector="Button.quickLaunch /template/ ContentPresenter"><Setter Property="Margin" Value="1,0,0,0"/></Style>
+  <Style Selector="Button.quickLaunch:pointerover"><Setter Property="Opacity" Value="0.9"/></Style>
 </Styles>

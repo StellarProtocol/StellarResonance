@@ -37,9 +37,10 @@ public sealed partial class MatrixCellViewModel
             MatrixCellKind.Incompatible => ($"{cell.InstalledVersion} ✗ incompatible", "#ff9a9a", "#1Fff6b6b", false),
             MatrixCellKind.Disabled => ($"{cell.InstalledVersion ?? "?"} · disabled", "#ff9a9a", "#1Fff6b6b", false),
             MatrixCellKind.NotInstalled => ("＋ install", "#b7a8ff", "#00000000", true),
-            MatrixCellKind.NoCompatibleVersion => ("no compatible version", "#4a5273", "#00000000", false),
-            MatrixCellKind.NeedsFramework => ("needs framework", "#4a5273", "#00000000", false),
-            _ => ("—", "#4a5273", "#00000000", false),
+            // Muted, but still legible on the dark ground (owner 2026-09-11: the matrix text was hard to read).
+            MatrixCellKind.NoCompatibleVersion => ("no compatible version", "#8a93b2", "#00000000", false),
+            MatrixCellKind.NeedsFramework => ("needs framework", "#8a93b2", "#00000000", false),
+            _ => ("—", "#8a93b2", "#00000000", false),
         };
     }
 

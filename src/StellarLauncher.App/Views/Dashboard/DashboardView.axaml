@@ -79,9 +79,11 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:MatrixCellViewModel">
                             <Panel Width="170">
-                              <Button Classes="tiny" Content="{Binding Label}" Command="{Binding ClickCommand}" IsEnabled="{Binding IsClickable}"
+                              <!-- version chips use the embedded UI font (Inter), NOT MonoFont: the mono fallback on
+                                   this platform has no real SemiBold, so faux-bold blurs the digits (owner 2026-09-11). -->
+                              <Button Classes="tiny cell" Content="{Binding Label}" Command="{Binding ClickCommand}" IsEnabled="{Binding IsClickable}"
                                       Background="{Binding BackgroundBrush}" Foreground="{Binding ForegroundBrush}" BorderBrush="{Binding BorderBrush}" BorderThickness="1"
-                                      FontFamily="{StaticResource MonoFont}" FontSize="11" HorizontalAlignment="Left"/>
+                                      FontSize="12.5" FontWeight="SemiBold" HorizontalAlignment="Left"/>
                             </Panel>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>

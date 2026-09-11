@@ -55,8 +55,8 @@
                           <TextBlock Text="{Binding Name}" Foreground="{Binding NameBrush}" FontWeight="SemiBold" FontSize="12.5"/>
                           <TextBlock Text="{Binding Summary}" Foreground="#697297" FontSize="10.5" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
-                        <Button Grid.Column="2" Classes="tiny" Content="▶" Width="20" Height="20" Padding="0" FontSize="9"
-                                Background="{StaticResource BrandGradient}" Foreground="White" IsVisible="{Binding ShowQuickLaunch}"
+                        <Button Grid.Column="2" Classes="quickLaunch" Content="▶" IsVisible="{Binding ShowQuickLaunch}"
+                                ToolTip.Tip="Launch this client"
                                 Command="{Binding $parent[Window].((shell:ShellViewModel)DataContext).QuickLaunchCommand}" CommandParameter="{Binding}"/>
                       </Grid>
                     </Border>
