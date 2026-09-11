@@ -56,6 +56,9 @@ public sealed class WorkspaceFixture
     public Detector GameDetector { get; } = new();
     public AutoConfirm Confirm { get; } = new();
     public WorkspaceServices Services { get; private set; } = null!;
+    /// <summary>Ticks registered by view-models through the fake timer; a registration lives here until its handle is disposed.</summary>
+    public List<Action> Ticks { get; } = new();
+    private sealed class Disposer(Action d) : IDisposable { public void Dispose() => d(); }
 
     public static PluginEntry Entry(string id, string name, string min, params string[] versions)
         => new(id, name, $"{name} description", "StellarProtocol",
@@ -91,7 +94,8 @@ public sealed class WorkspaceFixture
         var core = new DashboardServices(new ClientInventory(Fs, deps.Installer, deps.Plugins, new DoorstopToggle(Fs)),
             new RegistryCache(new Reg(Registry), () => Store.Load()), new FrameworkManifests(Manifests), new Review(), deps,
             new ClientCandidates(GameDetector, new Platform()));
-        Services = new WorkspaceServices(core, new DoorstopToggle(Fs), Fs, new Platform(), GameDetector, new GameLocator(Fs), Confirm);
+        Services = new WorkspaceServices(core, new DoorstopToggle(Fs), Fs, new Platform(), GameDetector, new GameLocator(Fs), Confirm,
+            Timer: (_, tick) => { Ticks.Add(tick); return new Disposer(() => Ticks.Remove(tick)); });
         Shell = new ShellViewModel(Store, sessions, new ShellPages(s => new DashboardViewModel(s, core), (s, cl) => new ClientWorkspaceViewModel(s, cl, Services, Tabs), s => new object(), s => new object()));
         Shell.Start();
         return Shell;

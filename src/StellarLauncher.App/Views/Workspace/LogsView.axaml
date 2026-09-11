@@ -1,0 +1,51 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StellarLauncher.App.ViewModels.Workspace"
+             x:Class="StellarLauncher.App.Views.Workspace.LogsView" x:DataType="vm:LogsViewModel">
+  <DockPanel>
+    <!-- pattern callouts with one-click fixes -->
+    <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Callouts}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:CalloutViewModel">
+          <Border Background="#29ffb347" BorderBrush="#80ffb347" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,8">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <StackPanel Spacing="3">
+                <TextBlock Text="{Binding Title}" Foreground="#ffcf6b" FontWeight="Bold" FontSize="12.5"/>
+                <TextBlock Text="{Binding Detail}" Foreground="#e6dcc0" FontSize="11.5" TextWrapping="Wrap"/>
+              </StackPanel>
+              <Button Grid.Column="1" Classes="amber tiny" Content="{Binding FixLabel}" Command="{Binding FixCommand}" IsVisible="{Binding FixAvailable}" VerticalAlignment="Center"/>
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- toolbar -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,8">
+      <ComboBox ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MinWidth="220"/>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+        <Button Classes="tiny ghost2" Classes.ghost="{Binding IsAll}" Content="All" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:LogFilter.All}"/>
+        <Button Classes="tiny ghost2" Classes.ghost="{Binding IsWarnings}" Content="Warnings+" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:LogFilter.WarningsPlus}"/>
+        <Button Classes="tiny ghost2" Classes.ghost="{Binding IsStellar}" Content="Stellar only" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:LogFilter.StellarOnly}"/>
+      </StackPanel>
+      <TextBox Grid.Column="2" Text="{Binding Search}" PlaceholderText="🔍 filter"/>
+      <Button Grid.Column="3" Classes="ghost2 tiny" Content="Open folder" Click="OpenFolder"/>
+      <Button Grid.Column="4" Classes="ghost tiny" Content="Copy last 200 lines" Click="CopyTail"/>
+    </Grid>
+    <TextBlock DockPanel.Dock="Top" Text="{Binding Status}" Foreground="#ffcf6b" FontSize="11.5" Margin="0,0,0,6" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+    <!-- tail -->
+    <Border Background="#060811" BorderBrush="#407c5cff" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,14">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Lines}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:LogLineViewModel">
+              <Border Classes="logline" Classes.hl="{Binding Highlight}" Padding="4,1">
+                <TextBlock Text="{Binding Text}" Foreground="{Binding Brush}" FontFamily="{StaticResource MonoFont}" FontSize="11" TextWrapping="Wrap"/>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+  </DockPanel>
+</UserControl>

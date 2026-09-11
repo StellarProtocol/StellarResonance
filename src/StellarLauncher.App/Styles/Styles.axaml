@@ -77,6 +77,9 @@
   <!-- accent swatches (Settings tab): the border is the selection ring — a class, so Classes.selected can win -->
   <Style Selector="Button.swatch"><Setter Property="BorderBrush" Value="Transparent"/></Style>
   <Style Selector="Button.swatch.selected"><Setter Property="BorderBrush" Value="White"/></Style>
+  <!-- log tail lines: highlighted rows (duplicate-id / shadow-load warnings) get a faint amber wash -->
+  <Style Selector="Border.logline"><Setter Property="Background" Value="Transparent"/></Style>
+  <Style Selector="Border.logline.hl"><Setter Property="Background" Value="#1Affcf6b"/></Style>
   <!-- rail rows -->
   <Style Selector="Border.railItem">
     <Setter Property="CornerRadius" Value="8"/><Setter Property="Padding" Value="7,7,8,7"/>

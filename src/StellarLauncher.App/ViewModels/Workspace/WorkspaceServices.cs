@@ -8,8 +8,10 @@ using StellarLauncher.Core.Services;
 namespace StellarLauncher.App.ViewModels.Workspace;
 
 // A parameter-object bundle (records are exempt from the ≤ 6 ctor-deps guardrail, which targets classes).
+// Timer: (period, tick) → a handle whose Dispose stops it. The app passes a DispatcherTimer; tests pass a recording fake.
 public sealed record WorkspaceServices(DashboardServices Core, IDoorstopToggle Doorstop, IFileSystem Fs,
-    IPlatformInfo Platform, IGameDetector Detector, IGameLocator Locator, IConfirm Confirm);
+    IPlatformInfo Platform, IGameDetector Detector, IGameLocator Locator, IConfirm Confirm,
+    Func<TimeSpan, Action, IDisposable> Timer);
 
 public enum WorkspaceTab { Overview, Plugins, Settings, Logs }
 
