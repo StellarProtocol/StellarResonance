@@ -18,7 +18,7 @@ public class LauncherSettingsViewModelTests
     }
     private sealed class NoSelfUpdate : ILauncherSelfUpdater
     {
-        public Task StageAsync(Stream zip, string sha, string staging, CancellationToken ct = default) => Task.CompletedTask;
+        public Task StageAsync(Stream zip, string sha, string staging, IProgress<string>? status = null, CancellationToken ct = default) => Task.CompletedTask;
         public string BuildWindowsSwapScript(string staging, string installDir, string exeName, int pid) => "";
         public string BuildUnixSwapScript(string staging, string installDir, string exeName, int pid) => "";
         public void ApplyAndRestart(string staging, string installDir, string exeName, bool isWindows) { }

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Abstractions;
 using System.IO.Compression;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,8 +15,9 @@ public sealed class LauncherSelfUpdater : ILauncherSelfUpdater
     private readonly IFileSystem _fs;
     public LauncherSelfUpdater(IFileSystem fs) => _fs = fs;
 
-    public async Task StageAsync(Stream zip, string expectedSha256, string stagingDir, CancellationToken ct = default)
+    public async Task StageAsync(Stream zip, string expectedSha256, string stagingDir, IProgress<string>? status = null, CancellationToken ct = default)
     {
+        status?.Report("verifying download…");
         using var buffer = new MemoryStream();
         await zip.CopyToAsync(buffer, ct);
         buffer.Position = 0;
@@ -28,6 +30,8 @@ public sealed class LauncherSelfUpdater : ILauncherSelfUpdater
         _fs.Directory.CreateDirectory(stagingDir);
         buffer.Position = 0;
         using var archive = new ZipArchive(buffer, ZipArchiveMode.Read);
+        var files = archive.Entries.Count(e => !string.IsNullOrEmpty(e.Name));
+        var done = 0;
         foreach (var entry in archive.Entries)
         {
             ct.ThrowIfCancellationRequested();
@@ -37,9 +41,10 @@ public sealed class LauncherSelfUpdater : ILauncherSelfUpdater
                 !string.Equals(dest, root, StringComparison.Ordinal))
                 throw new InvalidDataException($"zip entry escapes staging dir: {entry.FullName}");
             _fs.Directory.CreateDirectory(_fs.Path.GetDirectoryName(dest)!);
-            using var src = entry.Open();
-            using var outStream = _fs.File.Create(dest);
-            await src.CopyToAsync(outStream, ct);
+            using (var src = entry.Open())
+            using (var outStream = _fs.File.Create(dest))
+                await src.CopyToAsync(outStream, ct);
+            status?.Report($"installing update… ({++done}/{files})");
         }
     }
 
