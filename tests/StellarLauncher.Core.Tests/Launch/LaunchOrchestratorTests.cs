@@ -213,6 +213,35 @@ public class LaunchOrchestratorTests
         Assert.Equal(0, scripts.StartCalls);
     }
 
+    private sealed class ThrowingFactory : IProcessFactory
+    {
+        public IGameProcess? Start(ProcessStartInfo psi) => throw new System.ComponentModel.Win32Exception("No such file or directory");
+        public IGameProcess? Attach(int pid) => null;
+    }
+
+    [Fact]
+    public async Task Parallel_pre_launch_script_is_killed_when_the_process_fails_to_START_by_throwing()
+    {
+        // SystemProcessFactory.Start THROWS (not returns null) on a bad runner/exe — the alongside script must not leak.
+        var fs = new MockFileSystem();
+        fs.AddFile("/opt/game/P/drive_c/Star/StarLauncher/StarLauncher.exe", new MockFileData("mz"));
+        fs.AddDirectory(G);
+        fs.AddFile("/opt/game/P/pre.sh", new MockFileData("echo hi\n"));
+        var scripts = new FakeScripts();
+        var clock = T0;
+        var env = new LaunchEnvironment(fs, new Platform(false), new Detector(),
+            now: () => clock, delay: (d, ct) => { clock += d; return Task.CompletedTask; }) { MangoHudUserConfig = () => false, Scripts = scripts };
+        var sut = new LaunchOrchestrator(new Launcher(), new ThrowingFactory(), new BepInEx(), new Dxvk(),
+            new InteropMonitor(new Watch(false, new Queue<InteropSnapshot>(new[] { new InteropSnapshot(0, null) })), env), env);
+
+        var outcome = await sut.LaunchAsync(LinuxWithPre(wait: false), new Sink(), CancellationToken.None);
+
+        Assert.Equal(LaunchOutcomeKind.Failed, outcome.Kind);
+        Assert.Equal(1, scripts.StartCalls);
+        Assert.True(scripts.Handle.Killed);          // not leaked
+        Assert.True(scripts.Handle.Disposed);
+    }
+
     [Fact]
     public async Task Pre_launch_parallel_starts_alongside_and_is_killed_when_the_game_exits()
     {

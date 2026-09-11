@@ -107,6 +107,43 @@ public class ClientSessionsTests
         Assert.True(sut.For(c).CanStop);
     }
 
+    private sealed class AttachFactory(IGameProcess attached) : IProcessFactory
+    {
+        public IGameProcess? Start(ProcessStartInfo psi) => null;
+        public IGameProcess? Attach(int pid) => attached;
+    }
+    private sealed class ExitableProcess : IGameProcess
+    {
+        private readonly TaskCompletionSource _exit = new();
+        public int Id => 4242;
+        public bool HasExited { get; private set; }
+        public int ExitCode { get; private set; }
+        public void Exit(int code) { ExitCode = code; HasExited = true; _exit.TrySetResult(); }
+        public Task WaitForExitAsync(CancellationToken ct) => _exit.Task;
+        public void Kill(bool tree) => Exit(-1);
+    }
+
+    [Fact]
+    public async Task Reattached_session_leaves_Running_when_the_adopted_game_exits()
+    {
+        var proc = new ExitableProcess();
+        var fs = new MockFileSystem();
+        var store = new ConfigStore(fs, new Platform());
+        var cfg = new LauncherConfig();
+        var c = new ClientProfile { Id = "c1", Name = "Main", GameMiniDir = "/opt/game/P/drive_c/Star/StarLauncher/game/release_3.7/game_mini" };
+        cfg.Clients.Add(c); store.Save(cfg);
+        var scanner = new Scanner(new RunningProcess(4242, "/opt/game/P/drive_c/Star/StarLauncher/StarLauncher.exe --game"));
+        var sut = new ClientSessions(store, new FakeOrchestrator(), scanner, new AttachFactory(proc), () => T0, run => run());
+
+        sut.Reattach(new[] { c });
+        Assert.Equal(SessionState.Running, sut.For(c).State);   // adopted
+
+        proc.Exit(0);
+        for (var i = 0; i < 100 && sut.For(c).State == SessionState.Running; i++) await Task.Delay(10);
+        Assert.NotEqual(SessionState.Running, sut.For(c).State);   // exit was observed
+        Assert.True(sut.For(c).CanLaunch);                        // recovered — relaunchable
+    }
+
     [Fact]
     public void Forget_drops_the_session()
     {
