@@ -98,4 +98,14 @@ public class ClientInventoryTests
         Assert.Null(e.BestCompatible(null));
         Assert.Null(e.BestCompatible("1.0.0"));   // both need ≥ 2.0.0
     }
+
+    [Fact]
+    public void Malformed_registry_id_is_skipped_not_fatal()
+    {
+        var fs = Folder();
+        var registry = Registry.Concat(new[] { Entry("bad/../id", "Bad", "Bad.dll", "1.0.0") }).ToList();
+        var snap = Sut(fs).Read(new ClientProfile { GameMiniDir = G }, registry);
+        Assert.Equal(Registry.Count, snap.Plugins.Count);
+        Assert.DoesNotContain(snap.Plugins, p => p.Entry.Id == "bad/../id");
+    }
 }

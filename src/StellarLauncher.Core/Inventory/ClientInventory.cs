@@ -28,13 +28,24 @@ public sealed class ClientInventory
         var doorstopPath = _fs.Path.Combine(dir, "doorstop_config.ini");
         bool? doorstop = _fs.File.Exists(doorstopPath) ? _doorstop.IsEnabled(doorstopPath) : null;
 
-        var plugins = registry.Select(e => ReadPlugin(dir, e)).ToList();
+        var plugins = ReadPlugins(dir, registry);
         var dups = DuplicateSlotFinder.Find(_fs, dir, registry.Select(e => e.CanonicalDll()).OfType<string>());
 
         var log = _fs.Path.Combine(dir, "BepInEx", "LogOutput.log");
         var logBytes = _fs.File.Exists(log) ? _fs.FileInfo.New(log).Length : 0;
 
         return new InventorySnapshot(true, _installer.ReadInstalledVersion(dir), doorstop, plugins, dups, logBytes);
+    }
+
+    private List<InstalledPlugin> ReadPlugins(string dir, IReadOnlyList<PluginEntry> registry)
+    {
+        var result = new List<InstalledPlugin>();
+        foreach (var e in registry)
+        {
+            try { result.Add(ReadPlugin(dir, e)); }
+            catch (ArgumentException) { /* malformed registry id — skip the entry */ }
+        }
+        return result;
     }
 
     private InstalledPlugin ReadPlugin(string dir, PluginEntry e)
