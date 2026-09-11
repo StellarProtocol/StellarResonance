@@ -81,4 +81,10 @@
     <Setter Property="Background" Value="{StaticResource InputBrush}"/><Setter Property="BorderBrush" Value="#1FFFFFFF"/>
     <Setter Property="CornerRadius" Value="6"/><Setter Property="FontSize" Value="12"/>
   </Style>
+  <Style Selector="Button.railBtn">
+    <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="0"/><Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="CornerRadius" Value="8"/>
+  </Style>
+  <Style Selector="Button.railBtn:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
 </Styles>
