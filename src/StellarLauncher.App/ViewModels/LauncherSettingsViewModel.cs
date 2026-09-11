@@ -124,9 +124,10 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
             IsDownloading = true;
             try { await _svc.Http.DownloadToAsync(new Uri(_remote.DownloadUrlFor(_svc.Platform.IsWindows)), buffered, progress); }
             finally { IsDownloading = false; }
+            Status = "verifying update…";   // replace the frozen-looking "downloading 100%" the moment the download returns
             buffered.Position = 0;
             var staging = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "stellar-launcher-update");
-            await _svc.SelfUpdater.StageAsync(buffered, sha, staging);
+            await _svc.SelfUpdater.StageAsync(buffered, sha, staging, new Progress<string>(s => Status = s));
             var exePath = Environment.ProcessPath ?? throw new InvalidOperationException("cannot resolve launcher path");
             Status = "applying update — restarting…";
             _svc.SelfUpdater.ApplyAndRestart(staging, System.IO.Path.GetDirectoryName(exePath)!, System.IO.Path.GetFileName(exePath), _svc.Platform.IsWindows);

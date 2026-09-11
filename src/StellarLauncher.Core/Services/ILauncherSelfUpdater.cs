@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -6,7 +7,7 @@ namespace StellarLauncher.Core.Services;
 
 public interface ILauncherSelfUpdater
 {
-    Task StageAsync(Stream zip, string expectedSha256, string stagingDir, CancellationToken ct = default);
+    Task StageAsync(Stream zip, string expectedSha256, string stagingDir, IProgress<string>? status = null, CancellationToken ct = default);
     string BuildWindowsSwapScript(string stagingDir, string installDir, string exeName, int pid);
     string BuildUnixSwapScript(string stagingDir, string installDir, string exeName, int pid);
     void ApplyAndRestart(string stagingDir, string installDir, string exeName, bool isWindows);
