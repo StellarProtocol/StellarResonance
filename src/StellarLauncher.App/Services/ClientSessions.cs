@@ -81,8 +81,21 @@ public sealed class ClientSessions
         foreach (var c in clients)
         {
             if (ProcessReattach.Find(c, snapshot) is not { } pid) continue;
-            if (_processes.Attach(pid) is { } p) For(c).AttachRunning(p, _now());
+            if (_processes.Attach(pid) is { } p)
+            {
+                var session = For(c);
+                session.AttachRunning(p, _now());
+                _ = WatchAttachedExitAsync(session, p);   // reattach bypasses the orchestrator, so wire exit tracking here
+            }
         }
+    }
+
+    // Without this, a re-attached session stays Running forever after the adopted game closes (CanLaunch never returns).
+    private async Task WatchAttachedExitAsync(LaunchSession session, IGameProcess proc)
+    {
+        try { await proc.WaitForExitAsync(CancellationToken.None); } catch { /* process vanished */ }
+        var code = proc.ExitCode;   // getter is guarded; -1 if the code can't be read
+        _marshal(() => session.Apply(new ExitedEvent(code)));
     }
 
     private void PersistInteropCount(ClientProfile c, int count)

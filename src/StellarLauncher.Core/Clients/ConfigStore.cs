@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.IO.Abstractions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -35,16 +37,16 @@ public sealed class ConfigStore : IConfigStore
     public LauncherConfig Load()
     {
         if (!_fs.File.Exists(SettingsPath)) return new LauncherConfig();
-        var text = _fs.File.ReadAllText(SettingsPath);
         try
         {
+            var text = _fs.File.ReadAllText(SettingsPath);   // inside the try: a locked/unreadable file must not fault startup
             return IsV2(text)
                 ? JsonSerializer.Deserialize<LauncherConfig>(text, Json) ?? new LauncherConfig()
                 : ImportV1(text);
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            return new LauncherConfig();   // corrupt → empty; the file is left for the user
+            return new LauncherConfig();   // corrupt / locked / unreadable → empty; the file is left for the user
         }
     }
 

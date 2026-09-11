@@ -62,29 +62,35 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     [RelayCommand]
     public async Task ReloadAsync()
     {
-        var self = new ClientColumn(_ws.Client, _ws.Inventory, _ws.Registry);
-        // Gather the other clients into a local list first: the awaits below can interleave with a second Reload
-        // (an install triggers Refreshed), and clearing shared lists before awaiting would double-add.
-        var others = new List<ClientColumn>();
-        foreach (var other in _ws.Shell.Config.Clients.Where(c => c.Id != _ws.Client.Id))
+        // Fire-and-forget from the ctor and Refreshed, so it must observe its own exceptions (offline registry/read).
+        try
         {
-            var reg = await _ws.Services.Core.Registry.ForChannelAsync(other.Channel, CancellationToken.None);
-            others.Add(new ClientColumn(other, _ws.Services.Core.Inventory.Read(other, reg), reg));
+            var self = new ClientColumn(_ws.Client, _ws.Inventory, _ws.Registry);
+            // Gather the other clients into a local list first: the awaits below can interleave with a second Reload
+            // (an install triggers Refreshed), and clearing shared lists before awaiting would double-add.
+            var others = new List<ClientColumn>();
+            foreach (var other in _ws.Shell.Config.Clients.Where(c => c.Id != _ws.Client.Id))
+            {
+                var reg = await _ws.Services.Core.Registry.ForChannelAsync(other.Channel, CancellationToken.None);
+                others.Add(new ClientColumn(other, _ws.Services.Core.Inventory.Read(other, reg), reg));
+            }
+            _others.Clear(); _others.AddRange(others);
+            CopySources.Clear(); foreach (var o in others) CopySources.Add(o.Client);
+            SelectedPlugin = null;
+            _all.Clear();
+            var i = 0;
+            foreach (var e in _ws.Registry.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                var inv = _ws.Inventory.Plugins.FirstOrDefault(p => p.Entry.Id == e.Id);
+                var item = new PluginItemViewModel(e, inv?.Present ?? false, inv?.Version, _ws.Inventory.FrameworkVersion, this) { IsDisabled = inv?.Disabled ?? false };
+                _all.Add(new PluginRowViewModel(item, PluginMatrixBuilder.Classify(self, e.Id), AlsoOnFor(e.Id), i++, this));
+            }
+            ApplyFilter();
+            foreach (var r in _all) _ = r.Item.LoadThumbnailAsync(_ws.Services.Core.Install.Http);   // swallows its own failures
+            OnPropertyChanged(nameof(TargetLine));
+            // NOTE: don't clear Status on success — a reload is triggered after install/copy, whose result message must survive.
         }
-        _others.Clear(); _others.AddRange(others);
-        CopySources.Clear(); foreach (var o in others) CopySources.Add(o.Client);
-        SelectedPlugin = null;
-        _all.Clear();
-        var i = 0;
-        foreach (var e in _ws.Registry.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
-        {
-            var inv = _ws.Inventory.Plugins.FirstOrDefault(p => p.Entry.Id == e.Id);
-            var item = new PluginItemViewModel(e, inv?.Present ?? false, inv?.Version, _ws.Inventory.FrameworkVersion, this) { IsDisabled = inv?.Disabled ?? false };
-            _all.Add(new PluginRowViewModel(item, PluginMatrixBuilder.Classify(self, e.Id), AlsoOnFor(e.Id), i++, this));
-        }
-        ApplyFilter();
-        foreach (var r in _all) _ = r.Item.LoadThumbnailAsync(_ws.Services.Core.Install.Http);   // swallows its own failures
-        OnPropertyChanged(nameof(TargetLine));
+        catch (Exception ex) { Status = $"offline — {ex.Message}"; }
     }
 
     private IEnumerable<AlsoOnChip> AlsoOnFor(string pluginId)

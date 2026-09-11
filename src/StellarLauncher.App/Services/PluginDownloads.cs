@@ -11,7 +11,7 @@ public static class PluginDownloads
 {
     /// <summary>Download one plugin version and install it under its canonical DLL name into one client.</summary>
     public static async Task InstallAsync(PluginInstallDeps deps, string gameMini, PluginEntry entry, PluginVersion v,
-        Action<string>? status, CancellationToken ct = default)
+        Action<string>? status)
     {
         using var buffer = new MemoryStream();
         long lastTick = -1;
@@ -23,7 +23,7 @@ public static class PluginDownloads
         await deps.Http.DownloadToAsync(new Uri(v.DllUrl), buffer, progress);
         buffer.Position = 0;
         var fileName = v.Dll ?? Path.GetFileName(new Uri(v.DllUrl).LocalPath);
-        await deps.Plugins.InstallAsync(buffer, v.Sha256, gameMini, entry.Id, fileName, v.Version, ct);
+        await deps.Plugins.InstallAsync(buffer, v.Sha256, gameMini, entry.Id, fileName, v.Version, CancellationToken.None);
         status?.Invoke($"installed v{v.Version}");
     }
 }
