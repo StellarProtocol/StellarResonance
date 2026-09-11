@@ -122,4 +122,48 @@ public class ShellViewModelTests
         Assert.Contains("preparing", row.Summary);
         Assert.False(row.ShowQuickLaunch);
     }
+
+    [Fact]
+    public void QuickLaunch_routes_the_rows_client_through_the_handler()
+    {
+        var (shell, _, _) = Build(C("c1", "Main"));
+        shell.Start();
+        var seen = "";
+        shell.QuickLaunchHandler = c => { seen = c.Id; return Task.CompletedTask; };
+        shell.QuickLaunchCommand.Execute(shell.Clients[0]);
+        Assert.Equal("c1", seen);
+
+        // With null handler, executing does not throw
+        shell.QuickLaunchHandler = null;
+        shell.QuickLaunchCommand.Execute(shell.Clients[0]);
+    }
+
+    [Fact]
+    public void Page_disposal_disposes_disposable_pages_on_navigation()
+    {
+        var disposed = false;
+        var disposableMarker = new DisposableMarker { Disposed = () => disposed = true };
+        var pages = new ShellPages(
+            Dashboard: _ => disposableMarker,
+            Workspace: (_, c) => new Marker("workspace", c.Id),
+            AddClient: _ => new Marker("add"),
+            LauncherSettings: _ => new Marker("launcher"));
+
+        var (shell, _, _) = Build(C("c1", "Main"));
+        shell.Start();
+
+        // Set current to the disposable marker
+        shell.Current = disposableMarker;
+        Assert.False(disposed);
+
+        // Navigate away and verify disposal
+        shell.Current = new Marker("add");
+        Assert.True(disposed);
+    }
+
+    private sealed class DisposableMarker : IDisposable
+    {
+        public Action? Disposed { get; set; }
+        public void Dispose() => Disposed?.Invoke();
+    }
 }

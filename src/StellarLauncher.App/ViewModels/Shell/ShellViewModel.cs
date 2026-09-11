@@ -43,6 +43,9 @@ public sealed partial class ShellViewModel : ObservableObject
     public bool HasCandidates => CandidateCount > 0;
     partial void OnCandidateCountChanged(int value) => OnPropertyChanged(nameof(HasCandidates));
 
+    /// <summary>Pages are built fresh per navigation; a page that subscribed to shell/session events releases them here.</summary>
+    partial void OnCurrentChanged(object? oldValue, object? newValue) => (oldValue as IDisposable)?.Dispose();
+
     public ShellViewModel(IConfigStore store, ClientSessions sessions, ShellPages pages)
     {
         _store = store; _sessions = sessions; _pages = pages;

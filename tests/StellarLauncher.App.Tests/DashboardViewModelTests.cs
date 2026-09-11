@@ -113,4 +113,60 @@ public class DashboardViewModelTests
         Assert.True(dash.Tiles[0].IsRunningVisible);
         Assert.Contains("1 running", dash.SummaryLine);
     }
+
+    [Fact]
+    public async Task SessionChanged_refreshes_tiles()
+    {
+        var (dash, shell, _) = Build();
+        await dash.RefreshAsync();
+        var eventCount = 0;
+        dash.Tiles[0].PropertyChanged += (_, e) => { if (e.PropertyName == nameof(ClientTileViewModel.StateLine)) eventCount++; };
+
+        var session = shell.Sessions.For(shell.Config.Clients[0]);
+        session.Begin(DateTimeOffset.UnixEpoch);
+        session.Apply(new PreparingEvent());
+
+        Assert.True(eventCount > 0, "StateLine should have changed when session transitioned");
+    }
+
+    [Fact]
+    public async Task Offline_framework_manifest_shows_in_summary()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile($"{Main}/BepInEx/plugins/Stellar.Framework/.stellar-version", new MockFileData("2.7.4"));
+        var store = new ConfigStore(fs, new Platform());
+        var cfg = new LauncherConfig();
+        cfg.Clients.Add(new ClientProfile { Id = "c1", Name = "Main", GameMiniDir = Main, Accent = "#37c8e0" });
+        store.Save(cfg);
+
+        var sessions = new ClientSessions(store, new NoOrch(), new NoScan(), new NoProc(), () => DateTimeOffset.UnixEpoch, a => a());
+        var deps = new PluginInstallDeps(new Installer(fs), new PluginInstaller(fs), new HttpClient());
+
+        // IVersionService that throws (offline scenario)
+        var failingVersions = new ThrowingVersions();
+
+        var svc = new DashboardServices(
+            new StellarLauncher.Core.Inventory.ClientInventory(fs, deps.Installer, deps.Plugins, new DoorstopToggle(fs)),
+            new RegistryCache(new Registry(), () => store.Load()), new FrameworkManifests(failingVersions),
+            new Review(), deps, new ClientCandidates(new Detector(), new Platform()));
+
+        ShellViewModel shell = null!;
+        shell = new ShellViewModel(store, sessions, new ShellPages(s => new DashboardViewModel(s, svc), (s, c) => new object(), s => new object(), s => new object()));
+        shell.Start();
+        var dash = (DashboardViewModel)shell.Current!;
+
+        await dash.RefreshAsync();
+
+        Assert.Contains("framework manifest offline", dash.SummaryLine);
+    }
+
+    private sealed class NoOrch : ILaunchOrchestrator
+    {
+        public Task<LaunchOutcome> LaunchAsync(ClientProfile c, IProgress<LaunchEvent> e, CancellationToken ct) => Task.FromResult(new LaunchOutcome(LaunchOutcomeKind.Failed, null));
+    }
+
+    private sealed class ThrowingVersions : IVersionService
+    {
+        public Task<FrameworkManifest> FetchAsync(Uri url, CancellationToken ct = default) => throw new HttpRequestException("offline");
+    }
 }

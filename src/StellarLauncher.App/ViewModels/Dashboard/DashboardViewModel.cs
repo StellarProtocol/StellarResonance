@@ -20,10 +20,11 @@ public sealed record DashboardServices(ClientInventory Inventory, RegistryCache 
     IPreLaunchReview Review, PluginInstallDeps Install, ClientCandidates Candidates);
 
 /// <summary>All clients at once: launch tiles + the plugin matrix (mockup #dashboard).</summary>
-public sealed partial class DashboardViewModel : ObservableObject
+public sealed partial class DashboardViewModel : ObservableObject, IDisposable
 {
     private readonly ShellViewModel _shell;
     private readonly DashboardServices _svc;
+    private readonly Action<LaunchSession> _onSession;
     private IReadOnlyList<ClientColumn> _columns = Array.Empty<ClientColumn>();
     private string? _latestStable;
 
@@ -40,12 +41,15 @@ public sealed partial class DashboardViewModel : ObservableObject
     public DashboardViewModel(ShellViewModel shell, DashboardServices svc)
     {
         _shell = shell; _svc = svc;
-        _shell.QuickLaunchHandler = LaunchClientAsync;
-        _shell.Sessions.SessionChanged += _ => { foreach (var t in Tiles) t.Refresh(); UpdateSummary(); };
+        // QuickLaunchHandler is wired by the composition root (Task 11), not here: a StartOn == "lastClient" boot never constructs a Dashboard, and the rail ▶ must work from the first frame.
+        _onSession = _ => { foreach (var t in Tiles) t.Refresh(); UpdateSummary(); };
+        _shell.Sessions.SessionChanged += _onSession;
         foreach (var c in _shell.Config.Clients)
             Tiles.Add(new ClientTileViewModel(c, _shell.Sessions.For(c), LaunchClientAsync, x => _shell.Sessions.Stop(x), x => _shell.ShowClientById(x.Id)));
         _ = RefreshAsync();
     }
+
+    public void Dispose() => _shell.Sessions.SessionChanged -= _onSession;
 
     [RelayCommand]
     public async Task RefreshAsync()
