@@ -56,6 +56,9 @@ public sealed class ClientSessions
             {
                 var outcome = await _orchestrator.LaunchAsync(c, new Relay(e => _marshal(() => s.Apply(e))), ct);
                 if (outcome.InteropCount is { } n && n != c.LastInteropCount) PersistInteropCount(c, n);
+                // Steam launches the game in Steam's own process tree, so the launch returns a handoff with no handle.
+                // Adopt the real game process (bounded scan) so a Steam client can be tracked + Stopped like any other.
+                if (outcome.Kind == LaunchOutcomeKind.SteamHandoff) _ = AdoptAfterHandoffAsync(s, c, ct);
             }
             catch (OperationCanceledException)
             {
@@ -96,6 +99,29 @@ public sealed class ClientSessions
         try { await proc.WaitForExitAsync(CancellationToken.None); } catch { /* process vanished */ }
         var code = proc.ExitCode;   // getter is guarded; -1 if the code can't be read
         _marshal(() => session.Apply(new ExitedEvent(code)));
+    }
+
+    private static readonly TimeSpan AdoptPoll = TimeSpan.FromSeconds(2);
+    private const int AdoptTries = 45;   // bounded (~90 s) — enough for Steam to bring the game up, never unbounded
+
+    // After a Steam handoff, watch for the real game process to appear (it runs under Steam, not our Start) and adopt
+    // it: AttachRunning flips the session to Running with a handle, so the tile shows STOP and exit is tracked.
+    private async Task AdoptAfterHandoffAsync(LaunchSession session, ClientProfile c, CancellationToken ct)
+    {
+        for (var i = 0; i < AdoptTries; i++)
+        {
+            try { await Task.Delay(AdoptPoll, ct); } catch { return; }
+            if (session.State != SessionState.SteamHandoff) return;   // user relaunched, or it already moved on
+            int? pid;
+            try { pid = ProcessReattach.Find(c, new SnapshotScanner(_scanner.Snapshot())); } catch { continue; }
+            if (pid is not { } found) continue;
+            if (_processes.Attach(found) is { } p)
+            {
+                _marshal(() => session.AttachRunning(p, _now()));
+                _ = WatchAttachedExitAsync(session, p);
+            }
+            return;
+        }
     }
 
     private void PersistInteropCount(ClientProfile c, int count)
