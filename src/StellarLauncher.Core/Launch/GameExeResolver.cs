@@ -35,35 +35,17 @@ public static class GameExeResolver
     public static string? TryGetSteamAppId(IFileSystem fs, string gameMini)
     {
         var trimmed = gameMini.TrimEnd('/', '\\');
+        var common = fs.Directory.GetParent(trimmed);
+        var steamapps = common?.Parent;
+        if (common is null || steamapps is null) return null;
+        if (!string.Equals(common.Name, "common", StringComparison.OrdinalIgnoreCase)) return null;
+        if (!string.Equals(steamapps.Name, "steamapps", StringComparison.OrdinalIgnoreCase)) return null;
 
-        // Handle both Unix and Windows-style paths
-        var winPathSeparator = trimmed.Contains('\\') ? '\\' : '/';
-        var parts = trimmed.Split(winPathSeparator);
-        if (parts.Length < 3) return null;
-
-        var leaf = parts[^1];  // Last part (game folder name)
-        var commonName = parts[^2];  // Second to last (should be "common")
-        var steamappsName = parts[^3];  // Third to last (should be "steamapps")
-
-        if (!string.Equals(commonName, "common", StringComparison.OrdinalIgnoreCase)) return null;
-        if (!string.Equals(steamappsName, "steamapps", StringComparison.OrdinalIgnoreCase)) return null;
-
-        // Search for appmanifest_*.acf files recursively from root
-        // This handles MockFileSystem on Unix which may not properly handle Windows paths
+        var leaf = fs.Path.GetFileName(trimmed);
         try
         {
-            var allFiles = fs.Directory.EnumerateFileSystemEntries("/", "*", System.IO.SearchOption.AllDirectories);
-            foreach (var file in allFiles)
-            {
-                if (file.EndsWith(".acf", StringComparison.OrdinalIgnoreCase) && file.Contains("appmanifest_"))
-                {
-                    try
-                    {
-                        if (SteamAcf.AppIdForInstallDir(fs.File.ReadAllText(file), leaf) is { } id) return id;
-                    }
-                    catch { /* skip unreadable files */ }
-                }
-            }
+            foreach (var acf in fs.Directory.EnumerateFiles(steamapps.FullName, "appmanifest_*.acf"))
+                if (SteamAcf.AppIdForInstallDir(fs.File.ReadAllText(acf), leaf) is { } id) return id;
         }
         catch { /* unreadable library — fall back to direct launch */ }
         return null;

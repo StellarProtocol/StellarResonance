@@ -130,10 +130,10 @@ public class LaunchOrchestratorTests
     public async Task Windows_steam_install_hands_off_and_owns_no_process()
     {
         var fs = new MockFileSystem();
-        const string steam = @"D:\S\steamapps\common\Blue Protocol Star Resonance";
-        fs.AddFile(@"D:\S\steamapps\appmanifest_2358720.acf", new MockFileData("\"AppState\"\n{\n\t\"appid\"\t\t\"2358720\"\n\t\"installdir\"\t\t\"Blue Protocol Star Resonance\"\n}"));
-        fs.AddDirectory(steam + @"\StarSEA_STEAM_Data");
-        fs.AddFile(steam + @"\StarSEA_STEAM.exe", new MockFileData("mz"));
+        const string steam = "/games/SteamLibrary/steamapps/common/Blue Protocol Star Resonance";
+        fs.AddFile("/games/SteamLibrary/steamapps/appmanifest_2358720.acf", new MockFileData("\"AppState\"\n{\n\t\"appid\"\t\t\"2358720\"\n\t\"installdir\"\t\t\"Blue Protocol Star Resonance\"\n}"));
+        fs.AddDirectory(steam + "/StarSEA_STEAM_Data");
+        fs.AddFile(steam + "/StarSEA_STEAM.exe", new MockFileData("mz"));
         var env = new LaunchEnvironment(fs, new Platform(true), new Detector(), () => T0, (d, ct) => Task.CompletedTask);
         var launcher = new Launcher();
         var factory = new Factory(new LaunchSessionTests.FakeProcess());
