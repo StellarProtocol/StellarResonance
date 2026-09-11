@@ -1,0 +1,84 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- cards -->
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{StaticResource PanelGlassBrush}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource LineSoftBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="15,13"/>
+    <Setter Property="BoxShadow" Value="0 8 24 0 #40000000"/>
+  </Style>
+  <Style Selector="TextBlock.h4">
+    <Setter Property="FontSize" Value="11"/><Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="Foreground" Value="#a9b0d6"/><Setter Property="Margin" Value="0,0,0,8"/>
+  </Style>
+  <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/></Style>
+  <Style Selector="TextBlock.sub"><Setter Property="Foreground" Value="{StaticResource TextSubBrush}"/><Setter Property="FontSize" Value="11.5"/></Style>
+  <Style Selector="TextBlock.mono"><Setter Property="FontFamily" Value="{StaticResource MonoFont}"/><Setter Property="FontSize" Value="10.5"/></Style>
+  <!-- tags -->
+  <Style Selector="Border.tag">
+    <Setter Property="Background" Value="#2E7c5cff"/><Setter Property="CornerRadius" Value="20"/><Setter Property="Padding" Value="9,2"/>
+  </Style>
+  <Style Selector="Border.tag > TextBlock"><Setter Property="FontSize" Value="10.5"/><Setter Property="Foreground" Value="#dcd4ff"/></Style>
+  <Style Selector="Border.tag-gold"><Setter Property="Background" Value="#29ffcf6b"/></Style>
+  <Style Selector="Border.tag-gold > TextBlock"><Setter Property="Foreground" Value="#ffcf6b"/></Style>
+  <Style Selector="Border.tag-mint"><Setter Property="Background" Value="#2954e3a0"/></Style>
+  <Style Selector="Border.tag-mint > TextBlock"><Setter Property="Foreground" Value="#9affd0"/></Style>
+  <Style Selector="Border.tag-blue"><Setter Property="Background" Value="#2937c8e0"/></Style>
+  <Style Selector="Border.tag-blue > TextBlock"><Setter Property="Foreground" Value="#9fe9f5"/></Style>
+  <Style Selector="Border.tag-red"><Setter Property="Background" Value="#29ff6b6b"/></Style>
+  <Style Selector="Border.tag-red > TextBlock"><Setter Property="Foreground" Value="#ff9a9a"/></Style>
+  <!-- buttons -->
+  <Style Selector="Button">
+    <Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="16,8"/>
+    <Setter Property="FontWeight" Value="Bold"/><Setter Property="FontSize" Value="12.5"/>
+  </Style>
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{StaticResource BrandGradient}"/><Setter Property="Foreground" Value="White"/>
+    <Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="30,12"/><Setter Property="FontSize" Value="13.5"/>
+  </Style>
+  <Style Selector="Button.primary.sm"><Setter Property="Padding" Value="18,9"/><Setter Property="FontSize" Value="12"/></Style>
+  <Style Selector="Button.ghost">
+    <Setter Property="Background" Value="#427c5cff"/><Setter Property="BorderBrush" Value="#807c5cff"/>
+    <Setter Property="BorderThickness" Value="1"/><Setter Property="Foreground" Value="#e9e3ff"/>
+  </Style>
+  <Style Selector="Button.ghost2">
+    <Setter Property="Background" Value="#0AFFFFFF"/><Setter Property="BorderBrush" Value="#1FFFFFFF"/>
+    <Setter Property="BorderThickness" Value="1"/><Setter Property="Foreground" Value="#b7bdd9"/><Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style Selector="Button.green"><Setter Property="Background" Value="{StaticResource StateRunningBrush}"/><Setter Property="Foreground" Value="#0b0e16"/></Style>
+  <Style Selector="Button.amber"><Setter Property="Background" Value="#ffb740"/><Setter Property="Foreground" Value="#0b0e16"/></Style>
+  <Style Selector="Button.running">
+    <Setter Property="Background" Value="#1F54e3a0"/><Setter Property="BorderBrush" Value="#8054e3a0"/><Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Foreground" Value="#8dffcb"/><Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="18,9"/>
+  </Style>
+  <Style Selector="Button.prep">
+    <Setter Property="Background" Value="#245b8cff"/><Setter Property="BorderBrush" Value="#805b8cff"/><Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Foreground" Value="#b9ccff"/><Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="18,9"/>
+  </Style>
+  <Style Selector="Button.tiny"><Setter Property="Padding" Value="10,5"/><Setter Property="FontSize" Value="11"/><Setter Property="CornerRadius" Value="7"/></Style>
+  <Style Selector="Button.link">
+    <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="2"/>
+    <Setter Property="Foreground" Value="#b7a8ff"/><Setter Property="FontSize" Value="11.5"/><Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style Selector="Button.link-red"><Setter Property="Foreground" Value="#ff9a9a"/></Style>
+  <!-- workspace tabs -->
+  <Style Selector="Button.tab">
+    <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0,0,0,2"/>
+    <Setter Property="BorderBrush" Value="Transparent"/><Setter Property="CornerRadius" Value="0"/>
+    <Setter Property="Padding" Value="0,0,0,9"/><Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+  </Style>
+  <Style Selector="Button.tab.active"><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  <!-- rail rows -->
+  <Style Selector="Border.railItem">
+    <Setter Property="CornerRadius" Value="8"/><Setter Property="Padding" Value="7,7,8,7"/>
+    <Setter Property="BorderThickness" Value="3,0,0,0"/><Setter Property="BorderBrush" Value="Transparent"/>
+  </Style>
+  <Style Selector="Border.railItem:pointerover"><Setter Property="Background" Value="#14FFFFFF"/></Style>
+  <!-- inputs -->
+  <Style Selector="TextBox">
+    <Setter Property="Background" Value="{StaticResource InputBrush}"/><Setter Property="BorderBrush" Value="#1FFFFFFF"/>
+    <Setter Property="CornerRadius" Value="6"/><Setter Property="FontSize" Value="12"/>
+  </Style>
+</Styles>
