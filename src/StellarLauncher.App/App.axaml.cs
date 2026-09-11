@@ -1,14 +1,24 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading.Tasks;
 using System.IO.Abstractions;
 using System.Net.Http;
+using System.Threading;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
+using StellarLauncher.App.Services;
 using StellarLauncher.App.ViewModels;
+using StellarLauncher.App.ViewModels.AddClient;
+using StellarLauncher.App.ViewModels.Dashboard;
+using StellarLauncher.App.ViewModels.Shell;
+using StellarLauncher.App.ViewModels.Workspace;
 using StellarLauncher.App.Views;
+using StellarLauncher.Core.Clients;
+using StellarLauncher.Core.Inventory;
+using StellarLauncher.Core.Launch;
 using StellarLauncher.Core.Platform;
 using StellarLauncher.Core.Services;
 
@@ -18,6 +28,7 @@ public partial class App : Application
 {
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
+    /// <summary>Composition root: every service is built once here and handed to the shell's page factories.</summary>
     public override void OnFrameworkInitializationCompleted()
     {
         var fs = new FileSystem();
@@ -25,48 +36,80 @@ public partial class App : Application
         var http = new HttpClient();
         Views.MarkdownView.Http = http;   // guide images share the app-wide client
 
-        var settings = new SettingsStore(fs, platform);
+        var store = new ConfigStore(fs, platform);
         var locator = new GameLocator(fs);
         var doorstop = new DoorstopToggle(fs);
         var installer = new Installer(fs);
-        var launcher = new GameLauncher(platform);
-        var version = new VersionService(http);
-        var launcherUpdates = new LauncherUpdateService(http);   // reuse the existing HttpClient
+        var pluginInstaller = new PluginInstaller(fs);
+        var detector = new GameDetector(fs, locator,
+            () => BuildSearchRoots(fs, platform), () => BuildRunnerCandidates(fs, platform), () => BuildUmuCandidates(fs, platform));
         var selfUpdater = new LauncherSelfUpdater(fs);
         if (Environment.ProcessPath is { } procPath)
             selfUpdater.CleanupStaleUpdate(Path.GetDirectoryName(procPath)!, Path.GetFileName(procPath));
-        var detector = new GameDetector(fs, locator,
-            () => BuildSearchRoots(fs, platform),
-            () => BuildRunnerCandidates(fs, platform),
-            () => BuildUmuCandidates(fs, platform));
 
-        var pluginRegistry = new PluginRegistryService(http);
-        var pluginInstaller = new PluginInstaller(fs);
-        var pluginsVm = new PluginsViewModel(pluginRegistry, pluginInstaller, installer, settings, http);
-
-        var dxvkNvapi = new DxvkNvapiInstaller(http);
-        var bepinex = new BepInExConfig(fs);
-        var interop = new InteropWatch(fs);
-
-        // Lazily captured — mainWindow is set before the user can ever click Launch.
+        // Lazily captured — both exist before the user can ever click anything.
         MainWindow? mainWindow = null;
-        Task<ViewModels.PreLaunchResult> ReviewPrompt(ViewModels.PreLaunchReviewViewModel vm) =>
-            Views.PreLaunchReviewDialog.ShowFor(vm, mainWindow!);
+        ShellViewModel? shell = null;
 
-        var home = new HomeViewModel(settings, locator, doorstop, installer, launcher, version, platform,
-            launcherUpdates, detector, selfUpdater, dxvkNvapi, bepinex, interop,
-            pluginRegistry, pluginInstaller, http, ReviewPrompt);
-        var setVm = new SettingsViewModel(settings, locator, detector, platform);
-        var main = new MainWindowViewModel(home, setVm, pluginsVm);
+        var deps = new PluginInstallDeps(installer, pluginInstaller, http);
+        var inventory = new ClientInventory(fs, installer, pluginInstaller, doorstop);
+        var registry = new RegistryCache(new PluginRegistryService(http), () => shell!.Config);
+        var versions = new VersionService(http);
+        var manifests = new FrameworkManifests(versions);
+        var confirm = new ConfirmDialog(() => mainWindow);
+        var review = new PreLaunchReviewService(registry, inventory, versions, deps, vm => PreLaunchReviewDialog.ShowFor(vm, mainWindow!));
+
+        var env = new LaunchEnvironment(fs, platform, detector);
+        var orchestrator = new LaunchOrchestrator(new GameLauncher(platform), new SystemProcessFactory(), new BepInExConfig(fs),
+            new DxvkNvapiInstaller(http), new InteropMonitor(new InteropWatch(fs), env), env);
+        IRunningProcessScanner scanner = platform.IsWindows ? new WindowsProcessScanner() : new ProcFsScanner(fs);
+        var sessions = new ClientSessions(store, orchestrator, scanner, new SystemProcessFactory(),
+            () => DateTimeOffset.UtcNow, a => Dispatcher.UIThread.Post(a));
+
+        var core = new DashboardServices(inventory, registry, manifests, review, deps, new ClientCandidates(detector, platform));
+        var wsServices = new WorkspaceServices(core, doorstop, fs, platform, detector, locator, confirm, UiTimer);
+        var tabs = new WorkspaceTabFactories(w => new OverviewViewModel(w), w => new ClientPluginsViewModel(w),
+            w => new ClientSettingsViewModel(w), w => new LogsViewModel(w));
+        var launcherSvc = new LauncherServices(new LauncherUpdateService(http), selfUpdater, platform, store, http, fs);
+
+        var shellVm = new ShellViewModel(store, sessions, new ShellPages(
+            Dashboard: s => new DashboardViewModel(s, core),
+            Workspace: (s, c) => new ClientWorkspaceViewModel(s, c, wsServices, tabs),
+            AddClient: s => new AddClientViewModel(s, wsServices),
+            LauncherSettings: s => new LauncherSettingsViewModel(s, launcherSvc)));
+        shell = shellVm;
+        // The rail's quick ▶ must work from the very first frame, including a `StartOn == "lastClient"` boot that never
+        // shows the Dashboard — so the ONE launch path is wired here, not inside a page constructor.
+        shellVm.QuickLaunchHandler = c => sessions.LaunchAsync(c, review, CancellationToken.None);
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            mainWindow = new MainWindow { DataContext = main };
+            mainWindow = new MainWindow { DataContext = shellVm };
             desktop.MainWindow = mainWindow;
         }
 
+        // "Keep the launcher open while clients run" off → minimise once a client reaches Running.
+        sessions.SessionChanged += s =>
+        {
+            if (!shellVm.Config.Launcher.KeepOpen && s.State == SessionState.Running && mainWindow is not null)
+                mainWindow.WindowState = WindowState.Minimized;
+        };
+
+        shellVm.Start();
+        _ = LauncherSettingsViewModel.CheckUpdatesAsync(shellVm, launcherSvc);   // guarded inside; offline = no banner
         base.OnFrameworkInitializationCompleted();
     }
+
+    // The Logs tab's poll: a DispatcherTimer that exists only while the tab is on screen (the view disposes it on detach).
+    private static IDisposable UiTimer(TimeSpan period, Action tick)
+    {
+        var t = new DispatcherTimer { Interval = period };
+        t.Tick += (_, _) => tick();
+        t.Start();
+        return new StopOnDispose(t);
+    }
+
+    private sealed class StopOnDispose(DispatcherTimer t) : IDisposable { public void Dispose() => t.Stop(); }
 
     // Candidate locations the game install (a Wine prefix on Linux, a drive on Windows) may live in.
     private static IReadOnlyList<string> BuildSearchRoots(IFileSystem fs, IPlatformInfo platform)
