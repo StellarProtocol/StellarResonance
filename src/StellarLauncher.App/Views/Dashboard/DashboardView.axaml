@@ -24,12 +24,12 @@
                     <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="{Binding AccentBrush}" FontSize="14" FontWeight="Bold" Padding="0,0,8,0"/>
                     <Border Classes="tag" Classes.tag-gold="{Binding IsTesting}" Margin="0,2,6,0"><TextBlock Text="{Binding ChannelTag}"/></Border>
                     <Border Classes="tag" Margin="0,2,6,0"><TextBlock Text="{Binding ModeTag}"/></Border>
-                    <Border Classes="tag" Margin="0,2,0,0"><TextBlock Text="{Binding RunnerTag}"/></Border>
+                    <Border Classes="tag" Margin="0,2,6,0"><TextBlock Text="{Binding RunnerTag}"/></Border>
+                    <Border Classes="tag tag-mint" Margin="0,2,0,0" IsVisible="{Binding IsRunningVisible}"><TextBlock Text="● RUNNING"/></Border>
+                    <Border Classes="tag tag-blue" Margin="0,2,0,0" IsVisible="{Binding IsPrepVisible}"><TextBlock Text="● PREPARING"/></Border>
                   </WrapPanel>
                   <StackPanel Grid.Row="0" Grid.Column="1" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button Classes="primary sm" Content="▶  LAUNCH" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}"/>
-                    <Button Classes="running" Content="● RUNNING" IsEnabled="False" IsVisible="{Binding IsRunningVisible}"/>
-                    <Button Classes="prep" Content="PREPARING…" IsEnabled="False" IsVisible="{Binding IsPrepVisible}"/>
                     <Button Classes="stop" Content="◼  Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right"/>
                     <Button Classes="link" Content="Install framework" Command="{Binding OpenCommand}" IsVisible="{Binding ShowInstallFramework}" HorizontalAlignment="Right"/>
                   </StackPanel>

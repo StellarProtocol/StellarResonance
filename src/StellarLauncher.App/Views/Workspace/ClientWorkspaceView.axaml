@@ -10,7 +10,9 @@
             <TextBlock Text="{Binding Name}" Foreground="White" FontSize="22" FontWeight="ExtraBold" Margin="0,0,10,0"/>
             <Border Classes="tag" Classes.tag-gold="{Binding IsTesting}" Margin="0,6,6,0"><TextBlock Text="{Binding ChannelTag}"/></Border>
             <Border Classes="tag" Margin="0,6,6,0"><TextBlock Text="{Binding ModeTag}"/></Border>
-            <Border Classes="tag" Margin="0,6,0,0"><TextBlock Text="{Binding RuntimeTag}"/></Border>
+            <Border Classes="tag" Margin="0,6,6,0"><TextBlock Text="{Binding RuntimeTag}"/></Border>
+            <Border Classes="tag tag-mint" Margin="0,6,0,0" IsVisible="{Binding IsRunningVisible}"><TextBlock Text="● RUNNING"/></Border>
+            <Border Classes="tag tag-blue" Margin="0,6,0,0" IsVisible="{Binding IsPrepVisible}"><TextBlock Text="● PREPARING"/></Border>
           </WrapPanel>
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="{Binding Path}" Classes="sub mono" Foreground="#8f97c2"/>
@@ -23,11 +25,9 @@
           <ProgressBar IsVisible="{Binding ShowProgress}" Value="{Binding Progress}" IsIndeterminate="{Binding ProgressIndeterminate}"
                        Minimum="0" Maximum="100" Height="4" Width="420" HorizontalAlignment="Left" Foreground="{Binding AccentBrush}" Background="#1c2740"/>
         </StackPanel>
-        <StackPanel Grid.Column="1" Spacing="8" HorizontalAlignment="Right">
+        <StackPanel Grid.Column="1" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
           <Button Classes="primary" Content="▶  LAUNCH" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}"/>
-          <Button Classes="running" Content="● RUNNING" IsEnabled="False" IsVisible="{Binding IsRunningVisible}" Padding="28,12" FontSize="13.5"/>
-          <Button Classes="prep" Content="PREPARING…" IsEnabled="False" IsVisible="{Binding IsPrepVisible}" Padding="28,12" FontSize="13.5"/>
-          <Button Classes="stop" Content="◼  Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right"/>
+          <Button Classes="stop" Content="◼  Stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" Padding="28,12" FontSize="13.5" HorizontalAlignment="Right"/>
         </StackPanel>
       </Grid>
     </Border>

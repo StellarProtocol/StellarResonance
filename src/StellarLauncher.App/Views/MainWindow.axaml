@@ -55,9 +55,13 @@
                           <TextBlock Text="{Binding Name}" Foreground="{Binding NameBrush}" FontWeight="SemiBold" FontSize="12.5"/>
                           <TextBlock Text="{Binding Summary}" Foreground="#697297" FontSize="10.5" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
-                        <Button Grid.Column="2" Classes="quickLaunch" Content="▶" IsVisible="{Binding ShowQuickLaunch}"
+                        <Button Grid.Column="2" Classes="quickLaunch" IsVisible="{Binding ShowQuickLaunch}"
                                 ToolTip.Tip="Launch this client"
-                                Command="{Binding $parent[Window].((shell:ShellViewModel)DataContext).QuickLaunchCommand}" CommandParameter="{Binding}"/>
+                                Command="{Binding $parent[Window].((shell:ShellViewModel)DataContext).QuickLaunchCommand}" CommandParameter="{Binding}">
+                          <!-- vector triangle centres deterministically (a ▶ glyph sits low-left); +1px x = optical centre -->
+                          <Path Data="M0,0 L8,5 L0,10 Z" Fill="White" Stretch="None" Margin="1,0,0,0"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Button>
                       </Grid>
                     </Border>
                   </Button>

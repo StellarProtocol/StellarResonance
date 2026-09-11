@@ -51,14 +51,6 @@
   </Style>
   <Style Selector="Button.green"><Setter Property="Background" Value="{StaticResource StateRunningBrush}"/><Setter Property="Foreground" Value="#0b0e16"/></Style>
   <Style Selector="Button.amber"><Setter Property="Background" Value="#ffb740"/><Setter Property="Foreground" Value="#0b0e16"/></Style>
-  <Style Selector="Button.running">
-    <Setter Property="Background" Value="#1F54e3a0"/><Setter Property="BorderBrush" Value="#8054e3a0"/><Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Foreground" Value="#8dffcb"/><Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="18,9"/>
-  </Style>
-  <Style Selector="Button.prep">
-    <Setter Property="Background" Value="#245b8cff"/><Setter Property="BorderBrush" Value="#805b8cff"/><Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Foreground" Value="#b9ccff"/><Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="18,9"/>
-  </Style>
   <Style Selector="Button.tiny"><Setter Property="Padding" Value="10,5"/><Setter Property="FontSize" Value="11"/><Setter Property="CornerRadius" Value="7"/></Style>
   <!-- Plugin-matrix cells: a non-clickable ("up to date") cell is a disabled Button, and Fluent's disabled state
        washes its bound mint text + fill out to grey (owner 2026-09-11: "hard to read"). Keep the cell's own colours
@@ -122,14 +114,13 @@
     <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="CornerRadius" Value="8"/>
   </Style>
   <Style Selector="Button.railBtn:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
-  <!-- rail quick-launch: a clean circular ▶ (the glyph nudged right to sit optically centred) -->
+  <!-- rail quick-launch: a clean circular button holding a vector ▶ (see MainWindow.axaml) -->
   <Style Selector="Button.quickLaunch">
     <Setter Property="Width" Value="24"/><Setter Property="Height" Value="24"/><Setter Property="CornerRadius" Value="12"/>
-    <Setter Property="Padding" Value="0"/><Setter Property="FontSize" Value="10"/>
+    <Setter Property="Padding" Value="0"/>
     <Setter Property="Background" Value="{StaticResource BrandGradient}"/><Setter Property="Foreground" Value="White"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
     <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/>
   </Style>
-  <Style Selector="Button.quickLaunch /template/ ContentPresenter"><Setter Property="Margin" Value="1,0,0,0"/></Style>
   <Style Selector="Button.quickLaunch:pointerover"><Setter Property="Opacity" Value="0.9"/></Style>
 </Styles>
