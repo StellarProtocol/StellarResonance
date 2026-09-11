@@ -4,8 +4,15 @@ name: release
 # Runs on hosted runners — the launcher has NO game-interop dependency, so unlike the
 # framework's release workflow this is fully automatable.
 #
-# Fixed object names (no version in the filename) mean only the CURRENT version is ever
-# kept in the bucket — each release overwrites the previous binaries + launcher.json.
+# Zip object names are VERSION-STAMPED (StellarLauncher-<version>-<os>-x64.zip). The launcher's
+# self-updater downloads whatever URL the manifest names, so a new version means a brand-new CDN
+# path that no Cloudflare cache tier has ever seen — it is fetched clean from R2 and its bytes
+# always match the manifest checksum. Fixed names were RETIRED 2026-09-11: overwriting one key
+# left several STALE copies cached across Cloudflare tiers with no purge credential available, so
+# the edge served bytes that no longer matched the fresh manifest and self-update failed with a
+# sha256 mismatch ("unable to upgrade"). The manifest is uploaded no-cache so it is always fresh.
+# Old stamped zips accumulate in the bucket (add-only, ~40 MB each); the manifest only ever names
+# the current one.
 #
 # The resolved version is the SINGLE source of truth: it's stamped into the binary via
 # -p:Version (HomeViewModel.LauncherVersion reads it back) AND written into launcher.json,
@@ -124,16 +131,16 @@ jobs:
             "version": "${{ steps.ver.outputs.version }}",
             "date": "$(date -u +%Y-%m-%d)",
             "channel": "${{ steps.ver.outputs.channel }}",
-            "windowsUrl": "https://cdn.revette.io/$SUBDIR/StellarLauncher-win-x64.zip",
+            "windowsUrl": "https://cdn.revette.io/$SUBDIR/StellarLauncher-${{ steps.ver.outputs.version }}-win-x64.zip",
             "windowsSha256": "$WIN_SHA",
-            "linuxUrl": "https://cdn.revette.io/$SUBDIR/StellarLauncher-linux-x64.zip",
+            "linuxUrl": "https://cdn.revette.io/$SUBDIR/StellarLauncher-${{ steps.ver.outputs.version }}-linux-x64.zip",
             "linuxSha256": "$LINUX_SHA",
             "notes": "Stellar Launcher ${{ steps.ver.outputs.version }} (${{ steps.ver.outputs.channel }})"
           }
           EOF
           cat launcher.json
 
-      - name: Upload to MinIO (stellar bucket — fixed names, current-only)
+      - name: Upload to R2 (cdn bucket — version-stamped zips, no-cache manifest)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_KEY }}
@@ -141,14 +148,19 @@ jobs:
           AWS_REQUEST_CHECKSUM_CALCULATION: when_required
           AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
         run: |
+          VER="${{ steps.ver.outputs.version }}"
+          # Version-stamped zip keys: a brand-new path can never be served from a stale cache tier.
           aws s3 cp StellarLauncher-win-x64.zip \
-            "s3://cdn/$SUBDIR/StellarLauncher-win-x64.zip" \
+            "s3://cdn/$SUBDIR/StellarLauncher-$VER-win-x64.zip" \
             --endpoint-url https://757f61fd2bda67f9a3bc7c3b9b8d62e1.r2.cloudflarestorage.com
           aws s3 cp StellarLauncher-linux-x64.zip \
-            "s3://cdn/$SUBDIR/StellarLauncher-linux-x64.zip" \
+            "s3://cdn/$SUBDIR/StellarLauncher-$VER-linux-x64.zip" \
             --endpoint-url https://757f61fd2bda67f9a3bc7c3b9b8d62e1.r2.cloudflarestorage.com
+          # Manifest is overwritten every release, so it MUST stay uncacheable or the launcher
+          # would keep seeing an old version/URL. no-cache forces the edge to revalidate every fetch.
           aws s3 cp launcher.json \
             "s3://cdn/$MANIFEST" \
+            --cache-control "no-cache, max-age=0" \
             --endpoint-url https://757f61fd2bda67f9a3bc7c3b9b8d62e1.r2.cloudflarestorage.com
 
       # ---- GitHub Release: new-user download page (STABLE channel only), CURRENT VERSION ONLY ----
