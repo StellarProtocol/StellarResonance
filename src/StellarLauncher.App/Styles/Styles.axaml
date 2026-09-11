@@ -43,6 +43,10 @@
     <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/>
   </Style>
   <Style Selector="Button.primary.sm"><Setter Property="Padding" Value="18,9"/><Setter Property="FontSize" Value="12"/><Setter Property="MinWidth" Value="120"/></Style>
+  <!-- keep the gradient on hover/press (Fluent's default would grey the ContentPresenter) -->
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{StaticResource BrandGradient}"/></Style>
+  <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{StaticResource BrandGradient}"/></Style>
+  <Style Selector="Button.primary:pointerover"><Setter Property="Opacity" Value="0.92"/></Style>
   <Style Selector="Button.ghost">
     <Setter Property="Background" Value="#427c5cff"/><Setter Property="BorderBrush" Value="#807c5cff"/>
     <Setter Property="BorderThickness" Value="1"/><Setter Property="Foreground" Value="#e9e3ff"/>
@@ -82,6 +86,7 @@
     <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/>
   </Style>
   <Style Selector="Button.stop:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{StaticResource DangerGradient}"/></Style>
+  <Style Selector="Button.stop:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{StaticResource DangerGradient}"/></Style>
   <Style Selector="Button.stop:pointerover"><Setter Property="Opacity" Value="0.92"/></Style>
   <!-- workspace tabs -->
   <Style Selector="Button.tab">
