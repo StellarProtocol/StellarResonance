@@ -86,6 +86,19 @@ public partial class App : Application
         {
             mainWindow = new MainWindow { DataContext = shellVm };
             desktop.MainWindow = mainWindow;
+            // Regaining focus (after publishing a release from another window, or alt-tabbing back from the
+            // game) should always show current state — force a refetch rather than wait out the cache TTL.
+            // The TTL still shields rapid in-app navigation (tab/client switches) from hammering the CDN.
+            mainWindow.Activated += (_, _) =>
+            {
+                manifests.Invalidate();
+                registry.Invalidate();
+                switch (shellVm.Current)
+                {
+                    case DashboardViewModel d: _ = d.RefreshAsync(); break;
+                    case ClientWorkspaceViewModel w: _ = w.RefreshAsync(); break;
+                }
+            };
         }
 
         // "Keep the launcher open while clients run" off → minimise once a client reaches Running.

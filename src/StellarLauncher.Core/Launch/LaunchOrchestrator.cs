@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -56,10 +57,10 @@ public sealed class LaunchOrchestrator : ILaunchOrchestrator
             events.Report(new StatusEvent(status));
             var proc = _processes.Start(psi);
 
-            // parallel is Linux-only (RunPreScriptAsync returns null on Windows), so it never coincides with a Steam
-            // handoff; a launch that never really started still closes the alongside-script.
-            if (steam is not null) { events.Report(new SteamHandoffEvent()); events.Report(new StatusEvent("launching via Steam…")); return new LaunchOutcome(LaunchOutcomeKind.SteamHandoff, null); }
-            if (proc is null) { events.Report(new FailedEvent("launch failed: process did not start")); return new LaunchOutcome(LaunchOutcomeKind.Failed, null); }
+            // An alongside pre-launch script can't be tied to a Steam-handoff game (tracking stops here) or to a
+            // launch that never started — close it now so it can't leak (it's no longer Linux-only).
+            if (steam is not null) { parallel?.Kill(); parallel?.Dispose(); parallel = null; events.Report(new SteamHandoffEvent()); events.Report(new StatusEvent("launching via Steam…")); return new LaunchOutcome(LaunchOutcomeKind.SteamHandoff, null); }
+            if (proc is null) { parallel?.Kill(); parallel?.Dispose(); parallel = null; events.Report(new FailedEvent("launch failed: process did not start")); return new LaunchOutcome(LaunchOutcomeKind.Failed, null); }
 
             events.Report(new StartedEvent(proc));
             _ = ReportExitAsync(c, proc, psi, parallel, events);
@@ -84,19 +85,22 @@ public sealed class LaunchOrchestrator : ILaunchOrchestrator
         catch (Exception ex) { events.Report(new StatusEvent($"DXVK-NVAPI skipped: {ex.Message}")); }
     }
 
-    // Linux only — never touch psi.Environment on the Windows shell-execute path.
-    // Returns the status to show and, when the script runs ALONGSIDE the game, a handle to kill it on exit.
+    // Runs the user's pre-launch script (Linux AND Windows). The script env comes from ScriptEnv, NOT
+    // psi.Environment — on Windows the game psi uses UseShellExecute and even reading its Environment poisons
+    // the game start. Returns the status to show and, when the script runs ALONGSIDE the game, a handle to kill
+    // it on exit.
     private async Task<(string status, IScriptHandle? parallel)> RunPreScriptAsync(ClientProfile c, ProcessStartInfo psi, IProgress<LaunchEvent> events, CancellationToken ct)
     {
         var script = c.Advanced.PreLaunch;
-        if (_env.IsWindows || string.IsNullOrWhiteSpace(script) || !_env.Fs.File.Exists(script)) return ("launching…", null);
+        if (string.IsNullOrWhiteSpace(script) || !_env.Fs.File.Exists(script)) return ("launching…", null);
+        var env = ScriptEnv(c, psi);
         if (!c.Advanced.PreLaunchWait)
         {
             events.Report(new StatusEvent("starting pre-launch script alongside the game…"));
-            return ("launching…", _env.Scripts.Start(script, psi.Environment));   // closed in ReportExitAsync when the game ends
+            return ("launching…", _env.Scripts.Start(script, env));   // closed in ReportExitAsync when the game ends
         }
         events.Report(new StatusEvent("running pre-launch script…"));
-        var code = await _env.Scripts.RunAsync(script, psi.Environment, ScriptTimeout, ct);
+        var code = await _env.Scripts.RunAsync(script, env, ScriptTimeout, ct);
         return (code switch
         {
             null => "pre-launch script timed out — launching anyway",
@@ -104,6 +108,17 @@ public sealed class LaunchOrchestrator : ILaunchOrchestrator
             _ => $"pre-launch script exited {code} — launching anyway",
         }, null);
     }
+
+    // The environment handed to a user pre/post script. On Linux it is the game's fully-computed launch env
+    // (WINEPREFIX, dll overrides, …) — safe to read on the UseShellExecute=false psi. On Windows the game psi
+    // uses UseShellExecute, so even READING psi.Environment initializes its backing dict and makes the game's
+    // Process.Start throw; the script instead gets the user's own advanced env vars (it already inherits the
+    // launcher's process environment).
+    private IEnumerable<KeyValuePair<string, string?>> ScriptEnv(ClientProfile c, ProcessStartInfo psi)
+        => _env.IsWindows
+            ? c.Advanced.Env.Where(e => !string.IsNullOrEmpty(e.Name))
+                            .Select(e => new KeyValuePair<string, string?>(e.Name, (string?)e.Value))
+            : psi.Environment;
 
     private async Task<LaunchOutcome> FollowStartupAsync(ClientProfile c, IGameProcess proc, IProgress<LaunchEvent> events, CancellationToken ct)
     {
@@ -133,8 +148,8 @@ public sealed class LaunchOrchestrator : ILaunchOrchestrator
             exitCode = proc.ExitCode;
             if (parallel is not null) { try { parallel.Kill(); parallel.Dispose(); } catch { /* best effort */ } }   // "closed when the game closed"
             var post = c.Advanced.PostExit;
-            if (!_env.IsWindows && !string.IsNullOrWhiteSpace(post) && _env.Fs.File.Exists(post))
-                await _env.Scripts.RunAsync(post, psi.Environment, ScriptTimeout);
+            if (!string.IsNullOrWhiteSpace(post) && _env.Fs.File.Exists(post))
+                await _env.Scripts.RunAsync(post, ScriptEnv(c, psi), ScriptTimeout);
         }
         catch (Exception ex) { events.Report(new StatusEvent($"post-exit script failed: {ex.Message}")); }
         // Always report the exit so the session leaves Running even if the post-exit script (or kill) threw.

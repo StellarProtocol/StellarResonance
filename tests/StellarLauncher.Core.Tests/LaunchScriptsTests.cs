@@ -8,6 +8,50 @@ public class LaunchScriptsTests
 {
     private static readonly KeyValuePair<string, string?>[] NoEnv = Array.Empty<KeyValuePair<string, string?>>();
 
+    // ---- ScriptCommand.For: the per-OS interpreter choice (pure — runs on any CI host) ----
+
+    [Fact]
+    public void NonWindows_always_runs_via_bin_sh_regardless_of_extension()
+    {
+        foreach (var p in new[] { "/tmp/hook", "/tmp/hook.sh", "/tmp/hook.ps1", "/tmp/hook.bat" })
+        {
+            var cmd = ScriptCommand.For(p, isWindows: false);
+            Assert.Equal("/bin/sh", cmd.FileName);
+            Assert.Equal(new[] { p }, cmd.Args);
+        }
+    }
+
+    [Fact]
+    public void Windows_ps1_runs_via_powershell_with_bypass_policy()
+    {
+        var cmd = ScriptCommand.For(@"C:\hooks\pre.ps1", isWindows: true);
+        Assert.Equal("powershell.exe", cmd.FileName);
+        Assert.Equal(new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", @"C:\hooks\pre.ps1" }, cmd.Args);
+    }
+
+    [Theory]
+    [InlineData(@"C:\hooks\pre.bat")]
+    [InlineData(@"C:\hooks\pre.cmd")]
+    [InlineData(@"C:\hooks\pre.CMD")]   // case-insensitive
+    [InlineData(@"C:\hooks\pre")]       // no/unknown extension → cmd fallback
+    [InlineData(@"C:\hooks\pre.sh")]    // a .sh dropped on Windows → cmd fallback (best effort)
+    public void Windows_bat_cmd_and_unknown_run_via_cmd(string path)
+    {
+        var cmd = ScriptCommand.For(path, isWindows: true);
+        Assert.Equal("cmd.exe", cmd.FileName);
+        Assert.Equal(new[] { "/c", path }, cmd.Args);
+    }
+
+    [Theory]
+    [InlineData(@"C:\hooks\tool.exe")]
+    [InlineData(@"C:\hooks\tool.com")]
+    public void Windows_executables_run_directly(string path)
+    {
+        var cmd = ScriptCommand.For(path, isWindows: true);
+        Assert.Equal(path, cmd.FileName);
+        Assert.Empty(cmd.Args);
+    }
+
     [Fact]
     public async Task Returns_the_scripts_exit_code()
     {
