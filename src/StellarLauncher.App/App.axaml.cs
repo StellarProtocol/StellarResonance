@@ -86,11 +86,13 @@ public partial class App : Application
         {
             mainWindow = new MainWindow { DataContext = shellVm };
             desktop.MainWindow = mainWindow;
-            // Regaining focus (e.g. after publishing a release from another window) refreshes the current page,
-            // so the manifest/registry caches re-fetch once their TTL has elapsed. Without this, a session that
-            // never returns to the Dashboard keeps showing the versions cached at first fetch.
+            // Regaining focus (after publishing a release from another window, or alt-tabbing back from the
+            // game) should always show current state — force a refetch rather than wait out the cache TTL.
+            // The TTL still shields rapid in-app navigation (tab/client switches) from hammering the CDN.
             mainWindow.Activated += (_, _) =>
             {
+                manifests.Invalidate();
+                registry.Invalidate();
                 switch (shellVm.Current)
                 {
                     case DashboardViewModel d: _ = d.RefreshAsync(); break;
