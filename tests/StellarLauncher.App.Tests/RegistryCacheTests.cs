@@ -35,4 +35,21 @@ public class RegistryCacheTests
         await cache.ForChannelAsync("stable", CancellationToken.None);
         Assert.Equal(3, fake.Calls.Count);
     }
+
+    [Fact]
+    public async Task Refetches_after_the_ttl_elapses()
+    {
+        var fake = new Fake();
+        var now = new DateTimeOffset(2026, 9, 25, 0, 0, 0, TimeSpan.Zero);
+        var cache = new RegistryCache(fake, () => new LauncherConfig(), () => now, TimeSpan.FromSeconds(60));
+
+        await cache.ForChannelAsync("stable", CancellationToken.None);   // fetch #1
+        now = now.AddSeconds(30);
+        await cache.ForChannelAsync("stable", CancellationToken.None);   // within TTL → cached
+        Assert.Single(fake.Calls);
+
+        now = now.AddSeconds(31);                                        // now 61s since fetch → expired
+        await cache.ForChannelAsync("stable", CancellationToken.None);   // fetch #2
+        Assert.Equal(2, fake.Calls.Count);
+    }
 }

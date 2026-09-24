@@ -170,8 +170,9 @@ public class LaunchOrchestratorTests
     {
         public int RunCalls, StartCalls;
         public readonly FakeHandle Handle = new();
-        public Task<int?> RunAsync(string p, IEnumerable<KeyValuePair<string, string?>> env, TimeSpan t, CancellationToken ct = default) { RunCalls++; return Task.FromResult<int?>(0); }
-        public IScriptHandle? Start(string p, IEnumerable<KeyValuePair<string, string?>> env) { StartCalls++; return Handle; }
+        public IReadOnlyList<KeyValuePair<string, string?>> LastEnv = Array.Empty<KeyValuePair<string, string?>>();
+        public Task<int?> RunAsync(string p, IEnumerable<KeyValuePair<string, string?>> env, TimeSpan t, CancellationToken ct = default) { RunCalls++; LastEnv = env.ToList(); return Task.FromResult<int?>(0); }
+        public IScriptHandle? Start(string p, IEnumerable<KeyValuePair<string, string?>> env) { StartCalls++; LastEnv = env.ToList(); return Handle; }
     }
     private sealed class FakeHandle : IScriptHandle
     {
@@ -181,7 +182,7 @@ public class LaunchOrchestratorTests
         public void Dispose() => Disposed = true;
     }
 
-    private static (LaunchOrchestrator sut, FakeScripts scripts, LaunchSessionTests.FakeProcess proc) BuildWithScripts()
+    private static (LaunchOrchestrator sut, FakeScripts scripts, LaunchSessionTests.FakeProcess proc) BuildWithScripts(bool windows = false)
     {
         var fs = new MockFileSystem();
         fs.AddFile("/opt/game/P/drive_c/Star/StarLauncher/StarLauncher.exe", new MockFileData("mz"));
@@ -189,7 +190,7 @@ public class LaunchOrchestratorTests
         fs.AddFile("/opt/game/P/pre.sh", new MockFileData("echo hi\n"));
         var scripts = new FakeScripts();
         var clock = T0;
-        var env = new LaunchEnvironment(fs, new Platform(false), new Detector(),
+        var env = new LaunchEnvironment(fs, new Platform(windows), new Detector(),
             now: () => clock, delay: (d, ct) => { clock += d; return Task.CompletedTask; }) { MangoHudUserConfig = () => false, Scripts = scripts };
         var proc = new LaunchSessionTests.FakeProcess();
         var watch = new Watch(false, new Queue<InteropSnapshot>(new[] { new InteropSnapshot(0, null) }));
@@ -211,6 +212,28 @@ public class LaunchOrchestratorTests
         await sut.LaunchAsync(LinuxWithPre(wait: true), new Sink(), CancellationToken.None);
         Assert.Equal(1, scripts.RunCalls);
         Assert.Equal(0, scripts.StartCalls);
+    }
+
+    [Fact]
+    public async Task Pre_launch_script_runs_on_Windows_with_the_users_advanced_env()
+    {
+        var (sut, scripts, _) = BuildWithScripts(windows: true);
+        var client = new ClientProfile
+        {
+            Id = "w1", GameMiniDir = G,
+            Advanced = new AdvancedOptions
+            {
+                PreLaunch = "/opt/game/P/pre.sh", PreLaunchWait = true,
+                Env = { new EnvVar { Name = "FOO", Value = "bar" } },
+            },
+        };
+
+        await sut.LaunchAsync(client, new Sink(), CancellationToken.None);
+
+        Assert.Equal(1, scripts.RunCalls);   // no longer skipped on Windows
+        // The env is the user's advanced vars — NOT the game psi's Environment (reading that poisons the
+        // shell-execute game start on Windows).
+        Assert.Contains(new KeyValuePair<string, string?>("FOO", "bar"), scripts.LastEnv);
     }
 
     private sealed class ThrowingFactory : IProcessFactory

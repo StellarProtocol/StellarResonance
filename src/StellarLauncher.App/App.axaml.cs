@@ -86,6 +86,17 @@ public partial class App : Application
         {
             mainWindow = new MainWindow { DataContext = shellVm };
             desktop.MainWindow = mainWindow;
+            // Regaining focus (e.g. after publishing a release from another window) refreshes the current page,
+            // so the manifest/registry caches re-fetch once their TTL has elapsed. Without this, a session that
+            // never returns to the Dashboard keeps showing the versions cached at first fetch.
+            mainWindow.Activated += (_, _) =>
+            {
+                switch (shellVm.Current)
+                {
+                    case DashboardViewModel d: _ = d.RefreshAsync(); break;
+                    case ClientWorkspaceViewModel w: _ = w.RefreshAsync(); break;
+                }
+            };
         }
 
         // "Keep the launcher open while clients run" off → minimise once a client reaches Running.
