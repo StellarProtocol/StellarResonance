@@ -102,4 +102,23 @@ public sealed class DependencyParkingTests
         Assert.False(fs.File.Exists("/game_mini/dxgi.dll"));
         Assert.True(fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll"));
     }
+
+    // Important 1: a ledger file that parses but has the wrong shape (e.g. a missing "Entries" field,
+    // which System.Text.Json fills with null regardless of the record's non-nullable annotation) must not
+    // crash Park/Unpark/ReadAll with a NullReferenceException — it's just as unreadable as a parse failure.
+    [Fact]
+    public void A_shape_invalid_ledger_file_does_not_block_park_unpark_or_readall()
+    {
+        var (fs, s) = Setup();
+        fs.AddFile("/game_mini/stellar/deps/bad.json", new MockFileData("{\"PluginId\":\"x\"}"));
+
+        var all = new DependencyLedgerStore(fs).ReadAll(G); // must not throw
+        Assert.Single(all); // only "p" — "bad" is unreadable
+
+        s.ParkModdedOnly(G); // must not throw
+        Assert.True(fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll"));
+
+        s.UnparkModdedOnly(G); // must not throw
+        Assert.True(fs.File.Exists("/game_mini/dxgi.dll"));
+    }
 }

@@ -17,15 +17,21 @@ public sealed class FaultInjectingFileSystem : IFileSystem
     private readonly IFileSystem _inner;
 
     public FaultInjectingFileSystem(IFileSystem inner, string failPath, params string[] methodNames)
-        : this(inner, failPath, once: true, methodNames) { }
+        : this(inner, failPath, once: true, afterCalls: 0, methodNames) { }
 
     public FaultInjectingFileSystem(IFileSystem inner, string failPath, bool once, params string[] methodNames)
+        : this(inner, failPath, once, afterCalls: 0, methodNames) { }
+
+    /// <summary><paramref name="afterCalls"/> matching calls are let through untouched before the fault
+    /// starts firing — e.g. "let this path's own write succeed, but fail its LATER rollback-restore".</summary>
+    public FaultInjectingFileSystem(IFileSystem inner, string failPath, bool once, int afterCalls, params string[] methodNames)
     {
         _inner = inner;
         var proxy = (FaultProxy)DispatchProxy.Create<IFile, FaultProxy>()!;
         proxy.Inner = inner.File;
         proxy.FailPath = failPath;
         proxy.Once = once;
+        proxy.AfterCalls = afterCalls;
         proxy.MethodNames = methodNames.Length > 0 ? methodNames : new[] { "Move", "WriteAllBytes" };
         File = (IFile)proxy;
     }
@@ -45,9 +51,11 @@ public sealed class FaultInjectingFileSystem : IFileSystem
         public IFile Inner = null!;
         public string FailPath = "";
         public bool Once = true;
+        public int AfterCalls;
         public string[] MethodNames = Array.Empty<string>();
         private bool _fired;
         private int _count;
+        private int _matchCount;
 
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
@@ -56,9 +64,13 @@ public sealed class FaultInjectingFileSystem : IFileSystem
                 var path = targetMethod.Name == "Move" && args.Length >= 2 ? args[1] as string : args[0] as string;
                 if (path == FailPath)
                 {
-                    _fired = true;
-                    _count++;
-                    throw new IOException($"injected failure #{_count}: {targetMethod.Name} {FailPath}");
+                    if (_matchCount < AfterCalls) { _matchCount++; }
+                    else
+                    {
+                        _fired = true;
+                        _count++;
+                        throw new IOException($"injected failure #{_count}: {targetMethod.Name} {FailPath}");
+                    }
                 }
             }
             return targetMethod!.Invoke(Inner, args);

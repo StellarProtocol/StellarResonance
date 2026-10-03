@@ -76,4 +76,52 @@ public sealed class DependencyLedgerStoreTests
 
         Assert.Empty(store.ReadAll("/game_mini"));
     }
+
+    // Important 1: a ledger that PARSES fine but has the wrong shape (System.Text.Json fills a missing
+    // field with null regardless of the record's non-nullable annotation) must still read as unreadable,
+    // not crash some later consumer with a NullReferenceException.
+    [Fact]
+    public void ReadAll_skips_a_ledger_that_parses_but_has_the_wrong_shape()
+    {
+        var fs = new MockFileSystem(); fs.AddDirectory("/game_mini");
+        var store = new DependencyLedgerStore(fs);
+        store.Write("/game_mini", new DependencyLedger("good", new[] { new LedgerEntry("fx", "1", new LedgerFile[0]) }));
+        fs.AddFile("/game_mini/stellar/deps/bad.json", new MockFileData("{\"PluginId\":\"x\"}")); // Entries deserializes to null
+
+        var all = store.ReadAll("/game_mini"); // must not throw
+
+        Assert.Single(all);
+        Assert.Equal("good", all[0].PluginId);
+        Assert.Empty(store.Read("/game_mini", "bad").Entries);
+    }
+
+    // Important 2(a)/(b): a corrupt ledger is quarantined (renamed, never deleted) rather than thrown
+    // away, and the next successful Write to that plugin id must not destroy that evidence.
+    [Fact]
+    public void A_corrupt_ledger_is_quarantined_and_survives_the_next_write()
+    {
+        var fs = new MockFileSystem(); fs.AddDirectory("/game_mini");
+        var store = new DependencyLedgerStore(fs);
+        fs.AddFile("/game_mini/stellar/deps/p.json", new MockFileData("{ not valid json"));
+
+        Assert.Empty(store.Read("/game_mini", "p").Entries); // read as empty, not thrown
+        Assert.True(fs.File.Exists("/game_mini/stellar/deps/p.json.corrupt"));
+        Assert.False(fs.File.Exists("/game_mini/stellar/deps/p.json"));
+
+        store.Write("/game_mini", new DependencyLedger("p", new[] { new LedgerEntry("fx", "1", new LedgerFile[0]) }));
+
+        Assert.True(fs.File.Exists("/game_mini/stellar/deps/p.json")); // the fresh write landed
+        Assert.True(fs.File.Exists("/game_mini/stellar/deps/p.json.corrupt")); // evidence still there
+    }
+
+    // Important 2(a): the write is atomic — no .tmp artifact survives a normal write.
+    [Fact]
+    public void Write_leaves_no_temp_file_behind()
+    {
+        var fs = new MockFileSystem(); fs.AddDirectory("/game_mini");
+        new DependencyLedgerStore(fs).Write("/game_mini", new DependencyLedger("p", new[] { new LedgerEntry("fx", "1", new LedgerFile[0]) }));
+
+        Assert.False(fs.File.Exists("/game_mini/stellar/deps/p.json.tmp"));
+        Assert.True(fs.File.Exists("/game_mini/stellar/deps/p.json"));
+    }
 }

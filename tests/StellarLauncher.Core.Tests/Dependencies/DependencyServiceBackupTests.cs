@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Abstractions.TestingHelpers;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
@@ -62,10 +63,12 @@ public sealed partial class DependencyServiceTests
         Assert.False(_fs.File.Exists(bPath + ".stellar-bak"));
         Assert.False(_fs.File.Exists(UpdPath + "c.fx.stellar-bak"));
         Assert.False(_fs.File.Exists(bPath + ".stellar-tmp"));
+        Assert.DoesNotContain("(rollback incomplete)", st.Detail); // a fully-successful rollback never gets the suffix
     }
 
-    // Minor 4: if restoring a backup during rollback itself throws, the ORIGINAL failure (the one that
-    // triggered the rollback) must still be what's reported — never the rollback's own exception.
+    // Round-2 minor 4: if restoring a backup during rollback itself throws, the ORIGINAL failure (the one
+    // that triggered the rollback) must still be what's reported — never the rollback's own exception.
+    // Round-3 minor 4: since that restore genuinely failed, "(rollback incomplete)" is appended too.
     [Fact]
     public async Task Rollback_failure_does_not_mask_the_original_error()
     {
@@ -84,6 +87,78 @@ public sealed partial class DependencyServiceTests
         var st = Assert.Single(await s2.EnsureAsync(G, "p", new[] { v2 }, None, default));
 
         Assert.Equal(DependencyState.Failed, st.State);
-        Assert.Equal($"injected failure #1: Move {bPath}", st.Detail);
+        Assert.Equal($"injected failure #1: Move {bPath} (rollback incomplete)", st.Detail);
+    }
+
+    // Minor 1: RestoreBackups must restore only the paths THIS attempt backed up — a stale .stellar-bak
+    // left by some unrelated past event must never be used to "restore" a freshly created file.
+    [Fact]
+    public async Task Rollback_never_restores_a_stale_backup_this_attempt_did_not_create()
+    {
+        var bytes = ZipOf(("pack/a.fx", "A"), ("pack/b.fx", "B"), ("pack/c.fx", "C"));
+        _web["https://cdn/fresh"] = bytes;
+        var d = new PluginDependency("fresh", "fresh", "1", "https://cdn/fresh", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
+            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin");
+
+        var aPath = UpdPath + "a.fx";
+        var bPath = UpdPath + "b.fx";
+        _fs.AddFile(aPath + ".stellar-bak", new MockFileData("STALE")); // debris from some unrelated past event
+        var faulty = new FaultInjectingFileSystem(_fs, bPath, "Move");
+        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+
+        var st = Assert.Single(await s2.EnsureAsync(G, "p", new[] { d }, None, default));
+
+        Assert.Equal(DependencyState.Failed, st.State);
+        Assert.False(_fs.File.Exists(aPath)); // deleted (newly created this attempt) — never "restored" from stale debris
+    }
+
+    // Minor 2: a restore failure for one file must not skip the restores of the OTHER files in the same
+    // dependency. Minor 4: that leaves the rollback incomplete, noted on the Failed detail.
+    [Fact]
+    public async Task Rollback_isolates_failures_per_file_so_other_restores_still_happen()
+    {
+        var (v1, v2, v1Bytes, v2Bytes) = BuildUpdatePair();
+        _web["https://cdn/upd"] = v1Bytes;
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { v1 }, None, default);
+
+        _web["https://cdn/upd"] = v2Bytes;
+        var aPath = UpdPath + "a.fx";
+        var cPath = UpdPath + "c.fx";
+        // "a"'s restore (the 2nd Move to a.fx) fails; "c"'s content-write (the 1st Move to c.fx) fails and
+        // triggers the whole rollback.
+        var inner = new FaultInjectingFileSystem(_fs, aPath, once: true, afterCalls: 1, "Move");
+        var faulty = new FaultInjectingFileSystem(inner, cPath, "Move");
+        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+
+        var st = Assert.Single(await s2.EnsureAsync(G, "p", new[] { v2 }, None, default));
+
+        Assert.Equal(DependencyState.Failed, st.State);
+        Assert.Equal("A2", _fs.File.ReadAllText(aPath));               // its own restore failed — left at the new content
+        Assert.Equal("B1", _fs.File.ReadAllText(UpdPath + "b.fx"));    // restored despite a's failure
+        Assert.Equal("C1", _fs.File.ReadAllText(cPath));               // restored despite a's failure
+        Assert.Contains("(rollback incomplete)", st.Detail);
+    }
+
+    // Minor 3: a destination's parked copy must only be deleted once the ledger write actually commits —
+    // never when the attempt as a whole failed, even if the file content itself was already rolled back.
+    [Fact]
+    public async Task Parked_copy_cleanup_is_deferred_until_the_ledger_write_succeeds()
+    {
+        var d1 = File("fx", new byte[] { 1 }, "dxgi.dll", modded: true);
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { d1 }, None, default);
+        _fs.AddFile("/game_mini/stellar/deps-parked/p/dxgi.dll", new MockFileData(new byte[] { 0xAA })); // stale leftover
+
+        var d2 = File("fx", new byte[] { 2 }, "dxgi.dll", modded: true) with { Version = "2.0" };
+        var ledgerPath = "/game_mini/stellar/deps/p.json";
+        var faulty = new FaultInjectingFileSystem(_fs, ledgerPath, "Move"); // fails the ledger's atomic rename
+        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+
+        var st = Assert.Single(await s2.EnsureAsync(G, "p", new[] { d2 }, None, default));
+
+        Assert.Equal(DependencyState.Failed, st.State);
+        Assert.True(_fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll")); // never deleted — the write never committed
+        Assert.Equal(new byte[] { 0xAA }, _fs.File.ReadAllBytes("/game_mini/stellar/deps-parked/p/dxgi.dll"));
     }
 }

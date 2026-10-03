@@ -17,10 +17,10 @@ public sealed partial class DependencyService
 {
     private async Task<DependencyStatus> EnsureOneAsync(string gameMini, string pluginId, PluginDependency dep, CancellationToken ct)
     {
-        var ledger = _store.Read(gameMini, pluginId);
+        var (ledger, wasCorrupt) = _store.ReadWithStatus(gameMini, pluginId); // Important 2(c)
         var existing = ledger.Entries.FirstOrDefault(e => e.DependencyId == dep.Id);
         if (IsInstalled(gameMini, existing, dep))
-            return new DependencyStatus(dep.Id, DependencyState.Installed, null);
+            return Annotate(new DependencyStatus(dep.Id, DependencyState.Installed, null), wasCorrupt, pluginId);
 
         var bytes = await DownloadCappedAsync(dep.Url, dep.Size, ct);
         if (!string.Equals(DependencyFileHash.Of(bytes), dep.Sha256, StringComparison.OrdinalIgnoreCase))
@@ -30,67 +30,111 @@ public sealed partial class DependencyService
         foreach (var f in files)
         {
             var blocked = CheckDestination(gameMini, pluginId, dep.Id, existing, f.Abs);
-            if (blocked is not null) return blocked;
+            if (blocked is not null) return Annotate(blocked, wasCorrupt, pluginId);
         }
 
         // C1/I1: placement is transactional — anything this attempt creates OR overwrites is rolled back
         // on any failure (a pre-existing destination is backed up to .stellar-bak before being replaced),
         // and the ledger is written only once every file is safely in place.
         var preExisting = new HashSet<string>(files.Select(f => f.Abs).Where(_fs.File.Exists), StringComparer.Ordinal);
+        var backedUp = new HashSet<string>(StringComparer.Ordinal); // minor 1: only paths THIS attempt backed up
+        var parkedToClean = new HashSet<string>(StringComparer.Ordinal); // minor 3: collected, acted on after commit
         try
         {
-            WriteAll(gameMini, pluginId, files);
-            PruneStaleFiles(gameMini, pluginId, existing, files.Select(f => DependencyPaths.Relative(gameMini, f.Abs)));
+            WriteAll(gameMini, files, backedUp, parkedToClean);
+            PruneStaleFiles(gameMini, existing, files.Select(f => DependencyPaths.Relative(gameMini, f.Abs)), parkedToClean);
             var newEntry = new LedgerEntry(dep.Id, dep.Version, files.Select(f => new LedgerFile(
                 DependencyPaths.Relative(gameMini, f.Abs), DependencyFileHash.Of(f.Bytes),
                 dep.ModdedOnly && dep.Target == "game")).ToList());
             var entries = ledger.Entries.Where(e => e.DependencyId != dep.Id).Append(newEntry).ToList();
             _store.Write(gameMini, new DependencyLedger(pluginId, entries));
-            CleanupBackups(files);
+            CleanupParkedCopies(gameMini, pluginId, parkedToClean); // minor 3: only after the ledger write succeeds
+            CleanupBackups(files, backedUp);
         }
-        catch
+        catch (Exception original)
         {
-            // Minor 4: a rollback failure must never replace the ORIGINAL exception as the reported cause.
-            try { RollbackCreatedFiles(files, preExisting); RestoreBackups(files); }
-            catch { /* best-effort — the exception below (the real cause) is what EnsureAsync reports */ }
-            throw;
+            // Minor 2: isolate per file AND per step, so one failed restore never skips the others.
+            // Minor 4: when that leaves the rollback incomplete, say so — but the ORIGINAL exception
+            // (never a rollback-raised one) is always what's preserved as the reported cause.
+            var rollbackOk = RollbackAll(files, preExisting, backedUp);
+            if (rollbackOk) throw;
+            throw new InvalidOperationException($"{original.Message} (rollback incomplete)", original);
         }
 
-        return new DependencyStatus(dep.Id, DependencyState.Installed, null);
+        return Annotate(new DependencyStatus(dep.Id, DependencyState.Installed, null), wasCorrupt, pluginId);
     }
 
-    /// <summary>C1: undoes everything THIS attempt newly created — a file that did not exist before (so is
-    /// safe to remove) and any leftover <c>.stellar-tmp</c> — so a retry never self-blocks on its own debris.</summary>
-    private void RollbackCreatedFiles(List<(string Abs, byte[] Bytes)> files, HashSet<string> preExisting)
+    /// <summary>Important 2(c): a plugin whose ledger was found unreadable this pass carries that fact on
+    /// every status it reports — appended to an existing Blocked detail, or set as Installed's.</summary>
+    private static DependencyStatus Annotate(DependencyStatus status, bool wasCorrupt, string pluginId)
     {
+        if (!wasCorrupt) return status;
+        var note = $"dependency record was unreadable; kept as {pluginId}.json.corrupt";
+        return status with { Detail = status.Detail is null ? note : $"{status.Detail}; {note}" };
+    }
+
+    /// <summary>C1/I1, minor 2: undoes everything THIS attempt did — per file, per step, each isolated so
+    /// one failure never stops the others — and reports whether every step actually succeeded.</summary>
+    private bool RollbackAll(List<(string Abs, byte[] Bytes)> files, HashSet<string> preExisting, HashSet<string> backedUp)
+    {
+        var ok = true;
         foreach (var (abs, _) in files)
+        {
+            if (!TryDeleteCreated(abs, preExisting)) ok = false;
+            if (!TryRestoreBackup(abs, backedUp)) ok = false;
+        }
+        return ok;
+    }
+
+    /// <summary>C1: deletes a file that did not exist before this attempt (so is safe to remove) and any
+    /// leftover <c>.stellar-tmp</c> — so a retry never self-blocks on its own debris.</summary>
+    private bool TryDeleteCreated(string abs, HashSet<string> preExisting)
+    {
+        try
         {
             if (!preExisting.Contains(abs) && _fs.File.Exists(abs)) _fs.File.Delete(abs);
             var tmp = abs + ".stellar-tmp";
             if (_fs.File.Exists(tmp)) _fs.File.Delete(tmp);
+            return true;
         }
+        catch { return false; }
     }
 
-    /// <summary>I1: restores every <c>.stellar-bak</c> this attempt took of a pre-existing destination, so
-    /// a failed UPDATE leaves the previous version intact rather than half-overwritten.</summary>
-    private void RestoreBackups(List<(string Abs, byte[] Bytes)> files)
+    /// <summary>I1, minor 1: restores THIS attempt's own <c>.stellar-bak</c> (never a stale one left by
+    /// some earlier, unrelated attempt), so a failed UPDATE leaves the previous version intact.</summary>
+    private bool TryRestoreBackup(string abs, HashSet<string> backedUp)
     {
-        foreach (var (abs, _) in files)
+        if (!backedUp.Contains(abs)) return true;
+        try
         {
             var bak = abs + ".stellar-bak";
             if (_fs.File.Exists(bak)) _fs.File.Move(bak, abs, overwrite: true);
+            return true;
         }
+        catch { return false; }
     }
 
     /// <summary>I1: on success, the backups this attempt took are no longer needed. Best-effort — a
-    /// leftover backup is cosmetic debris, never a correctness problem, so it must not turn a successful
-    /// install into a reported failure.</summary>
-    private void CleanupBackups(List<(string Abs, byte[] Bytes)> files)
+    /// leftover backup is cosmetic debris, never a correctness problem.</summary>
+    private void CleanupBackups(List<(string Abs, byte[] Bytes)> files, HashSet<string> backedUp)
     {
         foreach (var (abs, _) in files)
         {
+            if (!backedUp.Contains(abs)) continue;
             var bak = abs + ".stellar-bak";
             try { if (_fs.File.Exists(bak)) _fs.File.Delete(bak); } catch { /* best effort */ }
+        }
+    }
+
+    /// <summary>Minor 3: run only after the ledger write has committed, so a failure before that point
+    /// never destroys a parked copy the (aborted) attempt had no right to touch yet. Best-effort — this
+    /// must never turn an already-successful install into a reported failure.</summary>
+    private void CleanupParkedCopies(string gameMini, string pluginId, HashSet<string> relativePaths)
+    {
+        foreach (var rel in relativePaths)
+        {
+            var parked = DependencyPaths.ParkedPath(gameMini, pluginId, rel);
+            try { if (_fs.File.Exists(parked)) _fs.File.Delete(parked); } catch { /* best effort */ }
         }
     }
 
@@ -122,11 +166,10 @@ public sealed partial class DependencyService
     }
 
     /// <summary>I1: a pre-existing destination is backed up to <c>.stellar-bak</c> before being replaced.
-    /// M12: a stale <c>.stellar-tmp</c> left by a previous crashed attempt is always safe to delete (the
-    /// suffix is our own naming pattern), and the temp file is cleaned up again if the final move fails.
-    /// M8: a freshly (re)written destination drops any stale parked copy, so a later Unpark can never
-    /// restore outdated bytes over it.</summary>
-    private void WriteAll(string gameMini, string pluginId, List<(string Abs, byte[] Bytes)> files)
+    /// Minor 1: a stale leftover backup is cleared first, same as the <c>.stellar-tmp</c> handling below.
+    /// Minor 3: a destination's parked copy is only COLLECTED here — <see cref="CleanupParkedCopies"/>
+    /// deletes it later, once the ledger write has actually committed.</summary>
+    private void WriteAll(string gameMini, List<(string Abs, byte[] Bytes)> files, HashSet<string> backedUp, HashSet<string> parkedToClean)
     {
         foreach (var (abs, bytes) in files)
         {
@@ -134,7 +177,12 @@ public sealed partial class DependencyService
             if (!string.IsNullOrEmpty(dir)) _fs.Directory.CreateDirectory(dir);
 
             var bak = abs + ".stellar-bak";
-            if (_fs.File.Exists(abs)) _fs.File.Move(abs, bak, overwrite: true); // I1
+            if (_fs.File.Exists(abs))
+            {
+                if (_fs.File.Exists(bak)) _fs.File.Delete(bak); // minor 1
+                _fs.File.Move(abs, bak, overwrite: true);
+                backedUp.Add(abs);
+            }
 
             var tmp = abs + ".stellar-tmp";
             if (_fs.File.Exists(tmp)) _fs.File.Delete(tmp);
@@ -142,14 +190,14 @@ public sealed partial class DependencyService
             try { _fs.File.Move(tmp, abs, overwrite: true); }
             catch { if (_fs.File.Exists(tmp)) _fs.File.Delete(tmp); throw; }
 
-            var parked = DependencyPaths.ParkedPath(gameMini, pluginId, DependencyPaths.Relative(gameMini, abs));
-            if (_fs.File.Exists(parked)) _fs.File.Delete(parked);
+            parkedToClean.Add(DependencyPaths.Relative(gameMini, abs)); // minor 3
         }
     }
 
     /// <summary>I2: an old recorded path is only acted on once validated. I3: a file whose content no
-    /// longer matches the recorded hash was replaced by someone else and is left alone.</summary>
-    private void PruneStaleFiles(string gameMini, string pluginId, LedgerEntry? existing, IEnumerable<string> kept)
+    /// longer matches the recorded hash was replaced by someone else and is left alone. Minor 3: a pruned
+    /// destination's parked copy is only COLLECTED here, deleted later via <see cref="CleanupParkedCopies"/>.</summary>
+    private void PruneStaleFiles(string gameMini, LedgerEntry? existing, IEnumerable<string> kept, HashSet<string> parkedToClean)
     {
         if (existing is null) return;
         var keptSet = new HashSet<string>(kept, StringComparer.Ordinal); // M11
@@ -159,8 +207,7 @@ public sealed partial class DependencyService
             var abs = DependencyPaths.FromLedger(gameMini, old.Path);
             if (abs is null) continue;
             if (DependencyFileHash.Matches(_fs, abs, old.Sha256)) _fs.File.Delete(abs);
-            var parked = DependencyPaths.ParkedPath(gameMini, pluginId, old.Path); // M8
-            if (_fs.File.Exists(parked)) _fs.File.Delete(parked);
+            parkedToClean.Add(old.Path); // minor 3 (M8)
         }
     }
 }
