@@ -40,6 +40,10 @@ public sealed partial class DependencyService
                 return null;
             }
 
+            // Final review I2: a live file holding exactly the bytes our own pending record says we were placing
+            // is our interrupted update, not the player's edit.
+            if (IsOurPendingFile(gameMini, pluginId, dependencyId, rel, abs, quarantine: true)) return null;
+
             DropFileFromLedger(gameMini, pluginId, dependencyId, rel); // I2
             return new DependencyStatus(dependencyId, DependencyState.Blocked, $"{rel} (modified)");
         }
@@ -58,8 +62,25 @@ public sealed partial class DependencyService
         var owner = FindOwner(gameMini, rel, quarantine);
         ours = owner is not null && owner.Value.PluginId == pluginId && owner.Value.DependencyId == dependencyId;
         if (owner is not null && !ours) return new DependencyStatus(dependencyId, DependencyState.Blocked, rel);
-        if (owner is null && _fs.File.Exists(abs)) return new DependencyStatus(dependencyId, DependencyState.Blocked, rel);
+        if (owner is null && _fs.File.Exists(abs))
+        {
+            // Final review I2: an unowned file is the player's — UNLESS this very (plugin, dependency)'s pending
+            // record lists it with these exact bytes: then the launcher placed it and died before committing.
+            // A byte-identical file with no such record (the player's own copy) is never adopted.
+            if (IsOurPendingFile(gameMini, pluginId, dependencyId, rel, abs, quarantine)) { ours = true; return null; }
+            return new DependencyStatus(dependencyId, DependencyState.Blocked, rel);
+        }
         return null;
+    }
+
+    /// <summary>Final review I2: true only when this plugin's ledger has a pending record for
+    /// <paramref name="dependencyId"/> listing <paramref name="rel"/>, and the file there hashes to the sha256
+    /// that record expected.</summary>
+    private bool IsOurPendingFile(string gameMini, string pluginId, string dependencyId, string rel, string abs, bool quarantine)
+    {
+        var pending = _store.Read(gameMini, pluginId, quarantine).Pending;
+        var f = pending?.Where(e => e.DependencyId == dependencyId).SelectMany(e => e.Files).FirstOrDefault(x => x.Path == rel);
+        return f is not null && DependencyFileHash.Matches(_fs, abs, f.Sha256);
     }
 
     /// <summary>Task 6: the destinations knowable WITHOUT downloading — a file-kind dependency's single
@@ -110,6 +131,6 @@ public sealed partial class DependencyService
         var remaining = entry.Files.Where(f => f.Path != relPath).ToList();
         var entries = ledger.Entries.Where(e => e.DependencyId != dependencyId).ToList();
         if (remaining.Count > 0) entries.Add(entry with { Files = remaining });
-        _store.Write(gameMini, new DependencyLedger(pluginId, entries));
+        _store.Write(gameMini, ledger with { Entries = entries }); // keeps any pending record (I2)
     }
 }

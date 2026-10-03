@@ -139,9 +139,15 @@ public sealed partial class DependencyService : IDependencyService
         if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
             throw new InvalidOperationException("dependency record could not be read");
         var entry = ledger.Entries.FirstOrDefault(e => e.DependencyId == dependencyId);
-        if (entry is null) return;
-        DeleteEntryFiles(gameMini, pluginId, entry);
-        _store.Write(gameMini, ledger with { Entries = ledger.Entries.Where(e => e.DependencyId != dependencyId).ToList() });
+        var pending = ledger.Pending?.FirstOrDefault(e => e.DependencyId == dependencyId);
+        if (entry is null && pending is null) return;
+        if (entry is not null) DeleteEntryFiles(gameMini, pluginId, entry);
+        if (pending is not null) DeleteEntryFiles(gameMini, pluginId, pending); // I2: hash-checked, our own bytes only
+        _store.Write(gameMini, ledger with
+        {
+            Entries = ledger.Entries.Where(e => e.DependencyId != dependencyId).ToList(),
+            Pending = ledger.PendingWithout(dependencyId),
+        });
     }
 
     public Task RemoveAllAsync(string gameMini, string pluginId, CancellationToken ct = default) =>
@@ -152,8 +158,9 @@ public sealed partial class DependencyService : IDependencyService
         if (!DependencyPaths.IsValidPluginId(pluginId)) return; // controller round: see Remove above
         if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
             throw new InvalidOperationException("dependency record could not be read");
-        foreach (var entry in ledger.Entries) DeleteEntryFiles(gameMini, pluginId, entry);
-        _store.Write(gameMini, ledger with { Entries = Array.Empty<LedgerEntry>() });
+        foreach (var entry in ledger.Entries.Concat(ledger.Pending ?? Array.Empty<LedgerEntry>()))
+            DeleteEntryFiles(gameMini, pluginId, entry);
+        _store.Write(gameMini, ledger with { Entries = Array.Empty<LedgerEntry>(), Pending = null });
     }
 
     public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) =>

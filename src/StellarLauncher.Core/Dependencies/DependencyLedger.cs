@@ -4,13 +4,29 @@ using System.IO;
 using System.IO.Abstractions;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace StellarLauncher.Core.Dependencies;
 
 /// <summary>One placed file: path relative to game_mini ('/'), its sha256, and whether Vanilla launches park it.</summary>
 public sealed record LedgerFile(string Path, string Sha256, bool ModdedOnly);
 public sealed record LedgerEntry(string DependencyId, string Version, IReadOnlyList<LedgerFile> Files);
-public sealed record DependencyLedger(string PluginId, IReadOnlyList<LedgerEntry> Entries);
+
+/// <summary><paramref name="Pending"/> (final review I2): a placement in flight, written BEFORE the first file
+/// is moved into place and cleared by the ledger write that commits it. If the launcher dies in between, the
+/// next run finds the files it already placed listed here with their expected sha256 — a live file that
+/// matches is the launcher's own half-finished work, never the player's. Null/absent in a ledger written by
+/// an older launcher, and whenever nothing is in flight.</summary>
+public sealed record DependencyLedger(string PluginId, IReadOnlyList<LedgerEntry> Entries,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<LedgerEntry>? Pending = null)
+{
+    /// <summary>The pending entries other than <paramref name="dependencyId"/>'s, or null when none remain.</summary>
+    public IReadOnlyList<LedgerEntry>? PendingWithout(string dependencyId)
+    {
+        var rest = (Pending ?? Array.Empty<LedgerEntry>()).Where(e => e.DependencyId != dependencyId).ToList();
+        return rest.Count == 0 ? null : rest;
+    }
+}
 
 /// <summary>The record of exactly what the launcher placed for a plugin (so remove deletes exactly that).</summary>
 public sealed class DependencyLedgerStore
@@ -75,9 +91,12 @@ public sealed class DependencyLedgerStore
     /// regardless of a record's non-nullable annotations, so a well-formed-but-incomplete ledger (e.g.
     /// <c>{"PluginId":"x"}</c>) deserializes without throwing — this is the only check that catches it.</summary>
     private static bool IsWellFormed(DependencyLedger? ledger) =>
-        ledger is not null && ledger.Entries is not null && ledger.Entries.All(e =>
-            e is not null && e.DependencyId is not null && e.Version is not null && e.Files is not null &&
-            e.Files.All(f => f is not null && f.Path is not null && f.Sha256 is not null));
+        ledger is not null && ledger.Entries is not null && ledger.Entries.All(IsWellFormed)
+        && (ledger.Pending is null || ledger.Pending.All(IsWellFormed));
+
+    private static bool IsWellFormed(LedgerEntry? e) =>
+        e is not null && e.DependencyId is not null && e.Version is not null && e.Files is not null &&
+        e.Files.All(f => f is not null && f.Path is not null && f.Sha256 is not null);
 
     /// <summary>Renames a corrupt ledger aside (never deletes it) so the evidence survives the next
     /// successful Write to the same plugin id (a different file); an existing <c>.corrupt</c> is
@@ -91,7 +110,11 @@ public sealed class DependencyLedgerStore
     public void Write(string gameMini, DependencyLedger ledger)
     {
         var path = DependencyPaths.LedgerFile(gameMini, ledger.PluginId);
-        if (ledger.Entries.Count == 0) { if (_fs.File.Exists(path)) _fs.File.Delete(path); return; }
+        if (ledger.Entries.Count == 0 && ledger.Pending is not { Count: > 0 })
+        {
+            if (_fs.File.Exists(path)) _fs.File.Delete(path);
+            return;
+        }
         _fs.Directory.CreateDirectory(DependencyPaths.LedgerDir(gameMini));
         var tmp = path + ".tmp";
         _fs.File.WriteAllText(tmp, JsonSerializer.Serialize(ledger, Json));

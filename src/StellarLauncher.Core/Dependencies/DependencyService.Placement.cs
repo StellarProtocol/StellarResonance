@@ -75,15 +75,21 @@ public sealed partial class DependencyService
         var preExisting = new HashSet<string>(files.Select(f => f.Abs).Where(_fs.File.Exists), StringComparer.Ordinal);
         var backedUp = new HashSet<string>(StringComparer.Ordinal); // minor 1: only paths THIS attempt backed up
         var parkedToClean = new HashSet<string>(StringComparer.Ordinal); // minor 3: collected, acted on after commit
+        var newEntry = new LedgerEntry(dep.Id, dep.Version, files.Select(f => new LedgerFile(
+            DependencyPaths.Relative(gameMini, f.Abs), DependencyFileHash.Of(f.Bytes),
+            dep.ModdedOnly && dep.Target == "game")).ToList());
+        var pending = false;
         try
         {
+            // Final review I2: record what is about to be placed BEFORE the first move. If the launcher dies
+            // between the moves and the commit below, the next run recognises these exact bytes as its own
+            // (CheckDestination) instead of reading them as the player's file and blocking forever.
+            _store.Write(gameMini, ledger with { Pending = (ledger.PendingWithout(dep.Id) ?? Array.Empty<LedgerEntry>()).Append(newEntry).ToList() });
+            pending = true;
             WriteAll(gameMini, files, backedUp, parkedToClean);
             PruneStaleFiles(gameMini, existing, files.Select(f => DependencyPaths.Relative(gameMini, f.Abs)), parkedToClean);
-            var newEntry = new LedgerEntry(dep.Id, dep.Version, files.Select(f => new LedgerFile(
-                DependencyPaths.Relative(gameMini, f.Abs), DependencyFileHash.Of(f.Bytes),
-                dep.ModdedOnly && dep.Target == "game")).ToList());
             var entries = ledger.Entries.Where(e => e.DependencyId != dep.Id).Append(newEntry).ToList();
-            _store.Write(gameMini, new DependencyLedger(pluginId, entries));
+            _store.Write(gameMini, ledger with { Entries = entries, Pending = ledger.PendingWithout(dep.Id) });
             CleanupParkedCopies(gameMini, pluginId, parkedToClean); // minor 3: only after the ledger write succeeds
             CleanupBackups(files, backedUp);
         }
@@ -93,11 +99,19 @@ public sealed partial class DependencyService
             // Minor 4: when that leaves the rollback incomplete, say so — but the ORIGINAL exception
             // (never a rollback-raised one) is always what's preserved as the reported cause.
             var rollbackOk = RollbackAll(files, preExisting, backedUp);
+            // I2: a complete rollback leaves nothing of ours in place, so the pending record goes too (best
+            // effort). An incomplete one keeps it: whatever is left behind is still recognisably ours.
+            if (rollbackOk && pending) TryWriteLedger(gameMini, ledger with { Pending = ledger.PendingWithout(dep.Id) });
             if (rollbackOk) throw;
             throw new InvalidOperationException($"{original.Message} (rollback incomplete)", original);
         }
 
         return new DependencyStatus(dep.Id, DependencyState.Installed, null);
+    }
+
+    private void TryWriteLedger(string gameMini, DependencyLedger ledger)
+    {
+        try { _store.Write(gameMini, ledger); } catch { /* best effort — a stale pending record only ever adopts our own bytes */ }
     }
 
     /// <summary>Important 2(c), narrowed by minor 1 (round 6): the "dependency record was unreadable…"
