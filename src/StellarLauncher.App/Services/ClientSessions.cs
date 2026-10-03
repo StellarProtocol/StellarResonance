@@ -48,8 +48,11 @@ public sealed class ClientSessions
         try
         {
             bool proceed;
-            try { proceed = await review.ReviewAsync(c, ct); }
+            // The review reports its progress (dependency downloads) on the client's state line; it is
+            // cleared however the review ends, and Begin clears it too.
+            try { proceed = await review.ReviewAsync(c, text => _marshal(() => s.SetReviewText(text)), ct); }
             catch (OperationCanceledException) { return; }   // cancelled review = no launch; session stays Idle
+            finally { _marshal(() => s.SetReviewText(null)); }
             if (!proceed) return;
             s.Begin(_now());
             try

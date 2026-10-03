@@ -37,13 +37,22 @@ public static class PluginDownloads
         if (v.Dependencies is not { Count: > 0 } pluginDeps) return;
         if (!client.Modded) { status?.Invoke("will be installed at next modded launch"); return; }
 
-        // No EnsureAsync may run while files are parked — unpark first, every time (idempotent).
-        deps.Dependencies.UnparkModdedOnly(gameMini);
+        // No EnsureAsync may run while files are parked — unpark first, every time (idempotent). Task 6 (a):
+        // its own try/catch, like PreLaunchReviewService.TryUnpark — the plugin IS installed at this point,
+        // so an unpark error must not surface as a failed install (a still-parked file stays parked, and
+        // EnsureAsync then reports it on the plugin page).
+        TryUnpark(deps, gameMini);
         // Fix round 1, Important 2: honour whatever the player already opted out of for THIS plugin —
-        // an install/update must not silently re-install a dependency they unticked.
-        var skipped = DependencyRunner.Skipped(client, entry.Id);
+        // an install/update must not silently re-install a dependency they unticked (optional ones only).
+        var skipped = DependencyRunner.Skipped(client, entry.Id, pluginDeps);
         foreach (var s in await deps.Dependencies.EnsureAsync(gameMini, entry.Id, pluginDeps, skipped, CancellationToken.None))
             if (s.State != DependencyState.Installed)
-                status?.Invoke($"{entry.Id}/{s.DependencyId}: {s.State}{(s.Detail is null ? "" : " — " + s.Detail)}");
+                status?.Invoke(DependencyRunner.Line(entry.Id, s));
+    }
+
+    private static void TryUnpark(PluginInstallDeps deps, string gameMini)
+    {
+        try { deps.Dependencies.UnparkModdedOnly(gameMini); }
+        catch (Exception) { /* fail-open — the install already succeeded */ }
     }
 }

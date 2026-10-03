@@ -147,6 +147,7 @@ public class ClientPluginsViewModelTests
         }
         public void ParkModdedOnly(string gameMini) { }
         public void UnparkModdedOnly(string gameMini) { }
+        public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
     }
 
     [Fact]
@@ -192,5 +193,121 @@ public class ClientPluginsViewModelTests
         Assert.True(f.Fs.File.Exists($"{Test}/stellar/plugins/playerhud/Stellar.PlayerHUD.dll"));
         Assert.False(f.Fs.Directory.Exists($"{Test}/stellar/plugins/wardrobe"));   // disabled on source → skipped
         Assert.Contains("1 installed", vm.Status);
+    }
+
+    // ---- Task 6: plugin page DEPENDENCIES section ----
+
+    private static StellarLauncher.Core.Model.PluginDependency DepCase(string id, bool optional, params string[] requires) =>
+        new(id, $"{id} name", "1.0", $"https://cdn/deps/{id}", WorkspaceFixture.DllSha,
+            WorkspaceFixture.DllBytes.Length, "file", new[] { new StellarLauncher.Core.Model.PluginDependencyFile(null, $"{id}.bin") },
+            "plugin", Optional: optional, Requires: requires.Length == 0 ? null : requires);
+
+    /// <summary>One installed plugin ("photo", v1.0.0) on client c2 declaring opt (optional), withopt
+    /// (required, requires opt) and req (required).</summary>
+    private static async Task<(WorkspaceFixture f, ClientPluginsViewModel vm, StellarLauncher.App.ViewModels.PluginItemViewModel item)> OpenWithDeps(bool modded = true)
+    {
+        var f = new WorkspaceFixture();
+        var deps = new[] { DepCase("opt", true), DepCase("withopt", false, "opt"), DepCase("req", false) };
+        f.Registry.Add(new StellarLauncher.Core.Model.PluginEntry("photo", "Photo", "d", "a", new[]
+        {
+            new StellarLauncher.Core.Model.PluginVersion("1.0.0", null, "Stellar.Photo.dll", "https://cdn/photo/1.0.0.dll",
+                WorkspaceFixture.DllSha, "2.0.0", null, null, Dependencies: deps),
+        }));
+        f.AddClient("c2", "Test", Test, framework: "2.7.4");
+        f.InstallPlugin(Test, "photo", "Stellar.Photo.dll", "1.0.0");
+        var seeded = f.Store.Load(); seeded.Clients.Single(c => c.Id == "c2").Modded = modded; f.Store.Save(seeded);
+        f.Tabs = f.Tabs with { Plugins = w => new ClientPluginsViewModel(w) };
+        f.Start();
+        var ws = await f.OpenAsync("c2");
+        ws.ShowPluginsCommand.Execute(null);
+        var vm = (ClientPluginsViewModel)ws.TabContent!;
+        await vm.ReloadAsync();
+        var item = vm.Rows.Single().Item;
+        // Everything installed, as after a Modded launch.
+        await f.Services.Core.Install.Dependencies.EnsureAsync(Test, "photo", deps, new HashSet<string>(), CancellationToken.None);
+        vm.OpenPluginCommand.Execute(item);
+        return (f, vm, item);
+    }
+
+    [Fact]
+    public async Task Opening_the_page_lists_the_dependencies_with_their_state()
+    {
+        var (_, _, item) = await OpenWithDeps();
+
+        Assert.True(item.HasDependencies);
+        Assert.Equal(new[] { "opt", "withopt", "req" }, item.Dependencies.Select(d => d.Id));
+        Assert.All(item.Dependencies, d => Assert.Equal("Installed", d.StateText));
+        Assert.All(item.Dependencies, d => Assert.True(d.Use));
+    }
+
+    [Fact]
+    public async Task Unticking_an_optional_dependency_saves_the_skip_and_removes_it_and_its_dependents_now()
+    {
+        var (f, vm, item) = await OpenWithDeps();
+
+        item.Dependencies.Single(d => d.Id == "opt").Use = false;
+
+        Assert.Equal(new[] { "photo/opt" }, f.Store.Load().Clients.Single(c => c.Id == "c2").SkippedDependencies);
+        Assert.False(f.Fs.File.Exists($"{Test}/stellar/deps/photo/opt.bin"));
+        Assert.False(f.Fs.File.Exists($"{Test}/stellar/deps/photo/withopt.bin"));   // requires opt
+        Assert.True(f.Fs.File.Exists($"{Test}/stellar/deps/photo/req.bin"));
+        Assert.Equal("Skipped", item.Dependencies.Single(d => d.Id == "opt").StateText);
+        Assert.Equal("Skipped", item.Dependencies.Single(d => d.Id == "withopt").StateText);
+        Assert.Equal("Installed", item.Dependencies.Single(d => d.Id == "req").StateText);
+        Assert.Contains("skipped", vm.Status);
+    }
+
+    // Task 6 (e): only optional dependencies can be skipped.
+    [Fact]
+    public async Task A_required_dependency_cannot_be_skipped()
+    {
+        var (f, vm, item) = await OpenWithDeps();
+
+        vm.SetDependencyUse(item, "req", false);
+        item.Dependencies.Single(d => d.Id == "withopt").Use = false;
+
+        Assert.Empty(f.Store.Load().Clients.Single(c => c.Id == "c2").SkippedDependencies);
+        Assert.True(f.Fs.File.Exists($"{Test}/stellar/deps/photo/req.bin"));
+        Assert.True(f.Fs.File.Exists($"{Test}/stellar/deps/photo/withopt.bin"));
+    }
+
+    [Fact]
+    public async Task Ticking_it_again_on_a_Modded_client_installs_it_in_the_background()
+    {
+        var (f, vm, item) = await OpenWithDeps();
+        item.Dependencies.Single(d => d.Id == "opt").Use = false;
+
+        item.Dependencies.Single(d => d.Id == "opt").Use = true;
+        await vm.DependencyWork;
+
+        Assert.Empty(f.Store.Load().Clients.Single(c => c.Id == "c2").SkippedDependencies);
+        Assert.True(f.Fs.File.Exists($"{Test}/stellar/deps/photo/opt.bin"));
+        Assert.True(f.Fs.File.Exists($"{Test}/stellar/deps/photo/withopt.bin"));
+        Assert.All(item.Dependencies, d => Assert.Equal("Installed", d.StateText));
+        Assert.Equal("Photo: opt name installed", vm.Status);
+    }
+
+    [Fact]
+    public async Task Ticking_it_again_on_a_Vanilla_client_waits_for_the_next_Modded_launch()
+    {
+        var (f, vm, item) = await OpenWithDeps(modded: false);
+        item.Dependencies.Single(d => d.Id == "opt").Use = false;
+
+        item.Dependencies.Single(d => d.Id == "opt").Use = true;
+        await vm.DependencyWork;
+
+        Assert.False(f.Fs.File.Exists($"{Test}/stellar/deps/photo/opt.bin"));
+        Assert.Equal("Not installed — installs at next Modded launch", item.Dependencies.Single(d => d.Id == "opt").StateText);
+    }
+
+    [Fact]
+    public async Task A_plugin_without_dependencies_has_no_section()
+    {
+        var (_, vm) = await Open();
+        var cm = vm.Rows.Single(r => r.Item.Entry.Id == "combatmeter").Item;
+
+        vm.OpenPluginCommand.Execute(cm);
+
+        Assert.False(cm.HasDependencies);
     }
 }

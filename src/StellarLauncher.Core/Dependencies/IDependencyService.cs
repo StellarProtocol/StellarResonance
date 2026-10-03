@@ -42,4 +42,9 @@ public interface IDependencyService
     /// <summary>Moves parked files back, unless something now occupies the destination — in which case
     /// it stays parked. Idempotent.</summary>
     void UnparkModdedOnly(string gameMini);
+
+    /// <summary>The plugin ids that currently have a dependency ledger in this game folder (valid ids
+    /// only; nothing is read or quarantined). Used to find ledgers left behind by a plugin that is no
+    /// longer installed.</summary>
+    IReadOnlyList<string> LedgerPluginIds(string gameMini);
 }

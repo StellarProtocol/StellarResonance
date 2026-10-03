@@ -202,7 +202,13 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     // ---- detail page + lightbox (same member names as the old PluginsViewModel so the XAML moves verbatim) ----
     partial void OnSelectedPluginChanged(PluginItemViewModel? value) => OnPropertyChanged(nameof(IsDetailOpen));
     partial void OnLightboxImageChanged(Bitmap? value) => OnPropertyChanged(nameof(IsLightboxOpen));
-    [RelayCommand] private void OpenPlugin(PluginItemViewModel item) { SelectedPlugin = item; _ = item.EnsureDetailLoadedAsync(_ws.Services.Core.Install.Http, bmp => LightboxImage = bmp); }
+    [RelayCommand]
+    private void OpenPlugin(PluginItemViewModel item)
+    {
+        SelectedPlugin = item;
+        item.RefreshDependencies();   // re-read every time the page opens: disk may have changed since (a launch, a remove)
+        _ = item.EnsureDetailLoadedAsync(_ws.Services.Core.Install.Http, bmp => LightboxImage = bmp);
+    }
     [RelayCommand] private void CloseDetail() => SelectedPlugin = null;
     [RelayCommand] private void CloseLightbox() { var old = LightboxImage; LightboxImage = null; old?.Dispose(); }
     [RelayCommand] private void OpenLink(string? url) => Services.Browser.Open(url);

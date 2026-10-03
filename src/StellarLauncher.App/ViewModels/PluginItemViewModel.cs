@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Model;
 using StellarLauncher.Core.Services;
 
@@ -122,6 +123,60 @@ public partial class PluginItemViewModel : ObservableObject
             }
             catch { GuideStatus = "guide unavailable (couldn't download it — check your connection)"; }
         }
+    }
+
+    // ---- DEPENDENCIES section (Task 6) ----
+
+    public ObservableCollection<DependencyItemViewModel> Dependencies { get; } = new();
+    public bool HasDependencies => Dependencies.Count > 0;
+    public IEnumerable<string> DependencyNotices =>
+        Dependencies.Where(d => d.HasNotice).Select(d => $"Notice from {Name}: {d.Notice!.Trim()}").Distinct();
+    public bool HasOptionalDependency => Dependencies.Any(d => d.IsOptional);
+    public string DependencyFootnote => HasOptionalDependency
+        ? $"Untick an optional dependency to skip it; {Name} works without it. Removing the plugin removes everything listed here."
+        : "Removing the plugin removes everything listed here.";
+
+    /// <summary>The page shows the dependencies of the INSTALLED version when the registry still lists it,
+    /// else of the newest version (what an install would bring).</summary>
+    public PluginVersion? ShownVersion =>
+        (InstalledVersion is { } iv ? Versions.FirstOrDefault(v => v.Version == iv) : null) ?? Versions.FirstOrDefault();
+    public IReadOnlyList<PluginDependency> ShownDependencies =>
+        ShownVersion?.Dependencies ?? (IReadOnlyList<PluginDependency>)Array.Empty<PluginDependency>();
+
+    /// <summary>Rebuilds the section from <see cref="ShownDependencies"/> and the host's status. Rows whose
+    /// ids are unchanged are updated in place (so a checkbox mid-toggle keeps its row); otherwise the list
+    /// is rebuilt. A failing status read leaves the section as it was.</summary>
+    public void RefreshDependencies()
+    {
+        var deps = ShownDependencies;
+        IReadOnlyList<DependencyStatus> statuses;
+        try { statuses = deps.Count == 0 ? Array.Empty<DependencyStatus>() : _parent.DependencyStatus(this); }
+        catch (Exception) { return; }
+        var byId = statuses.ToDictionary(s => s.DependencyId);
+        DependencyStatus StatusOf(PluginDependency d) =>
+            byId.TryGetValue(d.Id, out var s) ? s : new DependencyStatus(d.Id, DependencyState.NotInstalled, null);
+
+        if (Dependencies.Select(r => r.Id).SequenceEqual(deps.Select(d => d.Id)))
+        {
+            for (var i = 0; i < deps.Count; i++)
+            {
+                var st = StatusOf(deps[i]);
+                Dependencies[i].Update(st, st.State != DependencyState.Skipped);
+            }
+        }
+        else
+        {
+            Dependencies.Clear();
+            foreach (var d in deps)
+            {
+                var st = StatusOf(d);
+                Dependencies.Add(new DependencyItemViewModel(d, st, st.State != DependencyState.Skipped,
+                    (id, use) => _parent.SetDependencyUse(this, id, use)));
+            }
+        }
+        OnPropertyChanged(nameof(HasDependencies));
+        OnPropertyChanged(nameof(DependencyNotices));
+        OnPropertyChanged(nameof(DependencyFootnote));
     }
 
     // Selected version's changelog (may be null); the view guards visibility.

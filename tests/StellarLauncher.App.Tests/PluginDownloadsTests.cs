@@ -34,7 +34,13 @@ public class PluginDownloadsTests
         public void Remove(string gameMini, string pluginId, string dependencyId) { }
         public void RemoveAll(string gameMini, string pluginId) { }
         public void ParkModdedOnly(string gameMini) { }
-        public void UnparkModdedOnly(string gameMini) => Calls.Add("Unpark");
+        public bool ThrowOnUnpark;
+        public void UnparkModdedOnly(string gameMini)
+        {
+            Calls.Add("Unpark");
+            if (ThrowOnUnpark) throw new IOException("parked file locked");
+        }
+        public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
     }
 
     private sealed class DllHandler : HttpMessageHandler
@@ -154,5 +160,36 @@ public class PluginDownloadsTests
 
         Assert.True(fs.File.Exists("/g/stellar/plugins/p1/P1.dll"));
         Assert.False(fs.File.Exists("/g/dep1.dll"));
+    }
+
+    // Task 6 (a), from the Task 5 review: the plugin DLL is already installed when UnparkModdedOnly runs,
+    // so an unpark error must not escape as a failed install — it is swallowed (like the review's
+    // TryUnpark) and the dependencies are still ensured.
+    [Fact]
+    public async Task Unpark_failure_does_not_fail_the_install_and_still_ensures()
+    {
+        var (deps, fake) = Build();
+        fake.ThrowOnUnpark = true;
+        var entry = EntryWithDependency();
+        var messages = new List<string>();
+
+        await PluginDownloads.InstallAsync(deps, Client(modded: true), entry, entry.Versions[0], messages.Add);
+
+        Assert.Equal(new[] { "Unpark", "Ensure:p1" }, fake.Calls);
+        Assert.Contains("installed v1.0.0", messages);
+    }
+
+    // Task 6 (e): only OPTIONAL dependencies can be skipped — a stale/hand-edited profile entry naming a
+    // required dependency must never reach EnsureAsync's skip set.
+    [Fact]
+    public async Task A_required_dependency_in_the_skip_list_is_still_installed()
+    {
+        var (deps, fake) = Build();
+        var entry = EntryWithDependency(optional: false);
+
+        await PluginDownloads.InstallAsync(deps, Client(modded: true, "p1/dep1"), entry, entry.Versions[0], null);
+
+        Assert.NotNull(fake.LastSkippedIds);
+        Assert.Empty(fake.LastSkippedIds!);
     }
 }

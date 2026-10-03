@@ -133,6 +133,8 @@ public sealed partial class DependencyService : IDependencyService
 
     public void UnparkModdedOnly(string gameMini) => _parking.Unpark(gameMini);
 
+    public IReadOnlyList<string> LedgerPluginIds(string gameMini) => _store.PluginIds(gameMini);
+
     /// <summary>R1/R2: resolves whether <paramref name="d"/> is gated by <paramref name="skippedIds"/> or
     /// by its <c>requires</c> chain, given every earlier dependency's outcome in <paramref name="resultsSoFar"/>.
     /// Null means "not gated — evaluate normally". A forward reference (R2) and a Failed prerequisite both

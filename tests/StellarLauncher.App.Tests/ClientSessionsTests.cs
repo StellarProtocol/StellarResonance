@@ -259,4 +259,34 @@ public class ClientSessionsTests
         await sut.LaunchAsync(c, new Review(true), CancellationToken.None);          // latch was released
         Assert.Single(orch.Launched);
     }
+
+    // Task 6 (d): the review's progress ("Preparing <plugin>: <dependency>…") reaches the client's state
+    // line through LaunchSession.ReviewText while the review runs, and is cleared however it ends.
+    private sealed class ReportingReview(bool answer, Func<string?> peek) : IPreLaunchReview
+    {
+        public string? SeenDuring;
+        public Task<bool> ReviewAsync(ClientProfile c, CancellationToken ct) => throw new InvalidOperationException("status overload expected");
+        public Task<bool> ReviewAsync(ClientProfile c, Action<string?> status, CancellationToken ct)
+        {
+            status("Preparing P: Dep…");
+            SeenDuring = peek();
+            return Task.FromResult(answer);
+        }
+    }
+
+    [Fact]
+    public async Task Review_status_shows_on_the_state_line_during_the_review_and_is_cleared_after()
+    {
+        var (sut, _, _, c) = Build();
+        var s = sut.For(c);
+        var inv = new StellarLauncher.Core.Inventory.InventorySnapshot(true, null, null,
+            Array.Empty<StellarLauncher.Core.Inventory.InstalledPlugin>(), Array.Empty<StellarLauncher.Core.Inventory.DuplicateSlot>(), 0);
+        var review = new ReportingReview(false, () => StellarLauncher.App.Services.SessionPresenter.StateLine(s, inv, true));
+
+        await sut.LaunchAsync(c, review, CancellationToken.None);
+
+        Assert.Equal("Preparing P: Dep…", review.SeenDuring);
+        Assert.Null(s.ReviewText);
+        Assert.Equal("idle", StellarLauncher.App.Services.SessionPresenter.StateLine(s, inv, true));
+    }
 }

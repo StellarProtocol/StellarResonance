@@ -17,25 +17,28 @@ public class DependencyRunnerTests
             return Task.FromResult<IReadOnlyList<DependencyStatus>>(
                 deps.Select(d => new DependencyStatus(d.Id, DependencyState.Installed, null)).ToList());
         }
+        public readonly HashSet<string> NotInstalled = new();
         public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,
-            IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds) => Array.Empty<DependencyStatus>();
+            IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds) =>
+            deps.Select(d => new DependencyStatus(d.Id, NotInstalled.Contains(d.Id) ? DependencyState.NotInstalled : DependencyState.Installed, null)).ToList();
         public void Remove(string gameMini, string pluginId, string dependencyId) { }
         public void RemoveAll(string gameMini, string pluginId) { }
         public void ParkModdedOnly(string gameMini) { }
         public void UnparkModdedOnly(string gameMini) { }
+        public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
     }
 
-    private static PluginDependency Dep(string id) =>
-        new(id, id, "1.0", $"https://cdn/{id}", new string('a', 64), 1, "file",
-            new[] { new PluginDependencyFile(null, $"{id}.dll") }, "game");
+    private static PluginDependency Dep(string id, bool optional = false) =>
+        new(id, $"{id}-name", "1.0", $"https://cdn/{id}", new string('a', 64), 1, "file",
+            new[] { new PluginDependencyFile(null, $"{id}.dll") }, "game", Optional: optional);
 
-    private static PluginEntry EntryWithVersion(string id, string version, IReadOnlyList<PluginDependency>? deps = null) =>
-        new(id, id, "d", null, new[] { new PluginVersion(version, null, $"{id}.dll", $"https://cdn/{id}.dll", "sha", "0.1.0", null, null, Dependencies: deps) });
+    private static PluginEntry EntryWithVersion(string id, string version, IReadOnlyList<PluginDependency>? deps = null, string? name = null) =>
+        new(id, name ?? id, "d", null, new[] { new PluginVersion(version, null, $"{id}.dll", $"https://cdn/{id}.dll", "sha", "0.1.0", null, null, Dependencies: deps) });
 
     [Fact]
     public async Task Ensures_only_installed_plugins_whose_installed_version_declares_dependencies()
     {
-        var withDeps = EntryWithVersion("p1", "1.0.0", new[] { Dep("a") });
+        var withDeps = EntryWithVersion("p1", "1.0.0", new[] { Dep("a", optional: true) });
         var noDeps = EntryWithVersion("p2", "1.0.0");
         var versionNotInRegistry = EntryWithVersion("p3", "1.0.0", new[] { Dep("b") }); // installed "9.9.9" below
 
@@ -61,9 +64,49 @@ public class DependencyRunnerTests
     public void Skipped_returns_only_this_plugins_ids_with_the_prefix_stripped()
     {
         var c = new ClientProfile { SkippedDependencies = new List<string> { "p1/a", "p1/b", "p2/a" } };
+        var optional = new[] { Dep("a", optional: true), Dep("b", optional: true) };
 
-        Assert.Equal(new[] { "a", "b" }, DependencyRunner.Skipped(c, "p1").OrderBy(x => x));
-        Assert.Equal(new[] { "a" }, DependencyRunner.Skipped(c, "p2"));
-        Assert.Empty(DependencyRunner.Skipped(c, "p3"));
+        Assert.Equal(new[] { "a", "b" }, DependencyRunner.Skipped(c, "p1", optional).OrderBy(x => x));
+        Assert.Equal(new[] { "a" }, DependencyRunner.Skipped(c, "p2", optional));
+        Assert.Empty(DependencyRunner.Skipped(c, "p3", optional));
+    }
+
+    // Task 6 (e): only ids that are OPTIONAL in the plugin's installed version can be skipped — a required
+    // id (or one the version no longer declares) is filtered out, so it is always installed.
+    [Fact]
+    public void Skipped_drops_required_and_undeclared_ids()
+    {
+        var c = new ClientProfile { SkippedDependencies = new List<string> { "p1/opt", "p1/req", "p1/gone" } };
+        var deps = new[] { Dep("opt", optional: true), Dep("req") };
+
+        Assert.Equal(new[] { "opt" }, DependencyRunner.Skipped(c, "p1", deps));
+    }
+
+    [Fact]
+    public async Task EnsureForClient_never_passes_a_required_id_as_skipped()
+    {
+        var entry = EntryWithVersion("p1", "1.0.0", new[] { Dep("req"), Dep("opt", optional: true) });
+        var client = new ClientProfile { GameMiniDir = "/g", SkippedDependencies = new List<string> { "p1/req", "p1/opt" } };
+        var fake = new FakeDependencyService();
+
+        await DependencyRunner.EnsureForClientAsync(fake, client, new[] { (entry, "1.0.0") }, CancellationToken.None);
+
+        Assert.Equal(new[] { "opt" }, Assert.Single(fake.Calls).SkippedIds);
+    }
+
+    // Task 6 (d): before a plugin whose dependencies still need downloading, the runner reports
+    // "Preparing <plugin>: <dependency names>…"; nothing is reported when everything is already installed.
+    [Fact]
+    public async Task EnsureForClient_reports_preparing_only_for_dependencies_not_yet_installed()
+    {
+        var needs = EntryWithVersion("p1", "1.0.0", new[] { Dep("a"), Dep("b") }, name: "Photo Thing");
+        var done = EntryWithVersion("p2", "1.0.0", new[] { Dep("c") });
+        var fake = new FakeDependencyService { NotInstalled = { "a" } };
+        var progress = new List<string>();
+
+        await DependencyRunner.EnsureForClientAsync(fake, new ClientProfile { GameMiniDir = "/g" },
+            new[] { (needs, "1.0.0"), (done, "1.0.0") }, CancellationToken.None, progress.Add);
+
+        Assert.Equal(new[] { "Preparing Photo Thing: a-name…" }, progress);
     }
 }

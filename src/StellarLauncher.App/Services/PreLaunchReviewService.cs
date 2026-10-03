@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,7 +28,11 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
         _registry = registry; _inventory = inventory; _versions = versions; _deps = deps; _prompt = prompt;
     }
 
-    public async Task<bool> ReviewAsync(ClientProfile client, CancellationToken ct)
+    public Task<bool> ReviewAsync(ClientProfile client, CancellationToken ct) => ReviewAsync(client, _ => { }, ct);
+
+    /// <param name="status">The client's state line during the review (Task 6 d): dependency downloads
+    /// report "Preparing &lt;plugin&gt;: &lt;dependency&gt;…"; the caller clears it when the review ends.</param>
+    public async Task<bool> ReviewAsync(ClientProfile client, Action<string?> status, CancellationToken ct)
     {
         if (!client.Modded) { TryPark(client); return true; }
         try
@@ -47,14 +52,14 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
             var plan = PreLaunchPlanner.Build(inv.FrameworkVersion, target, AppInfo.LauncherVersion, installed, client.AutoUpdateBeforeLaunch);
             if (plan.IsEmpty)
             {
-                await EnsureDependenciesAsync(client, registry, ct);
+                await EnsureDependenciesAsync(client, registry, status, ct);
                 return true;
             }
 
             var vm = new PreLaunchReviewViewModel(inv.FrameworkVersion, target, AppInfo.LauncherVersion, installed, registry,
                 client.AutoUpdateBeforeLaunch, client.GameMiniDir, _deps.Installer, _deps.Plugins, _deps.Http);
             if (await _prompt(vm) == PreLaunchResult.Cancel) return false;
-            await EnsureDependenciesAsync(client, registry, ct);
+            await EnsureDependenciesAsync(client, registry, status, ct);
             return true;
         }
         // Fix round 1, Important 1: HttpClient's own request timeout throws OperationCanceledException
@@ -70,22 +75,51 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
     }
 
     /// <summary>The dialog may have installed/updated/disabled plugins, so this re-reads the inventory
-    /// rather than reusing the plan's — then brings every installed plugin's dependencies up to date.
-    /// Swallows any non-cancel failure (including an HttpClient timeout surfacing as an uncancelled
-    /// OperationCanceledException — fix round 1, Important 1): a dependency problem is surfaced on its
-    /// own plugin page, never here, and must never be the reason a launch doesn't proceed.</summary>
-    private async Task EnsureDependenciesAsync(ClientProfile client, IReadOnlyList<PluginEntry> registry, CancellationToken ct)
+    /// rather than reusing the plan's — then removes dependencies left by plugins that are gone (Task 6 b)
+    /// and brings every installed plugin's dependencies up to date, reporting progress on the state line
+    /// and writing each resulting status line to the launcher log (Task 6 c). Swallows any non-cancel
+    /// failure (including an HttpClient timeout surfacing as an uncancelled OperationCanceledException —
+    /// fix round 1, Important 1): a dependency problem is surfaced on its own plugin page, never here, and
+    /// must never be the reason a launch doesn't proceed.</summary>
+    private async Task EnsureDependenciesAsync(ClientProfile client, IReadOnlyList<PluginEntry> registry,
+        Action<string?> status, CancellationToken ct)
     {
         try
         {
             var inv = _inventory.Read(client, registry);
+            SweepOrphans(client, inv.Plugins.Where(p => p.Installed || p.Disabled).Select(p => p.Entry.Id));
             var installed = inv.Plugins.Where(p => p.Installed && p.Version is not null)
                 .Select(p => (p.Entry, p.Version!)).ToList();
-            await DependencyRunner.EnsureForClientAsync(_deps.Dependencies, client, installed, ct);
+            var lines = await DependencyRunner.EnsureForClientAsync(_deps.Dependencies, client, installed, ct, t => status(t));
+            foreach (var line in lines) Log(client, line);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception) { /* fail-open — launch is never blocked by a dependency problem */ }
+        catch (Exception ex) { Log(client, $"dependencies: {ex.Message}"); /* fail-open — launch is never blocked by a dependency problem */ }
     }
+
+    /// <summary>Task 6 (b): a ledger whose plugin is no longer installed on this client (removed by hand,
+    /// or its own cleanup failed) has its files removed. A plugin counts as present when the registry
+    /// inventory sees it (installed or disabled) OR its folder still holds a version marker / sits under
+    /// plugins-disabled — so a plugin missing from the registry never loses its dependencies. Each ledger
+    /// is fail-open on its own.</summary>
+    private void SweepOrphans(ClientProfile client, IEnumerable<string> presentIds)
+    {
+        var present = presentIds.ToHashSet(StringComparer.Ordinal);
+        foreach (var id in _deps.Dependencies.LedgerPluginIds(client.GameMiniDir))
+        {
+            try
+            {
+                if (present.Contains(id) || _deps.Plugins.IsInstalled(client.GameMiniDir, id)
+                    || _deps.Plugins.IsDisabled(client.GameMiniDir, id)) continue;
+                _deps.Dependencies.RemoveAll(client.GameMiniDir, id);
+                Log(client, $"{id}: plugin no longer installed — its dependencies were removed");
+            }
+            catch (Exception ex) { Log(client, $"{id}: orphaned dependencies could not be removed — {ex.Message}"); }
+        }
+    }
+
+    /// <summary>The launcher's log (stellar-launcher.log when debug logging is on — see Program.cs).</summary>
+    private static void Log(ClientProfile client, string line) => Trace.WriteLine($"[deps] {client.Name}: {line}");
 
     /// <summary>Vanilla launches park every moddedOnly dependency file out of the game tree. Best-effort —
     /// launch is never blocked by this.</summary>

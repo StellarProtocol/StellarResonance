@@ -38,10 +38,19 @@ public class PreLaunchReviewServiceTests
             return Task.FromResult<IReadOnlyList<DependencyStatus>>(
                 deps.Select(d => new DependencyStatus(d.Id, DependencyState.Installed, null)).ToList());
         }
+        public bool ReportNotInstalled;
+        public bool ThrowOnRemoveAll;
+        public List<string> Ledgers = new();
         public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,
-            IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds) => Array.Empty<DependencyStatus>();
+            IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds) =>
+            deps.Select(d => new DependencyStatus(d.Id, ReportNotInstalled ? DependencyState.NotInstalled : DependencyState.Installed, null)).ToList();
         public void Remove(string gameMini, string pluginId, string dependencyId) { }
-        public void RemoveAll(string gameMini, string pluginId) { }
+        public void RemoveAll(string gameMini, string pluginId)
+        {
+            Calls.Add($"RemoveAll:{pluginId}");
+            if (ThrowOnRemoveAll) throw new IOException("locked");
+        }
+        public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Ledgers;
         public void ParkModdedOnly(string gameMini) => Calls.Add("Park");
         public void UnparkModdedOnly(string gameMini)
         {
@@ -274,5 +283,92 @@ public class PreLaunchReviewServiceTests
             var manifest = new FrameworkManifest("2.0.0", null, new[] { version });
             return Task.FromResult(manifest);
         }
+    }
+
+    // Task 6 (b): a ledger whose plugin is no longer installed (not in the inventory, no version marker,
+    // not disabled) is swept with RemoveAll before ensuring; ledgers of present plugins — installed,
+    // disabled, or installed but missing from the registry — are left alone. A failing sweep is fail-open.
+    [Fact]
+    public async Task Orphaned_ledgers_are_removed_and_present_plugins_keep_theirs()
+    {
+        var fs = new MockFileSystem();
+        var entry = OnePluginWithDependency();
+        var fake = new FakeDependencyService { Ledgers = { "p1", "gone", "disabledone", "notinregistry" } };
+        var (deps, inventory) = BuildInstalledP1(fs, fake);
+        fs.AddFile("/g/stellar/plugins-disabled/disabledone/D.dll", new MockFileData("x"));
+        fs.AddFile("/g/stellar/plugins/notinregistry/N.dll", new MockFileData("x"));
+        fs.AddFile("/g/stellar/plugins/notinregistry/.plugin-version", new MockFileData("3.0.0"));
+        var sut = new PreLaunchReviewService(new RegistryCache(new OneEntryRegistry(entry), () => new LauncherConfig()),
+            inventory, new Online(), deps, _ => Task.FromResult(PreLaunchResult.Proceed));
+
+        var result = await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g", AutoUpdateBeforeLaunch = true }, CancellationToken.None);
+
+        Assert.True(result);
+        Assert.Equal(new[] { "Unpark", "RemoveAll:gone", "Ensure:p1" }, fake.Calls);
+    }
+
+    [Fact]
+    public async Task A_failing_orphan_sweep_still_ensures_and_launches()
+    {
+        var fs = new MockFileSystem();
+        var entry = OnePluginWithDependency();
+        var fake = new FakeDependencyService { Ledgers = { "gone" }, ThrowOnRemoveAll = true };
+        var (deps, inventory) = BuildInstalledP1(fs, fake);
+        var sut = new PreLaunchReviewService(new RegistryCache(new OneEntryRegistry(entry), () => new LauncherConfig()),
+            inventory, new Online(), deps, _ => Task.FromResult(PreLaunchResult.Proceed));
+
+        var result = await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g", AutoUpdateBeforeLaunch = true }, CancellationToken.None);
+
+        Assert.True(result);
+        Assert.Equal(new[] { "Unpark", "RemoveAll:gone", "Ensure:p1" }, fake.Calls);
+    }
+
+    // Task 6 (d): while dependencies still need downloading, the review reports "Preparing <plugin>:
+    // <dependency>…" through the status callback (ClientSessions shows it on the client's state line).
+    [Fact]
+    public async Task Review_reports_preparing_status_for_dependencies_still_to_download()
+    {
+        var fs = new MockFileSystem();
+        var entry = OnePluginWithDependency();
+        var fake = new FakeDependencyService { ReportNotInstalled = true };
+        var (deps, inventory) = BuildInstalledP1(fs, fake);
+        var sut = new PreLaunchReviewService(new RegistryCache(new OneEntryRegistry(entry), () => new LauncherConfig()),
+            inventory, new Online(), deps, _ => Task.FromResult(PreLaunchResult.Proceed));
+        var seen = new List<string?>();
+
+        Assert.True(await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g", AutoUpdateBeforeLaunch = true }, seen.Add, CancellationToken.None));
+
+        Assert.Equal(new[] { "Preparing Plugin One: Dep One…" }, seen);
+    }
+
+    // Task 6 (c): every status line EnsureForClientAsync returns at launch is written to the launcher log
+    // (System.Diagnostics.Trace — stellar-launcher.log when debug logging is on).
+    [Fact]
+    public async Task Review_writes_dependency_status_lines_to_the_launcher_log()
+    {
+        var fs = new MockFileSystem();
+        var entry = OnePluginWithDependency();
+        var fake = new FakeDependencyService();
+        var (deps, inventory) = BuildInstalledP1(fs, fake);
+        var sut = new PreLaunchReviewService(new RegistryCache(new OneEntryRegistry(entry), () => new LauncherConfig()),
+            inventory, new Online(), deps, _ => Task.FromResult(PreLaunchResult.Proceed));
+        var listener = new CapturingListener();
+        System.Diagnostics.Trace.Listeners.Add(listener);
+        try
+        {
+            var client = new ClientProfile { Name = "LogCheckClient", Modded = true, GameMiniDir = "/g", AutoUpdateBeforeLaunch = true };
+            Assert.True(await sut.ReviewAsync(client, CancellationToken.None));
+        }
+        finally { System.Diagnostics.Trace.Listeners.Remove(listener); }
+
+        Assert.Contains("[deps] LogCheckClient: p1/dep1: Installed", listener.Lines);
+    }
+
+    private sealed class CapturingListener : System.Diagnostics.TraceListener
+    {
+        public readonly System.Collections.Concurrent.ConcurrentQueue<string> Queue = new();
+        public IReadOnlyList<string> Lines => Queue.ToList();
+        public override void Write(string? message) { }
+        public override void WriteLine(string? message) { if (message is not null) Queue.Enqueue(message); }
     }
 }

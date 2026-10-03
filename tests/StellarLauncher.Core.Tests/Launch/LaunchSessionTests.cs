@@ -100,4 +100,30 @@ public class LaunchSessionTests
         s.AttachRunning(new FakeProcess(), T0);
         Assert.Equal(SessionState.Running, s.State); Assert.True(s.CanStop); Assert.Equal(T0, s.StartedAt);
     }
+
+    // Task 6 (d): the pre-launch review's progress ("Preparing <plugin>: <dependency>…") lives in its own
+    // field, cleared by Begin, and never touches StatusText (a previous failure message survives).
+    [Fact]
+    public void ReviewText_is_separate_from_StatusText_and_cleared_by_Begin()
+    {
+        var s = new LaunchSession("c1");
+        s.Apply(new FailedEvent("boom"));
+        var changes = 0; s.Changed += _ => changes++;
+
+        s.SetReviewText("Preparing P: Dep…");
+        Assert.Equal("Preparing P: Dep…", s.ReviewText);
+        Assert.Equal("boom", s.StatusText);
+        Assert.Equal(1, changes);
+
+        s.SetReviewText(null);
+        Assert.Null(s.ReviewText);
+        Assert.Equal("boom", s.StatusText);
+
+        s.SetReviewText("again");
+        s.Begin(T0);
+        Assert.Null(s.ReviewText);
+
+        s.SetReviewText("ignored while busy");
+        Assert.Null(s.ReviewText);
+    }
 }

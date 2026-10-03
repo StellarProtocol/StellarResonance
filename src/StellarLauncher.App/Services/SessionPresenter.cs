@@ -10,6 +10,7 @@ public static class SessionPresenter
 {
     public static string StateLine(LaunchSession s, InventorySnapshot inv, bool modded) => s.State switch
     {
+        _ when !s.IsBusy && s.ReviewText is { Length: > 0 } review => review,   // pre-launch review (e.g. dependencies)
         SessionState.Running when s.StartedAt is { } t => $"running · {Elapsed(t)}",
         SessionState.Running => "running",
         SessionState.Launching or SessionState.Preparing => s.StatusText,
@@ -21,6 +22,7 @@ public static class SessionPresenter
 
     public static IBrush StateBrush(LaunchSession s, InventorySnapshot inv) => new SolidColorBrush(Color.Parse(s.State switch
     {
+        _ when !s.IsBusy && s.ReviewText is { Length: > 0 } => "#9ec2ff",   // same colour as Launching/Preparing
         SessionState.Running or SessionState.SteamHandoff => "#54e3a0",
         SessionState.Launching or SessionState.Preparing => "#9ec2ff",
         SessionState.Failed => "#ff9a9a",

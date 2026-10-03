@@ -23,6 +23,28 @@
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="TextElement.Foreground" Value="#8cb0ff"/>
     </Style>
+    <!-- dependency state pills: the page's existing badge colours (INSTALLED / CHANGED / REMOVED);
+         "off" is the neutral outline -->
+    <Style Selector="Border.pill">
+      <Setter Property="CornerRadius" Value="9"/>
+      <Setter Property="Padding" Value="8,2"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="#222a44"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Border.pill > TextBlock">
+      <Setter Property="FontSize" Value="10.5"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="#8a93b2"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <Style Selector="Border.pill.ok"><Setter Property="Background" Value="#2354e3a0"/><Setter Property="BorderBrush" Value="#2354e3a0"/></Style>
+    <Style Selector="Border.pill.ok > TextBlock"><Setter Property="Foreground" Value="#9affd0"/></Style>
+    <Style Selector="Border.pill.warn"><Setter Property="Background" Value="#23ffcf6b"/><Setter Property="BorderBrush" Value="#23ffcf6b"/></Style>
+    <Style Selector="Border.pill.warn > TextBlock"><Setter Property="Foreground" Value="#ffcf6b"/></Style>
+    <Style Selector="Border.pill.bad"><Setter Property="Background" Value="#23ff6b6b"/><Setter Property="BorderBrush" Value="#23ff6b6b"/></Style>
+    <Style Selector="Border.pill.bad > TextBlock"><Setter Property="Foreground" Value="#ff9a9a"/></Style>
   </UserControl.Styles>
   <Panel>
     <!-- ======================= DETAIL PAGE (moved verbatim from PluginsView.axaml) ======================= -->
@@ -185,6 +207,67 @@
                       <TextBlock Text="This plugin hasn't published a guide yet — the description above covers the basics."
                                  IsVisible="{Binding !HasGuideUrl}" Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
                       <views:MarkdownView Markdown="{Binding GuideMarkdown}" BaseUrl="{Binding Entry.GuideUrl}"/>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+
+                <!-- dependencies: declared by the shown version's manifest, installed by the launcher -->
+                <StackPanel Spacing="7" IsVisible="{Binding HasDependencies}">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="section" Text="DEPENDENCIES"/>
+                    <TextBlock Text="— declared by this plugin, installed by the launcher before the game starts"
+                               Foreground="#566083" FontSize="10" VerticalAlignment="Center"/>
+                  </StackPanel>
+                  <Border Background="#10141f" BorderBrush="#222a44" BorderThickness="1"
+                          CornerRadius="12" Padding="14,12">
+                    <StackPanel Spacing="10">
+                      <ItemsControl ItemsSource="{Binding Dependencies}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:DependencyItemViewModel">
+                            <Border BorderBrush="#222a44" BorderThickness="1" CornerRadius="8"
+                                    Padding="10,8" Margin="0,0,0,6">
+                              <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                                <CheckBox Grid.Column="0" IsChecked="{Binding Use}" IsEnabled="{Binding IsOptional}"
+                                          VerticalAlignment="Center" MinWidth="0" Padding="0"/>
+                                <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                  <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="12.5"/>
+                                    <TextBlock Text="{Binding Version}" Foreground="#8a93b2" FontSize="12.5"/>
+                                    <Border Classes="pill" IsVisible="{Binding IsOptional}">
+                                      <TextBlock Text="optional"/>
+                                    </Border>
+                                  </StackPanel>
+                                  <TextBlock Text="{Binding Where}" Foreground="#8a93b2" FontSize="11.5" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                  <TextBlock Text="{Binding License}" FontFamily="{StaticResource MonoFont}" FontSize="11"
+                                             Foreground="#697297" VerticalAlignment="Center"/>
+                                  <Button Classes="link" Content="licence ↗" IsVisible="{Binding HasLicenseUrl}"
+                                          Command="{Binding $parent[UserControl].((wsvm:ClientPluginsViewModel)DataContext).OpenLinkCommand}"
+                                          CommandParameter="{Binding LicenseUrl}"/>
+                                  <Button Classes="link" Content="source ↗" IsVisible="{Binding HasSourceUrl}"
+                                          Command="{Binding $parent[UserControl].((wsvm:ClientPluginsViewModel)DataContext).OpenLinkCommand}"
+                                          CommandParameter="{Binding SourceUrl}"/>
+                                </StackPanel>
+                                <Border Grid.Column="3" Classes="pill" MaxWidth="280"
+                                        Classes.ok="{Binding IsOk}" Classes.warn="{Binding IsWarn}" Classes.bad="{Binding IsBad}">
+                                  <TextBlock Text="{Binding StateText}"/>
+                                </Border>
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <ItemsControl ItemsSource="{Binding DependencyNotices}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="sys:String">
+                            <Border Background="#1Affcf6b" CornerRadius="8" Padding="11,8" Margin="0,0,0,6">
+                              <TextBlock Classes="body amber" Text="{Binding}" FontSize="12" TextWrapping="Wrap" LineHeight="17"/>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock Text="{Binding DependencyFootnote}" Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
                     </StackPanel>
                   </Border>
                 </StackPanel>

@@ -15,6 +15,10 @@ public sealed class LaunchSession
     public IGameProcess? Process { get; private set; }
     public DateTimeOffset? StartedAt { get; private set; }
     public int? ExitCode { get; private set; }
+    /// <summary>What the pre-launch review is doing right now (e.g. "Preparing Photo Studio: …"), shown on
+    /// the state line before <see cref="Begin"/>; null when no review is running. Kept apart from
+    /// <see cref="StatusText"/> so a previous run's failure message survives a cancelled review.</summary>
+    public string? ReviewText { get; private set; }
 
     public event Action<LaunchSession>? Changed;
 
@@ -28,7 +32,7 @@ public sealed class LaunchSession
     {
         if (!CanLaunch) throw new InvalidOperationException($"cannot launch while {State}");
         State = SessionState.Launching; StartedAt = now; ExitCode = null; Process = null;
-        Progress = null; ProgressIndeterminate = false; StatusText = "launching…";
+        Progress = null; ProgressIndeterminate = false; StatusText = "launching…"; ReviewText = null;
         Raise();
     }
 
@@ -48,6 +52,15 @@ public sealed class LaunchSession
             case FailedEvent f:
                 State = SessionState.Failed; StatusText = f.Message; Progress = null; ProgressIndeterminate = false; break;
         }
+        Raise();
+    }
+
+    /// <summary>Sets (or, with null, clears) <see cref="ReviewText"/>. Ignored while the session is busy —
+    /// a running game's state line is never overwritten by a review.</summary>
+    public void SetReviewText(string? text)
+    {
+        if (IsBusy || ReviewText == text) return;
+        ReviewText = text;
         Raise();
     }
 

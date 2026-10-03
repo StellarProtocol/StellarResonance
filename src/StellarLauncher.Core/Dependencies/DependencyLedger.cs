@@ -98,6 +98,19 @@ public sealed class DependencyLedgerStore
         _fs.File.Move(tmp, path, overwrite: true); // atomic — never a half-written ledger
     }
 
+    /// <summary>Ids with a ledger file on disk — file stems only, validated like <see cref="ReadAll"/>;
+    /// no ledger is read, so this never quarantines anything.</summary>
+    public IReadOnlyList<string> PluginIds(string gameMini)
+    {
+        var dir = DependencyPaths.LedgerDir(gameMini);
+        if (!_fs.Directory.Exists(dir)) return Array.Empty<string>();
+        return _fs.Directory.GetFiles(dir, "*.json")
+            .Where(f => f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            .Select(f => _fs.Path.GetFileNameWithoutExtension(f))
+            .Where(DependencyPaths.IsValidPluginId)
+            .OrderBy(id => id, StringComparer.Ordinal).ToList();
+    }
+
     public IReadOnlyList<DependencyLedger> ReadAll(string gameMini)
     {
         var dir = DependencyPaths.LedgerDir(gameMini);
