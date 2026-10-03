@@ -69,48 +69,44 @@ public sealed partial class DependencyService : IDependencyService
         foreach (var d in deps)
         {
             ct.ThrowIfCancellationRequested();
-            DependencyStatus status;
-            if (DependencyDeclaration.Problem(d) is { } problem)   // I5/M-a/M-b: never downloaded, nothing touched
-            {
+            // I5/M-a/M-b: a declaration the launcher refuses is never downloaded, and nothing is touched.
+            if (DependencyDeclaration.Problem(d) is { } problem)
                 results[Key(d)] = new DependencyStatus(d.Id, DependencyState.Failed, problem);
-                continue;
-            }
-            var gate = GateStatus(d, skippedIds, results);
-            if (gate is not null)
-            {
-                if (gate.State == DependencyState.Skipped)
-                {
-                    // I6: a skip's own Remove can fail on IO — that must surface as Failed, never throw.
-                    // That failure IS ledger handling, so (minor 1) it's eligible for the note.
-                    try { RemoveCore(gameMini, pluginId, d.Id); status = gate; }
-                    catch (Exception ex) { status = AnnotateIfCorrupt(gameMini, pluginId, new DependencyStatus(d.Id, DependencyState.Failed, ex.Message)); }
-                }
-                else
-                {
-                    status = gate; // minor 1: a bare gate status ("requires … listed earlier"/"waiting for …") is never annotated
-                }
-            }
+            else if (GateStatus(d, skippedIds, results) is { } gate)
+                results[Key(d)] = ApplyGate(gameMini, pluginId, d, gate);
             else
-            {
-                try
-                {
-                    status = await EnsureOneAsync(gameMini, pluginId, d, ct).ConfigureAwait(false);
-                    // A Failed returned HERE (not thrown) is always a download/verify failure — never annotated (minor 1).
-                    if (status.State == DependencyState.Blocked) status = AnnotateIfCorrupt(gameMini, pluginId, status);
-                }
-                // Fix round 1, Important 1: EnsureOneAsync already converts an uncancelled OCE (e.g. an
-                // HttpClient timeout) to a Failed status rather than throwing — this guard is defense in
-                // depth for the same rule, never relying on EnsureOneAsync alone to apply it.
-                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-                catch (Exception ex)
-                {
-                    // Anything that escaped as an exception came from placement or ledger handling — eligible.
-                    status = AnnotateIfCorrupt(gameMini, pluginId, new DependencyStatus(d.Id, DependencyState.Failed, ex.Message));
-                }
-            }
-            results[Key(d)] = status;
+                results[Key(d)] = await EnsureGuardedAsync(gameMini, pluginId, d, ct).ConfigureAwait(false);
         }
         return deps.Select(d => results[Key(d)]).ToList();
+    }
+
+    /// <summary>A gated dependency: a Skip removes what it placed (I6: an IO failure there is Failed, never a
+    /// throw — and, being ledger handling, eligible for the unreadable note, minor 1); any other gate status
+    /// ("requires … listed earlier", "waiting for …") is returned bare, never annotated.</summary>
+    private DependencyStatus ApplyGate(string gameMini, string pluginId, PluginDependency d, DependencyStatus gate)
+    {
+        if (gate.State != DependencyState.Skipped) return gate;
+        try { RemoveCore(gameMini, pluginId, d.Id); return gate; }
+        catch (Exception ex) { return AnnotateIfCorrupt(gameMini, pluginId, new DependencyStatus(d.Id, DependencyState.Failed, ex.Message)); }
+    }
+
+    /// <summary><see cref="EnsureOneAsync"/>, turning anything but the caller's own cancel into a status.</summary>
+    private async Task<DependencyStatus> EnsureGuardedAsync(string gameMini, string pluginId, PluginDependency d, CancellationToken ct)
+    {
+        try
+        {
+            var status = await EnsureOneAsync(gameMini, pluginId, d, ct).ConfigureAwait(false);
+            // A Failed returned HERE (not thrown) is always a download/verify failure — never annotated (minor 1).
+            return status.State == DependencyState.Blocked ? AnnotateIfCorrupt(gameMini, pluginId, status) : status;
+        }
+        // Fix round 1, Important 1: EnsureOneAsync already converts an uncancelled OCE (e.g. an HttpClient
+        // timeout) to a Failed status rather than throwing — this guard is defense in depth for the same rule.
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            // Anything that escaped as an exception came from placement or ledger handling — eligible.
+            return AnnotateIfCorrupt(gameMini, pluginId, new DependencyStatus(d.Id, DependencyState.Failed, ex.Message));
+        }
     }
 
     /// <summary>A dependency's results key — "" for a declaration with no id at all (reported Failed).</summary>
