@@ -34,6 +34,7 @@ public sealed partial class DependencyService : IDependencyService
         foreach (var d in deps)
         {
             ct.ThrowIfCancellationRequested();
+            DependencyStatus status;
             var gate = GateStatus(d, skippedIds, results);
             if (gate is not null)
             {
@@ -41,14 +42,18 @@ public sealed partial class DependencyService : IDependencyService
                 try
                 {
                     if (gate.State == DependencyState.Skipped) Remove(gameMini, pluginId, d.Id);
-                    results[d.Id] = gate;
+                    status = gate;
                 }
-                catch (Exception ex) { results[d.Id] = new DependencyStatus(d.Id, DependencyState.Failed, ex.Message); }
-                continue;
+                catch (Exception ex) { status = new DependencyStatus(d.Id, DependencyState.Failed, ex.Message); }
             }
-            try { results[d.Id] = await EnsureOneAsync(gameMini, pluginId, d, ct); }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { results[d.Id] = new DependencyStatus(d.Id, DependencyState.Failed, ex.Message); }
+            else
+            {
+                try { status = await EnsureOneAsync(gameMini, pluginId, d, ct); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) { status = new DependencyStatus(d.Id, DependencyState.Failed, ex.Message); }
+            }
+            // Applied once, uniformly, regardless of which branch produced the status (see AnnotateIfCorrupt).
+            results[d.Id] = AnnotateIfCorrupt(gameMini, pluginId, status);
         }
         return deps.Select(d => results[d.Id]).ToList();
     }

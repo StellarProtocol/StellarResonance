@@ -24,18 +24,6 @@ public sealed class DependencyLedgerStore
     public DependencyLedger Read(string gameMini, string pluginId, bool quarantine = true) =>
         TryRead(gameMini, pluginId, quarantine) ?? new DependencyLedger(pluginId, new LedgerEntry[0]);
 
-    /// <summary>Like <see cref="Read"/>, but also reports whether this plugin is currently flagged
-    /// unreadable (Important 2c). WasCorrupt is derived from whether <c>&lt;id&gt;.json.corrupt</c> exists
-    /// on disk right now (Important 2, round 4) — never from whether THIS call is the one that quarantined
-    /// it, so the note survives regardless of which caller (Park's ReadAll, another EnsureAsync, …)
-    /// happened to discover the corruption first.</summary>
-    public (DependencyLedger Ledger, bool WasCorrupt) ReadWithStatus(string gameMini, string pluginId)
-    {
-        var ledger = TryRead(gameMini, pluginId, quarantine: true) ?? new DependencyLedger(pluginId, new LedgerEntry[0]);
-        var wasCorrupt = _fs.File.Exists(DependencyPaths.LedgerFile(gameMini, pluginId) + ".corrupt");
-        return (ledger, wasCorrupt);
-    }
-
     /// <summary>Null means "nothing readable" — a missing file, or one that failed to parse, didn't have
     /// the right shape, or couldn't be read. Never throws. Important 1 (round 4): only a parse failure
     /// (<see cref="JsonException"/>) or a shape failure is quarantined — an <see cref="IOException"/> or

@@ -17,10 +17,10 @@ public sealed partial class DependencyService
 {
     private async Task<DependencyStatus> EnsureOneAsync(string gameMini, string pluginId, PluginDependency dep, CancellationToken ct)
     {
-        var (ledger, wasCorrupt) = _store.ReadWithStatus(gameMini, pluginId); // Important 2(c)
+        var ledger = _store.Read(gameMini, pluginId);
         var existing = ledger.Entries.FirstOrDefault(e => e.DependencyId == dep.Id);
         if (IsInstalled(gameMini, existing, dep))
-            return Annotate(new DependencyStatus(dep.Id, DependencyState.Installed, null), wasCorrupt, pluginId);
+            return new DependencyStatus(dep.Id, DependencyState.Installed, null);
 
         var bytes = await DownloadCappedAsync(dep.Url, dep.Size, ct);
         if (!string.Equals(DependencyFileHash.Of(bytes), dep.Sha256, StringComparison.OrdinalIgnoreCase))
@@ -29,8 +29,9 @@ public sealed partial class DependencyService
         var files = BuildFiles(gameMini, pluginId, dep, bytes);
         foreach (var f in files)
         {
+            // The "unreadable" note (if any) is applied once, uniformly, by EnsureAsync — not here.
             var blocked = CheckDestination(gameMini, pluginId, dep.Id, existing, f.Abs);
-            if (blocked is not null) return Annotate(blocked, wasCorrupt, pluginId);
+            if (blocked is not null) return blocked;
         }
 
         // C1/I1: placement is transactional — anything this attempt creates OR overwrites is rolled back
@@ -61,14 +62,21 @@ public sealed partial class DependencyService
             throw new InvalidOperationException($"{original.Message} (rollback incomplete)", original);
         }
 
-        return Annotate(new DependencyStatus(dep.Id, DependencyState.Installed, null), wasCorrupt, pluginId);
+        return new DependencyStatus(dep.Id, DependencyState.Installed, null);
     }
 
-    /// <summary>Important 2(c): a plugin whose ledger was found unreadable this pass carries that fact on
-    /// every status it reports — appended to an existing Blocked detail, or set as Installed's.</summary>
-    private static DependencyStatus Annotate(DependencyStatus status, bool wasCorrupt, string pluginId)
+    /// <summary>Important 2(c), follow-up: the "dependency record was unreadable…" note only ever
+    /// explains a Blocked or Failed outcome — Installed/Skipped/NotInstalled are fine outcomes, and since
+    /// the <c>.corrupt</c> evidence is never auto-deleted, annotating a fine outcome would leave a scary
+    /// note on a healthy install forever. Derived from whether <c>&lt;id&gt;.json.corrupt</c> exists on
+    /// disk right now — never from whether this call is the one that quarantined it — so the note appears
+    /// (and keeps appearing) regardless of which earlier call discovered the corruption. Called exactly
+    /// once per dependency, by <see cref="DependencyService.EnsureAsync"/>, after every other outcome
+    /// (skip, requires-gate, placement) has already been decided.</summary>
+    private DependencyStatus AnnotateIfCorrupt(string gameMini, string pluginId, DependencyStatus status)
     {
-        if (!wasCorrupt) return status;
+        if (status.State is not (DependencyState.Blocked or DependencyState.Failed)) return status;
+        if (!_fs.File.Exists(DependencyPaths.LedgerFile(gameMini, pluginId) + ".corrupt")) return status;
         var note = $"dependency record was unreadable; kept as {pluginId}.json.corrupt";
         return status with { Detail = status.Detail is null ? note : $"{status.Detail}; {note}" };
     }
