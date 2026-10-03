@@ -1,0 +1,47 @@
+using StellarLauncher.Core.Dependencies;
+using Xunit;
+namespace StellarLauncher.Core.Tests.Dependencies;
+
+/// <summary>I2 (a modified owned file is never overwritten) and M1 (ownership is checked whether or not
+/// the destination exists) from the Task 4 fix-round-2 review. Shares helpers/fields with
+/// <see cref="DependencyServiceTests"/>.</summary>
+public sealed partial class DependencyServiceTests
+{
+    // I2: a launcher-placed file the user edited afterward is "the player's file" — Ensure must not
+    // overwrite it, must report Blocked "<path> (modified)", and must drop it from the ledger so it is
+    // never touched again (future attempts treat it as an ordinary foreign file).
+    [Fact]
+    public async Task A_user_modified_owned_file_blocks_as_modified_and_is_dropped_from_the_ledger()
+    {
+        var d = File("fx", new byte[] { 1 }, "dxgi.dll");
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { d }, None, default);
+        _fs.File.WriteAllBytes("/game_mini/dxgi.dll", new byte[] { 42 }); // the user replaces it
+
+        var d2 = File("fx", new byte[] { 2 }, "dxgi.dll") with { Version = "2.0" };
+        var st = Assert.Single(await s.EnsureAsync(G, "p", new[] { d2 }, None, default));
+
+        Assert.Equal(DependencyState.Blocked, st.State);
+        Assert.Equal("dxgi.dll (modified)", st.Detail);
+        Assert.Equal(new byte[] { 42 }, _fs.File.ReadAllBytes("/game_mini/dxgi.dll"));
+        Assert.Empty(new DependencyLedgerStore(_fs).Read(G, "p").Entries);
+    }
+
+    // M1: ownership is checked regardless of presence — a path another plugin's ledger records, even
+    // while currently parked away (so nothing physically sits there right now), is still foreign.
+    [Fact]
+    public async Task A_parked_file_owned_by_another_plugin_is_still_foreign()
+    {
+        var qDep = File("fx", new byte[] { 1 }, "dxgi.dll", modded: true);
+        var s = Make();
+        await s.EnsureAsync(G, "q", new[] { qDep }, None, default);
+        s.ParkModdedOnly(G); // the destination no longer physically exists
+
+        var pDep = File("fx2", new byte[] { 2 }, "dxgi.dll");
+        var st = Assert.Single(await s.EnsureAsync(G, "p", new[] { pDep }, None, default));
+
+        Assert.Equal(DependencyState.Blocked, st.State);
+        Assert.False(_fs.File.Exists("/game_mini/dxgi.dll"));
+        Assert.True(_fs.File.Exists("/game_mini/stellar/deps-parked/q/dxgi.dll"));
+    }
+}

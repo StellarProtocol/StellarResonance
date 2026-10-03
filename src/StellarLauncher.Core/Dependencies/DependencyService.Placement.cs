@@ -10,9 +10,9 @@ using StellarLauncher.Core.Model;
 namespace StellarLauncher.Core.Dependencies;
 
 /// <summary>Download/verify/place mechanics for a single dependency (rules 2-5 of the dependency-service
-/// contract, plus C1's transactional placement). See <see cref="DependencyService.EnsureAsync"/> for the
-/// skip/requires handling around this, <c>.Zip</c> for building the file list, and <c>.Ownership</c> for
-/// the foreign-file check.</summary>
+/// contract, plus C1/I1's transactional placement). See <see cref="DependencyService.EnsureAsync"/> for
+/// the skip/requires handling around this, <c>.Zip</c> for building the file list, and <c>.Ownership</c>
+/// for the foreign/modified-file check.</summary>
 public sealed partial class DependencyService
 {
     private async Task<DependencyStatus> EnsureOneAsync(string gameMini, string pluginId, PluginDependency dep, CancellationToken ct)
@@ -28,10 +28,13 @@ public sealed partial class DependencyService
 
         var files = BuildFiles(gameMini, pluginId, dep, bytes);
         foreach (var f in files)
-            if (IsForeign(gameMini, pluginId, dep.Id, f.Abs))
-                return new DependencyStatus(dep.Id, DependencyState.Blocked, DependencyPaths.Relative(gameMini, f.Abs));
+        {
+            var blocked = CheckDestination(gameMini, pluginId, dep.Id, existing, f.Abs);
+            if (blocked is not null) return blocked;
+        }
 
-        // C1: placement is transactional — anything this attempt creates is rolled back on any failure,
+        // C1/I1: placement is transactional — anything this attempt creates OR overwrites is rolled back
+        // on any failure (a pre-existing destination is backed up to .stellar-bak before being replaced),
         // and the ledger is written only once every file is safely in place.
         var preExisting = new HashSet<string>(files.Select(f => f.Abs).Where(_fs.File.Exists), StringComparer.Ordinal);
         try
@@ -43,17 +46,20 @@ public sealed partial class DependencyService
                 dep.ModdedOnly && dep.Target == "game")).ToList());
             var entries = ledger.Entries.Where(e => e.DependencyId != dep.Id).Append(newEntry).ToList();
             _store.Write(gameMini, new DependencyLedger(pluginId, entries));
+            CleanupBackups(files);
         }
         catch
         {
-            RollbackCreatedFiles(files, preExisting);
+            // Minor 4: a rollback failure must never replace the ORIGINAL exception as the reported cause.
+            try { RollbackCreatedFiles(files, preExisting); RestoreBackups(files); }
+            catch { /* best-effort — the exception below (the real cause) is what EnsureAsync reports */ }
             throw;
         }
 
         return new DependencyStatus(dep.Id, DependencyState.Installed, null);
     }
 
-    /// <summary>C1: undoes everything THIS attempt put on disk — a file that did not exist before (so is
+    /// <summary>C1: undoes everything THIS attempt newly created — a file that did not exist before (so is
     /// safe to remove) and any leftover <c>.stellar-tmp</c> — so a retry never self-blocks on its own debris.</summary>
     private void RollbackCreatedFiles(List<(string Abs, byte[] Bytes)> files, HashSet<string> preExisting)
     {
@@ -62,6 +68,29 @@ public sealed partial class DependencyService
             if (!preExisting.Contains(abs) && _fs.File.Exists(abs)) _fs.File.Delete(abs);
             var tmp = abs + ".stellar-tmp";
             if (_fs.File.Exists(tmp)) _fs.File.Delete(tmp);
+        }
+    }
+
+    /// <summary>I1: restores every <c>.stellar-bak</c> this attempt took of a pre-existing destination, so
+    /// a failed UPDATE leaves the previous version intact rather than half-overwritten.</summary>
+    private void RestoreBackups(List<(string Abs, byte[] Bytes)> files)
+    {
+        foreach (var (abs, _) in files)
+        {
+            var bak = abs + ".stellar-bak";
+            if (_fs.File.Exists(bak)) _fs.File.Move(bak, abs, overwrite: true);
+        }
+    }
+
+    /// <summary>I1: on success, the backups this attempt took are no longer needed. Best-effort — a
+    /// leftover backup is cosmetic debris, never a correctness problem, so it must not turn a successful
+    /// install into a reported failure.</summary>
+    private void CleanupBackups(List<(string Abs, byte[] Bytes)> files)
+    {
+        foreach (var (abs, _) in files)
+        {
+            var bak = abs + ".stellar-bak";
+            try { if (_fs.File.Exists(bak)) _fs.File.Delete(bak); } catch { /* best effort */ }
         }
     }
 
@@ -92,16 +121,21 @@ public sealed partial class DependencyService
         return buffer.ToArray();
     }
 
-    /// <summary>M12: a stale <c>.stellar-tmp</c> left by a previous crashed attempt is always safe to
-    /// delete (the suffix is our own naming pattern, never anything a user or tool would create), and the
-    /// temp file is cleaned up again if the final move fails. M8: a freshly (re)written destination drops
-    /// any stale parked copy, so a later Unpark can never restore outdated bytes over it.</summary>
+    /// <summary>I1: a pre-existing destination is backed up to <c>.stellar-bak</c> before being replaced.
+    /// M12: a stale <c>.stellar-tmp</c> left by a previous crashed attempt is always safe to delete (the
+    /// suffix is our own naming pattern), and the temp file is cleaned up again if the final move fails.
+    /// M8: a freshly (re)written destination drops any stale parked copy, so a later Unpark can never
+    /// restore outdated bytes over it.</summary>
     private void WriteAll(string gameMini, string pluginId, List<(string Abs, byte[] Bytes)> files)
     {
         foreach (var (abs, bytes) in files)
         {
             var dir = _fs.Path.GetDirectoryName(abs);
             if (!string.IsNullOrEmpty(dir)) _fs.Directory.CreateDirectory(dir);
+
+            var bak = abs + ".stellar-bak";
+            if (_fs.File.Exists(abs)) _fs.File.Move(abs, bak, overwrite: true); // I1
+
             var tmp = abs + ".stellar-tmp";
             if (_fs.File.Exists(tmp)) _fs.File.Delete(tmp);
             _fs.File.WriteAllBytes(tmp, bytes);

@@ -89,4 +89,17 @@ public sealed class DependencyParkingTests
         Assert.Equal("outside-x", fs.File.ReadAllText("/x"));
         Assert.Equal("outside-abs", fs.File.ReadAllText("/abs/x"));
     }
+
+    // M2: a malformed ledger next to a valid one must not stop Park from processing the valid one.
+    [Fact]
+    public void A_corrupt_ledger_file_does_not_block_parking_the_rest()
+    {
+        var (fs, s) = Setup();
+        fs.AddFile("/game_mini/stellar/deps/broken.json", new MockFileData("{ not valid json"));
+
+        s.ParkModdedOnly(G); // must not throw
+
+        Assert.False(fs.File.Exists("/game_mini/dxgi.dll"));
+        Assert.True(fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll"));
+    }
 }
