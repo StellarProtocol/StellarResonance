@@ -1,4 +1,5 @@
 using System.IO.Abstractions.TestingHelpers;
+using System.Net.Http;
 using StellarLauncher.Core.Dependencies;
 using Xunit;
 namespace StellarLauncher.Core.Tests.Dependencies;
@@ -68,5 +69,33 @@ public sealed partial class DependencyServiceTests
         Assert.Equal(DependencyState.Installed, st.State); // not Blocked "(modified)"
         Assert.Equal(new byte[] { 2 }, _fs.File.ReadAllBytes("/game_mini/dxgi.dll"));
         Assert.Single(new DependencyLedgerStore(_fs).Read(G, "p").Entries); // still tracked, not dropped
+    }
+
+    // Minor 2 (round 6): the mid-repair restore must happen BEFORE the normal backup-and-replace cycle —
+    // otherwise WriteAll's own fresh backup would overwrite the last known-good copy, so a SECOND,
+    // independent failure during this very retry would orphan the file for good instead of being
+    // restorable back to the TRUE original.
+    [Fact]
+    public async Task Mid_repair_restore_happens_before_the_normal_backup_so_a_second_failure_cannot_orphan_it()
+    {
+        var d1 = File("fx", new byte[] { 1 }, "dxgi.dll");
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { d1 }, None, default); // v1 installed; ledger records hash({1})
+
+        // Aftermath of an incomplete rollback: live file holds v2 bytes ("2"), backup holds the TRUE
+        // original v1 bytes ("1") matching the ledger.
+        _fs.File.WriteAllBytes("/game_mini/dxgi.dll", new byte[] { 2 });
+        _fs.AddFile("/game_mini/dxgi.dll.stellar-bak", new MockFileData(new byte[] { 1 }));
+
+        // This retry's OWN backup-and-replace step fails too — a second, independent failure.
+        var faulty = new FaultInjectingFileSystem(_fs, "/game_mini/dxgi.dll.stellar-bak", "Move");
+        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+        var d2 = File("fx", new byte[] { 3 }, "dxgi.dll") with { Version = "2.0" };
+
+        var st = Assert.Single(await s2.EnsureAsync(G, "p", new[] { d2 }, None, default));
+
+        Assert.Equal(DependencyState.Failed, st.State);
+        Assert.Equal(new byte[] { 1 }, _fs.File.ReadAllBytes("/game_mini/dxgi.dll")); // restored to the TRUE original — never orphaned
+        Assert.False(_fs.File.Exists("/game_mini/dxgi.dll.stellar-bak"));
     }
 }

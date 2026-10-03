@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO.Abstractions.TestingHelpers;
 using StellarLauncher.Core.Dependencies;
 using Xunit;
 namespace StellarLauncher.Core.Tests.Dependencies;
@@ -42,5 +43,26 @@ public sealed partial class DependencyServiceTests
         Assert.Equal("requires a listed earlier", st[0].Detail);
         Assert.False(_fs.File.Exists("/game_mini/b.dll"));
         Assert.Equal(DependencyState.Installed, st[1].State); // "a" itself is unaffected
+    }
+
+    // Minor 1 (round 6, narrowing round 5): the unreadable-ledger note explains a Blocked outcome or a
+    // Failed produced by placement/ledger handling — never a bare gate status, and never a download/verify
+    // failure (HTTP error, checksum mismatch, size cap), even when the plugin's ledger genuinely is corrupt.
+    [Fact]
+    public async Task Gate_and_download_verify_failures_never_carry_the_unreadable_note_even_with_a_corrupt_ledger()
+    {
+        _fs.AddFile("/game_mini/stellar/deps/p.json", new MockFileData("{ not valid json")); // discovered+quarantined when "a" is read
+        var a = File("a", new byte[] { 1 }, "a.dll") with { Sha256 = new string('0', 64) }; // forces a checksum mismatch
+        var b = File("b", new byte[] { 2 }, "b.dll", requires: new[] { "a" });
+
+        var st = await Make().EnsureAsync(G, "p", new[] { a, b }, None, default);
+
+        Assert.True(_fs.File.Exists("/game_mini/stellar/deps/p.json.corrupt")); // confirms the ledger genuinely was corrupt
+
+        Assert.Equal(DependencyState.Failed, st[0].State);
+        Assert.Equal("checksum mismatch", st[0].Detail); // download/verify failure — no note
+
+        Assert.Equal(DependencyState.Failed, st[1].State);
+        Assert.Equal("waiting for a", st[1].Detail); // gate status — no note either
     }
 }

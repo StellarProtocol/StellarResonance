@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 
 namespace StellarLauncher.Core.Dependencies;
@@ -30,7 +31,16 @@ public sealed partial class DependencyService
             // Minor 1 (round 4): a prior attempt's incomplete rollback can leave the live file holding
             // NEWER bytes than the ledger while its .stellar-bak still holds what the ledger expects —
             // that's our own half-finished repair, not the player's edit, so it's safe to overwrite.
-            if (DependencyFileHash.Matches(_fs, abs + ".stellar-bak", recorded.Sha256)) return null;
+            var bak = abs + ".stellar-bak";
+            if (DependencyFileHash.Matches(_fs, bak, recorded.Sha256))
+            {
+                // Minor 2 (round 6): restore the known-good backup over the live file FIRST, establishing
+                // it as the correct baseline before the normal backup-and-replace cycle runs. Otherwise
+                // WriteAll's own backup step would take a fresh (wrong, mid-repair) backup and destroy the
+                // last good copy — so a SECOND failure during this very retry would orphan the file for good.
+                _fs.File.Move(bak, abs, overwrite: true);
+                return null;
+            }
 
             DropFileFromLedger(gameMini, pluginId, dependencyId, rel); // I2
             return new DependencyStatus(dependencyId, DependencyState.Blocked, $"{rel} (modified)");
@@ -55,7 +65,10 @@ public sealed partial class DependencyService
     /// it was the last file), so a player-modified destination is never considered ours again.</summary>
     private void DropFileFromLedger(string gameMini, string pluginId, string dependencyId, string relPath)
     {
-        var ledger = _store.Read(gameMini, pluginId);
+        // Important (round 6): see DependencyLedgerStore.TryReadForWrite — never overwrite a ledger we
+        // simply failed to read this instant.
+        if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
+            throw new InvalidOperationException("dependency record could not be read");
         var entry = ledger.Entries.FirstOrDefault(e => e.DependencyId == dependencyId);
         if (entry is null) return;
         var remaining = entry.Files.Where(f => f.Path != relPath).ToList();

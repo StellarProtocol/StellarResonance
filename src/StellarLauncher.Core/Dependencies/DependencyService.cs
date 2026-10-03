@@ -38,22 +38,34 @@ public sealed partial class DependencyService : IDependencyService
             var gate = GateStatus(d, skippedIds, results);
             if (gate is not null)
             {
-                // I6: a skip's own Remove can fail on IO — that must surface as Failed, never throw.
-                try
+                if (gate.State == DependencyState.Skipped)
                 {
-                    if (gate.State == DependencyState.Skipped) Remove(gameMini, pluginId, d.Id);
-                    status = gate;
+                    // I6: a skip's own Remove can fail on IO — that must surface as Failed, never throw.
+                    // That failure IS ledger handling, so (minor 1) it's eligible for the note.
+                    try { Remove(gameMini, pluginId, d.Id); status = gate; }
+                    catch (Exception ex) { status = AnnotateIfCorrupt(gameMini, pluginId, new DependencyStatus(d.Id, DependencyState.Failed, ex.Message)); }
                 }
-                catch (Exception ex) { status = new DependencyStatus(d.Id, DependencyState.Failed, ex.Message); }
+                else
+                {
+                    status = gate; // minor 1: a bare gate status ("requires … listed earlier"/"waiting for …") is never annotated
+                }
             }
             else
             {
-                try { status = await EnsureOneAsync(gameMini, pluginId, d, ct); }
+                try
+                {
+                    status = await EnsureOneAsync(gameMini, pluginId, d, ct);
+                    // A Failed returned HERE (not thrown) is always a download/verify failure — never annotated (minor 1).
+                    if (status.State == DependencyState.Blocked) status = AnnotateIfCorrupt(gameMini, pluginId, status);
+                }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { status = new DependencyStatus(d.Id, DependencyState.Failed, ex.Message); }
+                catch (Exception ex)
+                {
+                    // Anything that escaped as an exception came from placement or ledger handling — eligible.
+                    status = AnnotateIfCorrupt(gameMini, pluginId, new DependencyStatus(d.Id, DependencyState.Failed, ex.Message));
+                }
             }
-            // Applied once, uniformly, regardless of which branch produced the status (see AnnotateIfCorrupt).
-            results[d.Id] = AnnotateIfCorrupt(gameMini, pluginId, status);
+            results[d.Id] = status;
         }
         return deps.Select(d => results[d.Id]).ToList();
     }
@@ -79,7 +91,10 @@ public sealed partial class DependencyService : IDependencyService
 
     public void Remove(string gameMini, string pluginId, string dependencyId)
     {
-        var ledger = _store.Read(gameMini, pluginId);
+        // Important (round 6): a present-but-unreadable ledger must never be treated as empty here —
+        // that would silently write/delete over data this call simply couldn't read right now.
+        if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
+            throw new InvalidOperationException("dependency record could not be read");
         var entry = ledger.Entries.FirstOrDefault(e => e.DependencyId == dependencyId);
         if (entry is null) return;
         DeleteEntryFiles(gameMini, pluginId, entry);
@@ -88,7 +103,8 @@ public sealed partial class DependencyService : IDependencyService
 
     public void RemoveAll(string gameMini, string pluginId)
     {
-        var ledger = _store.Read(gameMini, pluginId);
+        if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
+            throw new InvalidOperationException("dependency record could not be read");
         foreach (var entry in ledger.Entries) DeleteEntryFiles(gameMini, pluginId, entry);
         _store.Write(gameMini, ledger with { Entries = Array.Empty<LedgerEntry>() });
     }

@@ -17,14 +17,29 @@ public sealed partial class DependencyService
 {
     private async Task<DependencyStatus> EnsureOneAsync(string gameMini, string pluginId, PluginDependency dep, CancellationToken ct)
     {
-        var ledger = _store.Read(gameMini, pluginId);
+        // Important (round 6): a present-but-unreadable ledger must abort immediately — never silently
+        // treated as empty, which could overwrite or delete whatever it actually holds.
+        if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
+            throw new InvalidOperationException("dependency record could not be read");
         var existing = ledger.Entries.FirstOrDefault(e => e.DependencyId == dep.Id);
         if (IsInstalled(gameMini, existing, dep))
             return new DependencyStatus(dep.Id, DependencyState.Installed, null);
 
-        var bytes = await DownloadCappedAsync(dep.Url, dep.Size, ct);
-        if (!string.Equals(DependencyFileHash.Of(bytes), dep.Sha256, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("checksum mismatch");
+        byte[] bytes;
+        try
+        {
+            bytes = await DownloadCappedAsync(dep.Url, dep.Size, ct);
+            if (!string.Equals(DependencyFileHash.Of(bytes), dep.Sha256, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("checksum mismatch");
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            // Minor 1 (round 6, narrowing round 5): a download/verify failure (HTTP error, checksum
+            // mismatch, size cap) has nothing to do with the ledger — returned directly, rather than
+            // thrown, so EnsureAsync's caller never runs it through AnnotateIfCorrupt.
+            return new DependencyStatus(dep.Id, DependencyState.Failed, ex.Message);
+        }
 
         var files = BuildFiles(gameMini, pluginId, dep, bytes);
         foreach (var f in files)
@@ -34,9 +49,15 @@ public sealed partial class DependencyService
             if (blocked is not null) return blocked;
         }
 
-        // C1/I1: placement is transactional — anything this attempt creates OR overwrites is rolled back
-        // on any failure (a pre-existing destination is backed up to .stellar-bak before being replaced),
-        // and the ledger is written only once every file is safely in place.
+        return CommitPlacement(gameMini, pluginId, dep, ledger, existing, files);
+    }
+
+    /// <summary>C1/I1: placement is transactional — anything this attempt creates OR overwrites is rolled
+    /// back on any failure (a pre-existing destination is backed up to <c>.stellar-bak</c> before being
+    /// replaced), and the ledger is written only once every file is safely in place.</summary>
+    private DependencyStatus CommitPlacement(string gameMini, string pluginId, PluginDependency dep,
+        DependencyLedger ledger, LedgerEntry? existing, List<(string Abs, byte[] Bytes)> files)
+    {
         var preExisting = new HashSet<string>(files.Select(f => f.Abs).Where(_fs.File.Exists), StringComparer.Ordinal);
         var backedUp = new HashSet<string>(StringComparer.Ordinal); // minor 1: only paths THIS attempt backed up
         var parkedToClean = new HashSet<string>(StringComparer.Ordinal); // minor 3: collected, acted on after commit
@@ -65,14 +86,18 @@ public sealed partial class DependencyService
         return new DependencyStatus(dep.Id, DependencyState.Installed, null);
     }
 
-    /// <summary>Important 2(c), follow-up: the "dependency record was unreadable…" note only ever
-    /// explains a Blocked or Failed outcome — Installed/Skipped/NotInstalled are fine outcomes, and since
-    /// the <c>.corrupt</c> evidence is never auto-deleted, annotating a fine outcome would leave a scary
-    /// note on a healthy install forever. Derived from whether <c>&lt;id&gt;.json.corrupt</c> exists on
-    /// disk right now — never from whether this call is the one that quarantined it — so the note appears
-    /// (and keeps appearing) regardless of which earlier call discovered the corruption. Called exactly
-    /// once per dependency, by <see cref="DependencyService.EnsureAsync"/>, after every other outcome
-    /// (skip, requires-gate, placement) has already been decided.</summary>
+    /// <summary>Important 2(c), narrowed by minor 1 (round 6): the "dependency record was unreadable…"
+    /// note explains a Blocked outcome, or a Failed outcome produced by PLACEMENT or LEDGER HANDLING —
+    /// never a bare gate status ("requires … listed earlier", "waiting for …") and never a download/verify
+    /// failure (HTTP error, checksum mismatch, size cap), since neither has anything to do with the
+    /// ledger. Installed/Skipped/NotInstalled are fine outcomes and never carry it either — the
+    /// <c>.corrupt</c> evidence is never auto-deleted, so annotating a fine or unrelated outcome would
+    /// leave a scary, misleading note around forever. Derived from whether <c>&lt;id&gt;.json.corrupt</c>
+    /// exists on disk right now — never from whether this call is the one that quarantined it — so the
+    /// note appears (and keeps appearing) regardless of which earlier call discovered the corruption.
+    /// Callers (<see cref="DependencyService.EnsureAsync"/>) apply this only to a Blocked result returned
+    /// normally, or to a Failed status built from an exception that escaped placement/ledger-handling code
+    /// — never to a gate status or a directly-returned download/verify Failed.</summary>
     private DependencyStatus AnnotateIfCorrupt(string gameMini, string pluginId, DependencyStatus status)
     {
         if (status.State is not (DependencyState.Blocked or DependencyState.Failed)) return status;

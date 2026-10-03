@@ -20,38 +20,54 @@ public sealed class DependencyLedgerStore
     public DependencyLedgerStore(IFileSystem fs) => _fs = fs;
 
     /// <summary>Minor 3: <paramref name="quarantine"/> is false for read-only callers (Status) that must
-    /// not have the side effect of renaming a corrupt ledger aside — they still read it as empty either way.</summary>
+    /// not have the side effect of renaming a corrupt ledger aside — they still read it as empty either way.
+    /// Collapses all three <see cref="TryRead"/> outcomes to empty, including present-but-unreadable —
+    /// safe here because every caller of this overload only ever reads (ReadAll/FindOwner/Park/Unpark/Status),
+    /// never writes back based on what it saw.</summary>
     public DependencyLedger Read(string gameMini, string pluginId, bool quarantine = true) =>
-        TryRead(gameMini, pluginId, quarantine) ?? new DependencyLedger(pluginId, new LedgerEntry[0]);
+        TryRead(gameMini, pluginId, quarantine).Ledger ?? new DependencyLedger(pluginId, new LedgerEntry[0]);
 
-    /// <summary>Null means "nothing readable" — a missing file, or one that failed to parse, didn't have
-    /// the right shape, or couldn't be read. Never throws. Important 1 (round 4): only a parse failure
-    /// (<see cref="JsonException"/>) or a shape failure is quarantined — an <see cref="IOException"/> or
-    /// <see cref="UnauthorizedAccessException"/> is transient/environmental, not evidence the FILE is
-    /// corrupt, so it's treated as unreadable for this call only and the file is left exactly where it is.</summary>
-    private DependencyLedger? TryRead(string gameMini, string pluginId, bool quarantine)
+    /// <summary>Important (round 6): a write path must never treat a PRESENT-but-currently-unreadable
+    /// ledger as empty — doing so could overwrite or delete real data the launcher just happens to be
+    /// unable to read right now (a transient IO/permission error), unlike a ledger that's genuinely
+    /// missing or one that was corrupt and has already been safely quarantined aside (in both of those
+    /// cases there is nothing left to lose by proceeding as if empty). Returns false — and an empty ledger
+    /// the caller must NOT act on — only for the present-but-unreadable case.</summary>
+    public bool TryReadForWrite(string gameMini, string pluginId, out DependencyLedger ledger)
+    {
+        var (result, unreadable) = TryRead(gameMini, pluginId, quarantine: true);
+        ledger = result ?? new DependencyLedger(pluginId, new LedgerEntry[0]);
+        return !unreadable;
+    }
+
+    /// <summary>Ledger is null for "nothing readable" in every case (missing, corrupt-and-quarantined, or
+    /// present-but-unreadable). Unreadable distinguishes the last of those three — present on disk, but an
+    /// <see cref="IOException"/> or <see cref="UnauthorizedAccessException"/> (transient/environmental)
+    /// stopped THIS read; never set for a parse/shape failure, since quarantining already moved the bad
+    /// data safely aside. Never throws.</summary>
+    private (DependencyLedger? Ledger, bool Unreadable) TryRead(string gameMini, string pluginId, bool quarantine)
     {
         var path = DependencyPaths.LedgerFile(gameMini, pluginId);
-        if (!_fs.File.Exists(path)) return null;
+        if (!_fs.File.Exists(path)) return (null, false); // missing — safe to treat as empty
         try
         {
             var ledger = JsonSerializer.Deserialize<DependencyLedger>(_fs.File.ReadAllText(path), Json);
             if (!IsWellFormed(ledger)) // Important 1 (round 3): wrong shape IS quarantined
             {
                 if (quarantine) QuarantineCorrupt(path);
-                return null;
+                return (null, false); // bad data safely moved aside — safe to treat as empty
             }
             // I2: the file NAME is the only trusted source of PluginId — never whatever the JSON body claims.
-            return ledger! with { PluginId = pluginId };
+            return (ledger! with { PluginId = pluginId }, false);
         }
         catch (JsonException)
         {
             if (quarantine) QuarantineCorrupt(path); // Important 2(b) (round 3): parse failure IS quarantined
-            return null;
+            return (null, false); // bad data safely moved aside — safe to treat as empty
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return null; // Important 1 (round 4): never quarantined — leave the valid file in place
+            return (null, true); // present, but unreadable RIGHT NOW — NOT safe to treat as empty
         }
     }
 
@@ -89,9 +105,9 @@ public sealed class DependencyLedgerStore
         return _fs.Directory.GetFiles(dir, "*.json")
             .Select(f => _fs.Path.GetFileNameWithoutExtension(f))
             .Where(IsValidPluginId) // M3: a bogus stem is never read, let alone trusted as an id
-            .Select(id => TryRead(gameMini, id, quarantine: true))
+            .Select(id => TryRead(gameMini, id, quarantine: true).Ledger)
             .Where(l => l is not null)
-            .Select(l => l!).ToList(); // a ledger that failed to parse/validate is skipped outright
+            .Select(l => l!).ToList(); // a ledger that failed to parse/validate/read is skipped outright
     }
 
     /// <summary>M3: a ledger file's stem must look like a plugin id — never empty, ".", "..", or
