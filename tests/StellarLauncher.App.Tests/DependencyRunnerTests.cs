@@ -25,7 +25,8 @@ public class DependencyRunnerTests
         public Task RemoveAllAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.CompletedTask;
         public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
         public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
-        public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
+        public readonly List<string> Ledgers = new();
+        public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Ledgers;
     }
 
     private static PluginDependency Dep(string id, bool optional = false) =>
@@ -108,5 +109,24 @@ public class DependencyRunnerTests
             new[] { (needs, "1.0.0"), (done, "1.0.0") }, CancellationToken.None, progress.Add);
 
         Assert.Equal(new[] { "Preparing Photo Thing: a-name…" }, progress);
+    }
+
+    // Final review I3: an installed version that declares NO dependencies is still ensured (with an empty
+    // declaration) when its plugin has a ledger, so whatever an earlier version placed is removed. Without a
+    // ledger there is nothing to clean, and an unlisted version is never touched.
+    [Fact]
+    public async Task A_version_declaring_no_dependencies_is_ensured_empty_when_its_plugin_has_a_ledger()
+    {
+        var hadDeps = EntryWithVersion("p1", "2.0.0");
+        var never = EntryWithVersion("p2", "1.0.0");
+        var unlisted = EntryWithVersion("p3", "1.0.0");
+        var fake = new FakeDependencyService { Ledgers = { "p1", "p3" } };
+
+        await DependencyRunner.EnsureForClientAsync(fake, new ClientProfile { GameMiniDir = "/g" },
+            new[] { (hadDeps, "2.0.0"), (never, "1.0.0"), (unlisted, "9.9.9") }, CancellationToken.None);
+
+        var call = Assert.Single(fake.Calls);
+        Assert.Equal("p1", call.PluginId);
+        Assert.Empty(call.Deps);
     }
 }

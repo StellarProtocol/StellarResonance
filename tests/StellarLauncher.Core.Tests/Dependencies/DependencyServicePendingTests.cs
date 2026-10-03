@@ -64,8 +64,10 @@ public sealed partial class DependencyServiceTests
         new DependencyLedgerStore(_fs).Write(G, new DependencyLedger("p", Array.Empty<LedgerEntry>(),
             new[] { new LedgerEntry("other", "1", new[] { new LedgerFile("dxgi.dll", Convert.ToHexString(SHA256.HashData(bytes)), false) }) }));
 
-        var st = Assert.Single(await Make().EnsureAsync(G, "p", new[] { File("fx", bytes, "dxgi.dll") }, None, default));
-        Assert.Equal(DependencyState.Blocked, st.State);
+        // "other" stays declared (so the undeclared-entry sweep leaves its record alone) and is checked AFTER fx.
+        var st = await Make().EnsureAsync(G, "p", new[] { File("fx", bytes, "dxgi.dll"), File("other", new byte[] { 5 }, "o.dll") }, None, default);
+        Assert.Equal(DependencyState.Blocked, st[0].State);
+        Assert.Equal(bytes, _fs.File.ReadAllBytes("/game_mini/dxgi.dll"));
     }
 
     [Fact]

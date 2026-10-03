@@ -55,6 +55,9 @@ public sealed partial class DependencyService : IDependencyService
         if (!DependencyPaths.IsValidPluginId(pluginId))
             return deps.Select(d => new DependencyStatus(d.Id, DependencyState.Failed, "invalid plugin id")).ToList();
 
+        // Final review I3: FIRST, so a dependency renamed by a plugin update can reuse its old destination.
+        RemoveUndeclared(gameMini, pluginId, deps);
+
         var results = new Dictionary<string, DependencyStatus>();
         foreach (var d in deps)
         {
@@ -96,6 +99,23 @@ public sealed partial class DependencyService : IDependencyService
             results[d.Id] = status;
         }
         return deps.Select(d => results[d.Id]).ToList();
+    }
+
+    /// <summary>Final review I3: a dependency this plugin no longer declares (dropped or renamed by an update —
+    /// or every one of them, when the new version declares none) is removed exactly like an unticked one:
+    /// hash-checked, so a file the player changed since is left alone. Best-effort — an unreadable ledger or
+    /// an IO failure leaves it for the next run and never fails the dependencies that ARE declared.</summary>
+    private void RemoveUndeclared(string gameMini, string pluginId, IReadOnlyList<PluginDependency> deps)
+    {
+        var declared = deps.Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
+        var ledger = _store.Read(gameMini, pluginId, quarantine: false);
+        var stale = ledger.Entries.Concat(ledger.Pending ?? Array.Empty<LedgerEntry>())
+            .Select(e => e.DependencyId).Where(id => !declared.Contains(id)).Distinct().ToList();
+        foreach (var id in stale)
+        {
+            try { RemoveCore(gameMini, pluginId, id); }
+            catch (Exception) { /* best effort: retried on the next ensure */ }
+        }
     }
 
     public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,

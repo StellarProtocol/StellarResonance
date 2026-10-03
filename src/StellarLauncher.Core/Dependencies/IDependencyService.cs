@@ -22,7 +22,9 @@ public interface IDependencyService
 {
     /// <summary>Brings every dependency in <paramref name="deps"/> up to date: installs what's missing,
     /// leaves what's already current alone, and removes/skips anything in <paramref name="skippedIds"/>
-    /// or whose <c>requires</c> chain isn't fully installed. Never throws except
+    /// or whose <c>requires</c> chain isn't fully installed. <paramref name="deps"/> is the plugin's WHOLE
+    /// declaration: anything its ledger still records that is not in it (dropped or renamed by an update; all
+    /// of it when <paramref name="deps"/> is empty) is removed first. Never throws except
     /// <see cref="System.OperationCanceledException"/> — every other failure comes back as a
     /// <see cref="DependencyState.Failed"/>/<see cref="DependencyState.Blocked"/> status.</summary>
     Task<IReadOnlyList<DependencyStatus>> EnsureAsync(string gameMini, string pluginId, IReadOnlyList<PluginDependency> deps,

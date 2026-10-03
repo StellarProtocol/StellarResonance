@@ -30,10 +30,15 @@ public static class DependencyRunner
         IReadOnlyList<(PluginEntry Entry, string Version)> installed, CancellationToken ct, Action<string>? progress = null)
     {
         var lines = new List<string>();
+        var ledgers = LedgerIds(svc, c.GameMiniDir);
         foreach (var (entry, version) in installed)
         {
-            var deps = entry.Versions.FirstOrDefault(v => v.Version == version)?.Dependencies;
-            if (deps is not { Count: > 0 }) continue;
+            // A version the registry doesn't list: its declaration is unknown, so nothing is touched.
+            if (entry.Versions.FirstOrDefault(v => v.Version == version) is not { } v) continue;
+            var deps = v.Dependencies ?? Array.Empty<PluginDependency>();
+            // Final review I3: a version that declares nothing still gets ensured when this plugin has a ledger —
+            // an empty declaration is what removes everything an earlier version placed.
+            if (deps.Count == 0 && !ledgers.Contains(entry.Id)) continue;
             var skipped = Skipped(c, entry.Id, deps);
             if (progress is not null && PendingNames(svc, c.GameMiniDir, entry.Id, deps, skipped) is { Length: > 0 } names)
                 progress($"Preparing {entry.Name}: {names}…");
@@ -41,6 +46,12 @@ public static class DependencyRunner
                 lines.Add(Line(entry.Id, s));
         }
         return lines;
+    }
+
+    private static ISet<string> LedgerIds(IDependencyService svc, string gameMini)
+    {
+        try { return svc.LedgerPluginIds(gameMini).ToHashSet(StringComparer.Ordinal); }
+        catch (Exception) { return new HashSet<string>(); }
     }
 
     public static string Line(string pluginId, DependencyStatus s) =>

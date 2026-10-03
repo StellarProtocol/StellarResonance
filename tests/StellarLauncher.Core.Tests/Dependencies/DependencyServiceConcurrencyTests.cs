@@ -61,9 +61,12 @@ public sealed class DependencyServiceConcurrencyTests
         var s = Make();
         var a = Dep("a", 1); var b = Dep("b", 2);
 
+        // Final review I3: EnsureAsync's deps are now the plugin's WHOLE declaration (an undeclared entry is
+        // removed), so both overlapping calls declare both — the race this pins (two read-modify-writes of one
+        // ledger across a download) is unchanged.
         await Task.WhenAll(
-            Task.Run(() => s.EnsureAsync(G, "p", new[] { a }, None, default)),
-            Task.Run(() => s.EnsureAsync(G, "p", new[] { b }, None, default)));
+            Task.Run(() => s.EnsureAsync(G, "p", new[] { a, b }, None, default)),
+            Task.Run(() => s.EnsureAsync(G, "p", new[] { a, b }, None, default)));
 
         var ids = new DependencyLedgerStore(_fs).Read(G, "p").Entries.Select(e => e.DependencyId).OrderBy(x => x);
         Assert.Equal(new[] { "a", "b" }, ids);

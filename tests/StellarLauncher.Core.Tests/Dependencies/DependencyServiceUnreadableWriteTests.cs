@@ -23,8 +23,9 @@ public sealed partial class DependencyServiceTests
         await s.EnsureAsync(G, "p", new[] { a, b }, None, default); // both installed; p.json written with both entries
         var originalJson = _fs.File.ReadAllText(LedgerPath);
 
-        // Let the FIRST ledger read (dependency "a") through; fail the SECOND (dependency "b").
-        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, once: true, afterCalls: 1, "ReadAllText");
+        // Let the undeclared-entry sweep's read (final review I3) and the read for dependency "a" through;
+        // fail the next one (dependency "b").
+        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, once: true, afterCalls: 2, "ReadAllText");
         var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
 
         var a2 = File("a", new byte[] { 1 }, "a.dll"); // unchanged — stays Installed via the successful first read
@@ -50,7 +51,8 @@ public sealed partial class DependencyServiceTests
         await s.EnsureAsync(G, "p", new[] { d }, None, default); // installs; p.json written
         var originalJson = _fs.File.ReadAllText(LedgerPath);
 
-        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, "ReadAllText");
+        // The undeclared-entry sweep (final review I3) reads first; fail the skip's own read after it.
+        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, once: true, afterCalls: 1, "ReadAllText");
         var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
 
         var st = Assert.Single(await s2.EnsureAsync(G, "p", new[] { d }, new HashSet<string> { "fx" }, default));
