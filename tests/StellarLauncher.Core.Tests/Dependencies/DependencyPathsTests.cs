@@ -16,6 +16,7 @@ public sealed class DependencyPathsTests
     [InlineData("game", "../x.dll")] [InlineData("game", "/abs")] [InlineData("game", "a\\b")]
     [InlineData("game", "BepInEx/plugins/x.dll")] [InlineData("game", "stellar/plugins/x.dll")]
     [InlineData("game", "Stellar/Deps/x")] [InlineData("plugin", "../../x")] [InlineData("other", "x")]
+    [InlineData("game", "C:/x")] [InlineData("plugin", "c:/y")] [InlineData("game", "ab:cd")]
     public void Disallowed_paths_resolve_to_null(string target, string to) =>
         Assert.Null(DependencyPaths.Resolve(G, "p", target, to));
 

@@ -12,7 +12,7 @@ public static class DependencyPaths
 
     public static string? Resolve(string gameMini, string pluginId, string target, string to)
     {
-        if (string.IsNullOrEmpty(to) || to.Contains('\\') || to.StartsWith('/') || (to.Length > 1 && to[1] == ':')) return null;
+        if (string.IsNullOrEmpty(to) || to.Contains('\\') || to.StartsWith('/') || to.Contains(':')) return null;
         if (to.Split('/').Any(p => p == "..")) return null;
         return target switch
         {
