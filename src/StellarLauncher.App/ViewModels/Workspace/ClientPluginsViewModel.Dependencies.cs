@@ -27,16 +27,35 @@ public sealed partial class ClientPluginsViewModel
     /// still NotInstalled whose last install attempt this session was Failed or Blocked (same declaration
     /// since) shows that outcome instead: Status is offline and can't see a download failure, nor a
     /// collision inside a zip directory mapping. Called off the UI thread (fix round M1).</summary>
-    public IReadOnlyList<DependencyStatus> DependencyStatus(PluginItemViewModel item)
+    public IReadOnlyList<DependencyStatus> DependencyStatus(PluginItemViewModel item) => StatusFor(Snapshot(item));
+
+    /// <summary>Fix round 2, Minor 1: everything read from UI-thread state — the shown dependencies, the game
+    /// folder and a COPY of this plugin's skip set (from the profile's live SkippedDependencies list) — is
+    /// captured here, on the calling thread, before the ledger reads and hashing move to the pool.</summary>
+    public Task<IReadOnlyList<DependencyStatus>> DependencyStatusAsync(PluginItemViewModel item)
+    {
+        var snapshot = Snapshot(item);
+        return Task.Run(() => StatusFor(snapshot));
+    }
+
+    private sealed record StatusSnapshot(string GameMini, string PluginId, IReadOnlyList<PluginDependency> Deps, ISet<string> Skipped);
+
+    private StatusSnapshot Snapshot(PluginItemViewModel item)
     {
         var deps = item.ShownDependencies;
+        // Skipped() enumerates the live list into a NEW set right here — that set is the snapshot.
+        return new StatusSnapshot(_ws.Client.GameMiniDir, item.Entry.Id, deps, DependencyRunner.Skipped(_ws.Client, item.Entry.Id, deps));
+    }
+
+    private IReadOnlyList<DependencyStatus> StatusFor(StatusSnapshot snap)
+    {
+        var (gameMini, pluginId, deps, skipped) = snap;
         var install = _ws.Services.Core.Install;
-        var gameMini = _ws.Client.GameMiniDir;
-        var statuses = install.Dependencies.Status(gameMini, item.Entry.Id, deps, DependencyRunner.Skipped(_ws.Client, item.Entry.Id, deps));
+        var statuses = install.Dependencies.Status(gameMini, pluginId, deps, skipped);
         if (install.Outcomes is not { } outcomes) return statuses;
         return statuses.Select(s =>
             s.State == DependencyState.NotInstalled && deps.FirstOrDefault(d => d.Id == s.DependencyId) is { } d
-            && outcomes.LastProblem(gameMini, item.Entry.Id, d) is { } problem ? problem : s).ToList();
+            && outcomes.LastProblem(gameMini, pluginId, d) is { } problem ? problem : s).ToList();
     }
 
     public void SetDependencyUse(PluginItemViewModel item, string dependencyId, bool use)
@@ -60,8 +79,8 @@ public sealed partial class ClientPluginsViewModel
     }
 
     /// <summary>Un-using removes the dependency at once — and every dependency that requires it (directly
-    /// or through another), since those would be skipped at the next launch anyway. Off the UI thread: the
-    /// removal waits for the game folder's dependency gate.</summary>
+    /// or through another), since those would be skipped at the next launch anyway. Awaited: the removal waits
+    /// for the game folder's dependency gate, never blocking the UI thread on it.</summary>
     private async Task UnuseAsync(PluginItemViewModel item, PluginDependency dep)
     {
         var gone = new HashSet<string> { dep.Id };
@@ -71,7 +90,7 @@ public sealed partial class ClientPluginsViewModel
         var gameMini = _ws.Client.GameMiniDir;
         try
         {
-            await Task.Run(() => { foreach (var id in gone) svc.Remove(gameMini, item.Entry.Id, id); });
+            foreach (var id in gone) await svc.RemoveAsync(gameMini, item.Entry.Id, id);
             Status = $"{item.Name}: {dep.Name} skipped";
         }
         catch (Exception ex) { Status = $"{item.Name}: {dep.Name} could not be removed — {ex.Message}"; }
@@ -99,7 +118,7 @@ public sealed partial class ClientPluginsViewModel
         {
             var results = await Task.Run(async () =>
             {
-                try { svc.UnparkModdedOnly(client.GameMiniDir); } catch (Exception) { /* fail-open, see PluginDownloads */ }
+                try { await svc.UnparkModdedOnlyAsync(client.GameMiniDir); } catch (Exception) { /* fail-open, see PluginDownloads */ }
                 return await svc.EnsureAsync(client.GameMiniDir, item.Entry.Id, deps, skippedIds, CancellationToken.None);
             });
             var problems = results.Where(s => s.State is DependencyState.Blocked or DependencyState.Failed)

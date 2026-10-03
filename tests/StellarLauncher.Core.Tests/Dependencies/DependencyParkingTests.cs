@@ -26,27 +26,27 @@ public sealed class DependencyParkingTests
     }
 
     [Fact]
-    public void Park_moves_only_modded_only_files_and_unpark_restores()
+    public async Task Park_moves_only_modded_only_files_and_unpark_restores()
     {
         var (fs, s) = Setup();
-        s.ParkModdedOnly(G);
+        await s.ParkModdedOnlyAsync(G);
         Assert.False(fs.File.Exists("/game_mini/dxgi.dll"));
         Assert.True(fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll"));
         Assert.True(fs.File.Exists("/game_mini/plain.dll"));
-        s.ParkModdedOnly(G);   // idempotent
-        s.UnparkModdedOnly(G);
+        await s.ParkModdedOnlyAsync(G);   // idempotent
+        await s.UnparkModdedOnlyAsync(G);
         Assert.True(fs.File.Exists("/game_mini/dxgi.dll"));
-        s.UnparkModdedOnly(G); // idempotent
+        await s.UnparkModdedOnlyAsync(G); // idempotent
         Assert.True(fs.File.Exists("/game_mini/dxgi.dll"));
     }
 
     [Fact]
-    public void Unpark_never_overwrites_a_file_that_appeared_meanwhile()
+    public async Task Unpark_never_overwrites_a_file_that_appeared_meanwhile()
     {
         var (fs, s) = Setup();
-        s.ParkModdedOnly(G);
+        await s.ParkModdedOnlyAsync(G);
         fs.AddFile("/game_mini/dxgi.dll", new MockFileData(new byte[] { 7 }));
-        s.UnparkModdedOnly(G);
+        await s.UnparkModdedOnlyAsync(G);
         Assert.Equal(new byte[] { 7 }, fs.File.ReadAllBytes("/game_mini/dxgi.dll"));
         Assert.True(fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll"));
     }
@@ -54,12 +54,12 @@ public sealed class DependencyParkingTests
     // I3: Park must not move a file whose live content no longer matches the recorded hash — the user or
     // another tool replaced it, so parking it (and later restoring possibly-stale bytes) would be wrong.
     [Fact]
-    public void Park_leaves_a_user_replaced_moddedOnly_file_live()
+    public async Task Park_leaves_a_user_replaced_moddedOnly_file_live()
     {
         var (fs, s) = Setup();
         fs.File.WriteAllBytes("/game_mini/dxgi.dll", new byte[] { 42 }); // replaced before any park ever ran
 
-        s.ParkModdedOnly(G);
+        await s.ParkModdedOnlyAsync(G);
 
         Assert.True(fs.File.Exists("/game_mini/dxgi.dll"));
         Assert.Equal(new byte[] { 42 }, fs.File.ReadAllBytes("/game_mini/dxgi.dll"));
@@ -69,7 +69,7 @@ public sealed class DependencyParkingTests
     // I2: a ledger entry recording an unsafe path must never be resolved to an absolute path, by either
     // Park or Unpark, let alone acted on — a file planted at the would-be escape target is left untouched.
     [Fact]
-    public void Park_and_unpark_ignore_unsafe_ledger_paths_and_never_touch_planted_targets()
+    public async Task Park_and_unpark_ignore_unsafe_ledger_paths_and_never_touch_planted_targets()
     {
         var fs = new MockFileSystem();
         fs.AddDirectory(G);
@@ -83,8 +83,8 @@ public sealed class DependencyParkingTests
         }) }));
         var s = new DependencyService(fs, new System.Net.Http.HttpClient());
 
-        s.ParkModdedOnly(G);
-        s.UnparkModdedOnly(G);
+        await s.ParkModdedOnlyAsync(G);
+        await s.UnparkModdedOnlyAsync(G);
 
         Assert.Equal("outside-x", fs.File.ReadAllText("/x"));
         Assert.Equal("outside-abs", fs.File.ReadAllText("/abs/x"));
@@ -92,12 +92,12 @@ public sealed class DependencyParkingTests
 
     // M2: a malformed ledger next to a valid one must not stop Park from processing the valid one.
     [Fact]
-    public void A_corrupt_ledger_file_does_not_block_parking_the_rest()
+    public async Task A_corrupt_ledger_file_does_not_block_parking_the_rest()
     {
         var (fs, s) = Setup();
         fs.AddFile("/game_mini/stellar/deps/broken.json", new MockFileData("{ not valid json"));
 
-        s.ParkModdedOnly(G); // must not throw
+        await s.ParkModdedOnlyAsync(G); // must not throw
 
         Assert.False(fs.File.Exists("/game_mini/dxgi.dll"));
         Assert.True(fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll"));
@@ -107,7 +107,7 @@ public sealed class DependencyParkingTests
     // which System.Text.Json fills with null regardless of the record's non-nullable annotation) must not
     // crash Park/Unpark/ReadAll with a NullReferenceException — it's just as unreadable as a parse failure.
     [Fact]
-    public void A_shape_invalid_ledger_file_does_not_block_park_unpark_or_readall()
+    public async Task A_shape_invalid_ledger_file_does_not_block_park_unpark_or_readall()
     {
         var (fs, s) = Setup();
         fs.AddFile("/game_mini/stellar/deps/bad.json", new MockFileData("{\"PluginId\":\"x\"}"));
@@ -115,10 +115,10 @@ public sealed class DependencyParkingTests
         var all = new DependencyLedgerStore(fs).ReadAll(G); // must not throw
         Assert.Single(all); // only "p" — "bad" is unreadable
 
-        s.ParkModdedOnly(G); // must not throw
+        await s.ParkModdedOnlyAsync(G); // must not throw
         Assert.True(fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll"));
 
-        s.UnparkModdedOnly(G); // must not throw
+        await s.UnparkModdedOnlyAsync(G); // must not throw
         Assert.True(fs.File.Exists("/game_mini/dxgi.dll"));
     }
 }

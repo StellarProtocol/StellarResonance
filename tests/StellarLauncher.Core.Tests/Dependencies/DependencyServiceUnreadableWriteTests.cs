@@ -72,7 +72,7 @@ public sealed partial class DependencyServiceTests
         var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, "ReadAllText");
         var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
 
-        var ex = Assert.Throws<InvalidOperationException>(() => s2.RemoveAll(G, "p"));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => s2.RemoveAllAsync(G, "p"));
 
         Assert.Equal("dependency record could not be read", ex.Message);
         Assert.Equal(originalJson, _fs.File.ReadAllText(LedgerPath)); // untouched

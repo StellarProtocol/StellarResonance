@@ -15,6 +15,12 @@ public interface IPluginActions
     /// <summary>Read-only status of <see cref="PluginItemViewModel.ShownDependencies"/> on this client.</summary>
     IReadOnlyList<DependencyStatus> DependencyStatus(PluginItemViewModel item);
 
+    /// <summary>Same as <see cref="DependencyStatus"/>, computed off the calling (UI) thread. Fix round 2,
+    /// Minor 1: an implementation snapshots whatever UI-thread state it reads (the profile's skip list)
+    /// BEFORE leaving the thread.</summary>
+    System.Threading.Tasks.Task<IReadOnlyList<DependencyStatus>> DependencyStatusAsync(PluginItemViewModel item) =>
+        System.Threading.Tasks.Task.Run(() => DependencyStatus(item));
+
     /// <summary>Records whether an OPTIONAL dependency is used (required ones are ignored).</summary>
     void SetDependencyUse(PluginItemViewModel item, string dependencyId, bool use);
 }

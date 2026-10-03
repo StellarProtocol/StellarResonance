@@ -46,7 +46,7 @@ public sealed partial class DependencyServiceTests
         var s = Make();
         await s.EnsureAsync(G, "p", new[] { d }, None, default);
 
-        s.Remove(G, BadId, "fx"); // must not throw, must not touch plugin "p"'s own ledger/files
+        await s.RemoveAsync(G, BadId, "fx"); // must not throw, must not touch plugin "p"'s own ledger/files
 
         Assert.True(_fs.File.Exists("/game_mini/dxgi.dll"));
         Assert.Single(new DependencyLedgerStore(_fs).Read(G, "p").Entries);
@@ -59,7 +59,7 @@ public sealed partial class DependencyServiceTests
         var s = Make();
         await s.EnsureAsync(G, "p", new[] { d }, None, default);
 
-        s.RemoveAll(G, BadId); // must not throw, must not touch plugin "p"'s own ledger/files
+        await s.RemoveAllAsync(G, BadId); // must not throw, must not touch plugin "p"'s own ledger/files
 
         Assert.True(_fs.File.Exists("/game_mini/dxgi.dll"));
         Assert.Single(new DependencyLedgerStore(_fs).Read(G, "p").Entries);

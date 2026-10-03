@@ -15,6 +15,9 @@ public sealed record DependencyStatus(string DependencyId, DependencyState State
 
 /// <summary>Downloads, verifies and places a plugin's declared dependencies — generically, without
 /// knowing what any of them are (docs/manifest-standard.md § dependencies).</summary>
+/// <remarks>Every mutating member is serialised per game folder and only ever waits for that by awaiting
+/// (fix round 2) — there are deliberately no synchronous mutating members, so no caller on a UI thread can
+/// block it behind an install whose continuations need that thread.</remarks>
 public interface IDependencyService
 {
     /// <summary>Brings every dependency in <paramref name="deps"/> up to date: installs what's missing,
@@ -30,18 +33,18 @@ public interface IDependencyService
     IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId, IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds);
 
     /// <summary>Deletes the files this dependency placed (and their parked copies), then its ledger entry.</summary>
-    void Remove(string gameMini, string pluginId, string dependencyId);
+    Task RemoveAsync(string gameMini, string pluginId, string dependencyId, CancellationToken ct = default);
 
     /// <summary>Deletes every dependency's files for this plugin, then its ledger.</summary>
-    void RemoveAll(string gameMini, string pluginId);
+    Task RemoveAllAsync(string gameMini, string pluginId, CancellationToken ct = default);
 
     /// <summary>Moves every placed <c>moddedOnly</c> file (from every plugin's ledger) out of the game
     /// tree, for a vanilla launch. Idempotent.</summary>
-    void ParkModdedOnly(string gameMini);
+    Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default);
 
     /// <summary>Moves parked files back, unless something now occupies the destination — in which case
     /// it stays parked. Idempotent.</summary>
-    void UnparkModdedOnly(string gameMini);
+    Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default);
 
     /// <summary>The plugin ids that currently have a dependency ledger in this game folder (valid ids
     /// only; nothing is read or quarantined). Used to find ledgers left behind by a plugin that is no

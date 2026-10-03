@@ -58,7 +58,7 @@ public sealed partial class DependencyServiceTests
         _fs.AddFile("/game_mini/dxgi.dll", new MockFileData(new byte[] { 9 })); // untracked once "p"'s ledger is gone
         var s = Make();
 
-        s.ParkModdedOnly(G); // discovers + quarantines "p"'s ledger as a side effect of ReadAll
+        await s.ParkModdedOnlyAsync(G); // discovers + quarantines "p"'s ledger as a side effect of ReadAll
         Assert.True(_fs.File.Exists("/game_mini/stellar/deps/p.json.corrupt"));
 
         var d = File("fx", new byte[] { 1 }, "dxgi.dll");

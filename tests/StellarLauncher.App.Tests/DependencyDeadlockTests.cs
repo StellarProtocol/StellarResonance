@@ -1,0 +1,86 @@
+using System.IO.Abstractions.TestingHelpers;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using StellarLauncher.App.Services;
+using StellarLauncher.App.ViewModels;
+using StellarLauncher.Core.Clients;
+using StellarLauncher.Core.Dependencies;
+using StellarLauncher.Core.Inventory;
+using StellarLauncher.Core.Model;
+using StellarLauncher.Core.Services;
+using Xunit;
+
+/// <summary>Task 6 fix round 2, Critical: the dependency gate must never be waited for SYNCHRONOUSLY on the UI
+/// thread. If the holder is an EnsureAsync started from the UI context, its download continuations need that
+/// thread — a blocking Wait() there deadlocks the launcher. Reproduced on a single-threaded context pump.</summary>
+public class DependencyDeadlockTests
+{
+    private static readonly byte[] DllBytes = Encoding.UTF8.GetBytes("dll-bytes");
+    private static readonly string DllSha = Convert.ToHexString(SHA256.HashData(DllBytes)).ToLowerInvariant();
+    private static readonly TimeSpan Limit = TimeSpan.FromSeconds(10);
+
+    /// <summary>Holds the dependency download open until released; the plugin DLL itself downloads at once.</summary>
+    private sealed class HeldHandler(TaskCompletionSource hold, TaskCompletionSource started) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)
+        {
+            if (r.RequestUri!.AbsolutePath.Contains("/deps/"))
+            {
+                started.TrySetResult();
+                await hold.Task.WaitAsync(ct);
+            }
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(DllBytes) };
+        }
+    }
+
+    private sealed class EmptyRegistry : IPluginRegistryService
+    {
+        public Task<IReadOnlyList<PluginEntry>> FetchAllAsync(IEnumerable<Uri> urls, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<PluginEntry>>(Array.Empty<PluginEntry>());
+    }
+    private sealed class Offline : IVersionService
+    {
+        public Task<FrameworkManifest> FetchAsync(Uri url, CancellationToken ct = default) => throw new HttpRequestException("offline");
+    }
+
+    private static PluginDependency Dep(string id) =>
+        new(id, id, "1.0", $"https://cdn/deps/{id}", DllSha, DllBytes.Length, "file",
+            new[] { new PluginDependencyFile(null, $"{id}.bin") }, "game", ModdedOnly: true);
+
+    [Fact]
+    public async Task Launch_review_and_install_on_the_UI_context_never_deadlock_behind_a_UI_started_ensure()
+    {
+        var fs = new MockFileSystem(); fs.AddDirectory("/g");
+        var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var http = new HttpClient(new HeldHandler(hold, started));
+        var deps = new PluginInstallDeps(new Installer(fs), new PluginInstaller(fs), http, new DependencyService(fs, http));
+        var inventory = new ClientInventory(fs, deps.Installer, deps.Plugins, new DoorstopToggle(fs));
+        var review = new PreLaunchReviewService(new RegistryCache(new EmptyRegistry(), () => new LauncherConfig()),
+            inventory, new Offline(), deps, _ => Task.FromResult(PreLaunchResult.Proceed));
+        var plugin = new PluginEntry("p2", "P2", "d", null, new[]
+        {
+            new PluginVersion("1.0.0", null, "P2.dll", "https://cdn/p2.dll", DllSha, "0.1.0", null, null, Dependencies: new[] { Dep("b") }),
+        });
+        using var ui = new SingleThreadContext();
+
+        // 1. An install-time ensure started FROM the UI context holds the folder's gate across its download.
+        var ensure = ui.Run(() => deps.Dependencies.EnsureAsync("/g", "p1", new[] { Dep("a") }, new HashSet<string>(), CancellationToken.None));
+        await started.Task.WaitAsync(Limit);
+        // 2. Then, on the same UI context: a Vanilla launch (park), a Modded launch (unpark + sweep) and a
+        //    Modded plugin install (unpark + ensure) — all of which take the same gate.
+        var vanilla = ui.Run(() => review.ReviewAsync(new ClientProfile { Name = "v", Modded = false, GameMiniDir = "/g" }, CancellationToken.None));
+        var modded = ui.Run(() => review.ReviewAsync(new ClientProfile { Name = "m", Modded = true, GameMiniDir = "/g" }, CancellationToken.None));
+        var install = ui.Run(() => PluginDownloads.InstallAsync(deps, new ClientProfile { Modded = true, GameMiniDir = "/g" },
+            plugin, plugin.Versions[0], null));
+        await Task.Delay(200);
+        hold.TrySetResult();
+
+        var all = Task.WhenAll(ensure, vanilla, modded, install);
+        var finished = await Task.WhenAny(all, Task.Delay(Limit));
+        Assert.True(finished == all, "deadlock: the UI context was blocked waiting for the dependency gate");
+        await all;
+        Assert.True(fs.File.Exists("/g/stellar/plugins/p2/P2.dll"));
+    }
+}

@@ -34,14 +34,14 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
     /// report "Preparing &lt;plugin&gt;: &lt;dependency&gt;…"; the caller clears it when the review ends.</param>
     public async Task<bool> ReviewAsync(ClientProfile client, Action<string?> status, CancellationToken ct)
     {
-        if (!client.Modded) { TryPark(client); return true; }
+        if (!client.Modded) { await TryParkAsync(client, ct); return true; }
         try
         {
             // Dependencies must be back in place before anything below reads or installs plugins — no
             // EnsureAsync may ever run while a modded-only file is still parked for a vanilla launch.
             // Fix round 1, Minor 1: its own try/catch (like TryPark) — an unpark failure must not skip
             // the rest of the review (registry check, dialog, ensure).
-            TryUnpark(client);
+            await TryUnparkAsync(client, ct);
 
             var registry = await _registry.ForChannelAsync(client.Channel, ct);
             var manifest = await _versions.FetchAsync(ChannelManifests.FrameworkVersion(client.Channel), ct);
@@ -87,7 +87,7 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
         try
         {
             var inv = _inventory.Read(client, registry);
-            SweepOrphans(client, inv.Plugins.Where(p => p.Installed || p.Disabled).Select(p => p.Entry.Id));
+            await SweepOrphansAsync(client, inv.Plugins.Where(p => p.Installed || p.Disabled).Select(p => p.Entry.Id), ct);
             var installed = inv.Plugins.Where(p => p.Installed && p.Version is not null)
                 .Select(p => (p.Entry, p.Version!)).ToList();
             var lines = await DependencyRunner.EnsureForClientAsync(_deps.Dependencies, client, installed, ct, t => status(t));
@@ -102,7 +102,7 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
     /// inventory sees it (installed or disabled) OR its folder still holds a version marker / sits under
     /// plugins-disabled — so a plugin missing from the registry never loses its dependencies. Each ledger
     /// is fail-open on its own.</summary>
-    private void SweepOrphans(ClientProfile client, IEnumerable<string> presentIds)
+    private async Task SweepOrphansAsync(ClientProfile client, IEnumerable<string> presentIds, CancellationToken ct)
     {
         // Id case: ledger stems are the registry id EnsureAsync was given, so ordinal matches; only a registry id
         // whose CASE changed would read as orphaned, and on Windows the folder-path checks below still find it.
@@ -113,9 +113,10 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
             {
                 if (present.Contains(id) || _deps.Plugins.IsInstalled(client.GameMiniDir, id)
                     || _deps.Plugins.IsDisabled(client.GameMiniDir, id)) continue;
-                _deps.Dependencies.RemoveAll(client.GameMiniDir, id);
+                await _deps.Dependencies.RemoveAllAsync(client.GameMiniDir, id, ct);
                 Log(client, $"{id}: plugin no longer installed — its dependencies were removed");
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex) { Log(client, $"{id}: orphaned dependencies could not be removed — {ex.Message}"); }
         }
     }
@@ -125,18 +126,20 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
 
     /// <summary>Vanilla launches park every moddedOnly dependency file out of the game tree. Best-effort —
     /// launch is never blocked by this.</summary>
-    private void TryPark(ClientProfile client)
+    private async Task TryParkAsync(ClientProfile client, CancellationToken ct)
     {
-        try { _deps.Dependencies.ParkModdedOnly(client.GameMiniDir); }
+        try { await _deps.Dependencies.ParkModdedOnlyAsync(client.GameMiniDir, ct); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch { /* fail-open */ }
     }
 
-    /// <summary>Fix round 1, Minor 1: its own try/catch, like <see cref="TryPark"/> — an unpark failure
+    /// <summary>Fix round 1, Minor 1: its own try/catch, like <see cref="TryParkAsync"/> — an unpark failure
     /// must not skip the rest of the review (registry check, dialog, ensure); it only means a still-parked
     /// file stays parked for one more launch attempt.</summary>
-    private void TryUnpark(ClientProfile client)
+    private async Task TryUnparkAsync(ClientProfile client, CancellationToken ct)
     {
-        try { _deps.Dependencies.UnparkModdedOnly(client.GameMiniDir); }
+        try { await _deps.Dependencies.UnparkModdedOnlyAsync(client.GameMiniDir, ct); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch { /* fail-open — never skip the rest of the review */ }
     }
 }

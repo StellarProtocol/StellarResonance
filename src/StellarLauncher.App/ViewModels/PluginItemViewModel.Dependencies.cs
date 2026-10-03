@@ -49,7 +49,7 @@ public partial class PluginItemViewModel
         var generation = ++_refreshGeneration;
         var deps = ShownDependencies;
         IReadOnlyList<DependencyStatus> statuses;
-        try { statuses = deps.Count == 0 ? Array.Empty<DependencyStatus>() : await Task.Run(() => _parent.DependencyStatus(this)); }
+        try { statuses = deps.Count == 0 ? Array.Empty<DependencyStatus>() : await _parent.DependencyStatusAsync(this); }
         catch (Exception) { return; }
         if (generation != _refreshGeneration) return;   // a newer refresh started meanwhile; it owns the rows
         ApplyDependencyRows(deps, statuses);

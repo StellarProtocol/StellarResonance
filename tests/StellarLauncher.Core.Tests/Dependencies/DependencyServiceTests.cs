@@ -123,7 +123,7 @@ public sealed partial class DependencyServiceTests
         _fs.AddFile("/game_mini/keep.txt", new MockFileData("k"));
         var s = Make();
         await s.EnsureAsync(G, "p", new[] { File("fx", new byte[] { 1 }, "dxgi.dll") }, None, default);
-        s.RemoveAll(G, "p");
+        await s.RemoveAllAsync(G, "p");
         Assert.False(_fs.File.Exists("/game_mini/dxgi.dll"));
         Assert.True(_fs.File.Exists("/game_mini/keep.txt"));
         Assert.False(_fs.File.Exists("/game_mini/stellar/deps/p.json"));
@@ -139,7 +139,7 @@ public sealed partial class DependencyServiceTests
         await s.EnsureAsync(G, "p", new[] { d }, None, default);
         _fs.File.WriteAllBytes("/game_mini/dxgi.dll", new byte[] { 42 });
 
-        s.Remove(G, "p", "fx");
+        await s.RemoveAsync(G, "p", "fx");
 
         Assert.Equal(new byte[] { 42 }, _fs.File.ReadAllBytes("/game_mini/dxgi.dll"));
         Assert.Empty(new DependencyLedgerStore(_fs).Read(G, "p").Entries);
@@ -159,7 +159,7 @@ public sealed partial class DependencyServiceTests
         Assert.Equal(DependencyState.Blocked, stB.State);
         Assert.Equal(new byte[] { 1 }, _fs.File.ReadAllBytes("/game_mini/shared.dll"));
 
-        s.RemoveAll(G, "pluginB");
+        await s.RemoveAllAsync(G, "pluginB");
         Assert.True(_fs.File.Exists("/game_mini/shared.dll"));
         Assert.Equal(new byte[] { 1 }, _fs.File.ReadAllBytes("/game_mini/shared.dll"));
     }
@@ -198,7 +198,7 @@ public sealed partial class DependencyServiceTests
     // I2: an unsafe recorded path must never be resolved to an absolute path, so Remove/Park/Unpark can
     // never act on it — a file planted at the would-be escape target is left untouched either way.
     [Fact]
-    public void Remove_park_and_unpark_all_ignore_unsafe_ledger_paths()
+    public async Task Remove_park_and_unpark_all_ignore_unsafe_ledger_paths()
     {
         var fs = new MockFileSystem();
         fs.AddDirectory(G);
@@ -212,12 +212,12 @@ public sealed partial class DependencyServiceTests
         }) }));
         var s = MakeWith(fs);
 
-        s.ParkModdedOnly(G);
-        s.UnparkModdedOnly(G);
+        await s.ParkModdedOnlyAsync(G);
+        await s.UnparkModdedOnlyAsync(G);
         Assert.Equal("outside-x", fs.File.ReadAllText("/x"));
         Assert.Equal("outside-abs", fs.File.ReadAllText("/abs/x"));
 
-        s.Remove(G, "p", "evil");
+        await s.RemoveAsync(G, "p", "evil");
         Assert.Equal("outside-x", fs.File.ReadAllText("/x"));
         Assert.Equal("outside-abs", fs.File.ReadAllText("/abs/x"));
         Assert.Empty(new DependencyLedgerStore(fs).Read(G, "p").Entries);

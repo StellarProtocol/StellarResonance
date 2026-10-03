@@ -29,7 +29,7 @@ public sealed partial class DependencyService
         List<(string Abs, byte[] Bytes)> files;
         try
         {
-            bytes = await DownloadCappedAsync(dep.Url, dep.Size, ct);
+            bytes = await DownloadCappedAsync(dep.Url, dep.Size, ct).ConfigureAwait(false);
             if (!string.Equals(DependencyFileHash.Of(bytes), dep.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("checksum mismatch");
             // Controller round: BuildFiles runs INSIDE this try now — an archive-shape error (archive too
@@ -198,16 +198,17 @@ public sealed partial class DependencyService
 
     private async Task<byte[]> DownloadCappedAsync(string url, long cap, CancellationToken ct)
     {
-        using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
-        await using var src = await resp.Content.ReadAsStreamAsync(ct);
+        var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        await using var _ = src.ConfigureAwait(false);
         using var buffer = new MemoryStream();
         var chunk = new byte[81920];
         int n;
-        while ((n = await src.ReadAsync(chunk, ct)) > 0)
+        while ((n = await src.ReadAsync(chunk, ct).ConfigureAwait(false)) > 0)
         {
             if (buffer.Length + n > cap) throw new InvalidDataException("larger than declared");
-            await buffer.WriteAsync(chunk.AsMemory(0, n), ct);
+            await buffer.WriteAsync(chunk.AsMemory(0, n), ct).ConfigureAwait(false);
         }
         return buffer.ToArray();
     }

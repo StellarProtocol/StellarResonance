@@ -12,10 +12,10 @@ public class RecordingDependencyServiceTests
         public Task<IReadOnlyList<DependencyStatus>> EnsureAsync(string g, string p, IReadOnlyList<PluginDependency> deps, ISet<string> s, CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<DependencyStatus>>(deps.Select(d => new DependencyStatus(d.Id, Next, Next == DependencyState.Failed ? "HTTP 404" : null)).ToList());
         public IReadOnlyList<DependencyStatus> Status(string g, string p, IReadOnlyList<PluginDependency> deps, ISet<string> s) => Array.Empty<DependencyStatus>();
-        public void Remove(string g, string p, string d) { }
-        public void RemoveAll(string g, string p) { }
-        public void ParkModdedOnly(string g) { }
-        public void UnparkModdedOnly(string g) { }
+        public Task RemoveAsync(string g, string p, string d, CancellationToken ct = default) => Task.CompletedTask;
+        public Task RemoveAllAsync(string g, string p, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ParkModdedOnlyAsync(string g, CancellationToken ct = default) => Task.CompletedTask;
+        public Task UnparkModdedOnlyAsync(string g, CancellationToken ct = default) => Task.CompletedTask;
         public IReadOnlyList<string> LedgerPluginIds(string g) => Array.Empty<string>();
     }
 
@@ -43,11 +43,11 @@ public class RecordingDependencyServiceTests
     {
         var sut = new RecordingDependencyService(new Scripted());
         await sut.EnsureAsync("/g", "p", new[] { Fx }, new HashSet<string>(), default);
-        sut.Remove("/g", "p", "fx");
+        await sut.RemoveAsync("/g", "p", "fx");
         Assert.Null(sut.LastProblem("/g", "p", Fx));
 
         await sut.EnsureAsync("/g", "p", new[] { Fx }, new HashSet<string>(), default);
-        sut.RemoveAll("/g", "p");
+        await sut.RemoveAllAsync("/g", "p");
         Assert.Null(sut.LastProblem("/g", "p", Fx));
     }
 

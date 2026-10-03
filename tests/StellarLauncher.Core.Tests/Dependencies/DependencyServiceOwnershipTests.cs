@@ -37,7 +37,7 @@ public sealed partial class DependencyServiceTests
         var qDep = File("fx", new byte[] { 1 }, "dxgi.dll", modded: true);
         var s = Make();
         await s.EnsureAsync(G, "q", new[] { qDep }, None, default);
-        s.ParkModdedOnly(G); // the destination no longer physically exists
+        await s.ParkModdedOnlyAsync(G); // the destination no longer physically exists
 
         var pDep = File("fx2", new byte[] { 2 }, "dxgi.dll");
         var st = Assert.Single(await s.EnsureAsync(G, "p", new[] { pDep }, None, default));

@@ -21,7 +21,7 @@ public sealed partial class DependencyService : IDependencyService
     private readonly DependencyParking _parking;
     // Task 6 fix round, Important 1: one gate per game folder, held by every MUTATING member for its whole
     // run (EnsureAsync spans a download between its ledger read and its ledger write). Read-only Status
-    // never takes it. Not re-entrant — internal callers use the *Core methods.
+    // never takes it. Not re-entrant — internal callers use the *Core methods. Only ever awaited (round 2).
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _gates =
         new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
@@ -37,8 +37,10 @@ public sealed partial class DependencyService : IDependencyService
         IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds, CancellationToken ct)
     {
         var gate = Gate(gameMini);
-        await gate.WaitAsync(ct);
-        try { return await EnsureCoreAsync(gameMini, pluginId, deps, skippedIds, ct); }
+        // Fix round 2: ConfigureAwait(false) on every await in this service — none of it needs the caller's
+        // (UI) context, and a continuation queued behind a busy UI thread would hold the gate meanwhile.
+        await gate.WaitAsync(ct).ConfigureAwait(false);
+        try { return await EnsureCoreAsync(gameMini, pluginId, deps, skippedIds, ct).ConfigureAwait(false); }
         finally { gate.Release(); }
     }
 
@@ -75,7 +77,7 @@ public sealed partial class DependencyService : IDependencyService
             {
                 try
                 {
-                    status = await EnsureOneAsync(gameMini, pluginId, d, ct);
+                    status = await EnsureOneAsync(gameMini, pluginId, d, ct).ConfigureAwait(false);
                     // A Failed returned HERE (not thrown) is always a download/verify failure — never annotated (minor 1).
                     if (status.State == DependencyState.Blocked) status = AnnotateIfCorrupt(gameMini, pluginId, status);
                 }
@@ -121,8 +123,8 @@ public sealed partial class DependencyService : IDependencyService
         return deps.Select(d => results[d.Id]).ToList();
     }
 
-    public void Remove(string gameMini, string pluginId, string dependencyId) =>
-        Locked(gameMini, () => RemoveCore(gameMini, pluginId, dependencyId));
+    public Task RemoveAsync(string gameMini, string pluginId, string dependencyId, CancellationToken ct = default) =>
+        LockedAsync(gameMini, () => RemoveCore(gameMini, pluginId, dependencyId), ct);
 
     private void RemoveCore(string gameMini, string pluginId, string dependencyId)
     {
@@ -140,7 +142,8 @@ public sealed partial class DependencyService : IDependencyService
         _store.Write(gameMini, ledger with { Entries = ledger.Entries.Where(e => e.DependencyId != dependencyId).ToList() });
     }
 
-    public void RemoveAll(string gameMini, string pluginId) => Locked(gameMini, () => RemoveAllCore(gameMini, pluginId));
+    public Task RemoveAllAsync(string gameMini, string pluginId, CancellationToken ct = default) =>
+        LockedAsync(gameMini, () => RemoveAllCore(gameMini, pluginId), ct);
 
     private void RemoveAllCore(string gameMini, string pluginId)
     {
@@ -151,9 +154,11 @@ public sealed partial class DependencyService : IDependencyService
         _store.Write(gameMini, ledger with { Entries = Array.Empty<LedgerEntry>() });
     }
 
-    public void ParkModdedOnly(string gameMini) => Locked(gameMini, () => _parking.Park(gameMini));
+    public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) =>
+        LockedAsync(gameMini, () => _parking.Park(gameMini), ct);
 
-    public void UnparkModdedOnly(string gameMini) => Locked(gameMini, () => _parking.Unpark(gameMini));
+    public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default) =>
+        LockedAsync(gameMini, () => _parking.Unpark(gameMini), ct);
 
     /// <summary>The folder's gate. The key is the full path without a trailing separator (case-insensitive
     /// on Windows), so "/g", "/g/" and "/x/../g" share one gate.</summary>
@@ -163,11 +168,13 @@ public sealed partial class DependencyService : IDependencyService
         return _gates.GetOrAdd(key.Length == 0 ? gameMini : key, _ => new SemaphoreSlim(1, 1));
     }
 
-    /// <summary>Synchronous members wait synchronously for the folder's gate.</summary>
-    private void Locked(string gameMini, Action action)
+    /// <summary>Fix round 2, Critical: the gate is only ever AWAITED — never a blocking Wait(). A caller on
+    /// the UI thread blocked in Wait() behind an EnsureAsync whose continuations need that same thread would
+    /// deadlock the launcher. The work itself is short and synchronous once the gate is held.</summary>
+    private async Task LockedAsync(string gameMini, Action action, CancellationToken ct)
     {
         var gate = Gate(gameMini);
-        gate.Wait();
+        await gate.WaitAsync(ct).ConfigureAwait(false);
         try { action(); }
         finally { gate.Release(); }
     }

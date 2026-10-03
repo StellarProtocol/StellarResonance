@@ -138,15 +138,16 @@ public class ClientPluginsViewModelTests
             => Task.FromResult<IReadOnlyList<DependencyStatus>>(Array.Empty<DependencyStatus>());
         public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,
             IReadOnlyList<StellarLauncher.Core.Model.PluginDependency> deps, ISet<string> skippedIds) => Array.Empty<DependencyStatus>();
-        public void Remove(string gameMini, string pluginId, string dependencyId) { }
-        public void RemoveAll(string gameMini, string pluginId)
+        public Task RemoveAsync(string gameMini, string pluginId, string dependencyId, CancellationToken ct = default) => Task.CompletedTask;
+        public Task RemoveAllAsync(string gameMini, string pluginId, CancellationToken ct = default)
         {
             RemoveAllCalls++;
             DllStillPresentWhenRemoveAllRan = _fs.File.Exists(_dllPath);
             if (ThrowOnRemoveAll) throw new InvalidOperationException("ledger busy");
+            return Task.CompletedTask;
         }
-        public void ParkModdedOnly(string gameMini) { }
-        public void UnparkModdedOnly(string gameMini) { }
+        public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
+        public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
     }
 
@@ -455,5 +456,62 @@ public class ClientPluginsViewModelTests
         Assert.Equal("with opt name", item.Dependencies.Single(d => d.Id == "withopt").RequiresLabel);
         Assert.Null(item.Dependencies.Single(d => d.Id == "req").RequiresLabel);
         Assert.False(item.Dependencies.Single(d => d.Id == "req").HasRequires);
+    }
+
+    // Fix round 2, Minor 1: the page's background status must use a snapshot of SkippedDependencies taken on
+    // the calling (UI) thread — never read the live profile list from the pool while the UI may mutate it.
+    private sealed class StatusSpy(IDependencyService inner) : IDependencyService
+    {
+        public readonly System.Collections.Concurrent.ConcurrentQueue<string[]> Seen = new();
+        public Task<IReadOnlyList<DependencyStatus>> EnsureAsync(string g, string p, IReadOnlyList<StellarLauncher.Core.Model.PluginDependency> d, ISet<string> s, CancellationToken ct) => inner.EnsureAsync(g, p, d, s, ct);
+        public IReadOnlyList<DependencyStatus> Status(string g, string p, IReadOnlyList<StellarLauncher.Core.Model.PluginDependency> d, ISet<string> s)
+        { Seen.Enqueue(s.OrderBy(x => x).ToArray()); return inner.Status(g, p, d, s); }
+        public Task RemoveAsync(string g, string p, string d, CancellationToken ct = default) => inner.RemoveAsync(g, p, d, ct);
+        public Task RemoveAllAsync(string g, string p, CancellationToken ct = default) => inner.RemoveAllAsync(g, p, ct);
+        public Task ParkModdedOnlyAsync(string g, CancellationToken ct = default) => inner.ParkModdedOnlyAsync(g, ct);
+        public Task UnparkModdedOnlyAsync(string g, CancellationToken ct = default) => inner.UnparkModdedOnlyAsync(g, ct);
+        public IReadOnlyList<string> LedgerPluginIds(string g) => inner.LedgerPluginIds(g);
+    }
+
+    [Fact]
+    public async Task The_background_status_uses_the_skip_list_as_it_was_when_the_refresh_started()
+    {
+        var f = new WorkspaceFixture();
+        var dep = DepCase("opt", true);
+        f.Registry.Add(new StellarLauncher.Core.Model.PluginEntry("photo", "Photo", "d", "a", new[]
+        {
+            new StellarLauncher.Core.Model.PluginVersion("1.0.0", null, "Stellar.Photo.dll", "https://cdn/photo/1.0.0.dll",
+                WorkspaceFixture.DllSha, "2.0.0", null, null, Dependencies: new[] { dep }),
+        }));
+        f.AddClient("c2", "Test", Test, framework: "2.7.4");
+        f.InstallPlugin(Test, "photo", "Stellar.Photo.dll", "1.0.0");
+        var spy = new StatusSpy(new DependencyService(f.Fs, new HttpClient()));
+        f.Dependencies = spy;
+        f.Tabs = f.Tabs with { Plugins = w => new ClientPluginsViewModel(w) };
+        f.Start();
+        var ws = await f.OpenAsync("c2");
+        ws.ShowPluginsCommand.Execute(null);
+        var vm = (ClientPluginsViewModel)ws.TabContent!;
+        await vm.ReloadAsync();
+        var item = vm.Rows.Single().Item;
+        var client = f.Shell.Config.Clients.Single(c => c.Id == "c2");
+
+        // Hold every pool thread so the background half can't start before the "UI" mutates the list.
+        ThreadPool.GetMinThreads(out var workers, out _);
+        using var release = new ManualResetEventSlim(false);
+        var blockers = Enumerable.Range(0, workers).Select(_ => Task.Factory.StartNew(() => release.Wait(5000),
+            CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default)).ToArray();
+        Task refresh;
+        try
+        {
+            refresh = item.RefreshDependenciesAsync();
+            client.SkippedDependencies.Add("photo/opt");   // the UI changes the profile right after
+        }
+        finally { release.Set(); }
+        await Task.WhenAll(blockers);
+        await refresh;
+
+        Assert.True(spy.Seen.TryDequeue(out var seen));
+        Assert.Empty(seen);   // the snapshot from when the refresh started — not the later mutation
     }
 }

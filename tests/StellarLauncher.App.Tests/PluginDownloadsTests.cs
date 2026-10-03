@@ -31,14 +31,15 @@ public class PluginDownloadsTests
         }
         public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,
             IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds) => Array.Empty<DependencyStatus>();
-        public void Remove(string gameMini, string pluginId, string dependencyId) { }
-        public void RemoveAll(string gameMini, string pluginId) { }
-        public void ParkModdedOnly(string gameMini) { }
+        public Task RemoveAsync(string gameMini, string pluginId, string dependencyId, CancellationToken ct = default) => Task.CompletedTask;
+        public Task RemoveAllAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
         public bool ThrowOnUnpark;
-        public void UnparkModdedOnly(string gameMini)
+        public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default)
         {
             Calls.Add("Unpark");
             if (ThrowOnUnpark) throw new IOException("parked file locked");
+            return Task.CompletedTask;
         }
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
     }

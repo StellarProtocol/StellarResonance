@@ -72,7 +72,7 @@ public sealed partial class DependencyServiceTests
         var v1 = File("fx", new byte[] { 1 }, "dxgi.dll", modded: true);
         var s = Make();
         await s.EnsureAsync(G, "p", new[] { v1 }, None, default);
-        s.ParkModdedOnly(G); // moves the v1 bytes into deps-parked/
+        await s.ParkModdedOnlyAsync(G); // moves the v1 bytes into deps-parked/
         Assert.True(_fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll"));
 
         var v2 = File("fx", new byte[] { 2 }, "dxgi.dll", modded: true) with { Version = "2.0" };
@@ -81,7 +81,7 @@ public sealed partial class DependencyServiceTests
         Assert.Equal(new byte[] { 2 }, _fs.File.ReadAllBytes("/game_mini/dxgi.dll"));
         Assert.False(_fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll")); // stale copy dropped
 
-        s.UnparkModdedOnly(G); // nothing left to (wrongly) restore
+        await s.UnparkModdedOnlyAsync(G); // nothing left to (wrongly) restore
         Assert.Equal(new byte[] { 2 }, _fs.File.ReadAllBytes("/game_mini/dxgi.dll"));
     }
 

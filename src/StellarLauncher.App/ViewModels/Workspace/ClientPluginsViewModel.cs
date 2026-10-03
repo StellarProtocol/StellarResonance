@@ -158,10 +158,9 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
             // dependency problem) — but its skip entries are KEPT (cleanup never confirmed done) and the
             // failure is logged rather than silently dropped.
             string? depCleanupFailure = null;
-            // Off the UI thread: RemoveAll waits for the game folder's dependency gate, which a background
-            // install may hold for the length of a download.
-            var gameMini = _ws.Client.GameMiniDir;
-            try { await Task.Run(() => _ws.Services.Core.Install.Dependencies.RemoveAll(gameMini, item.Entry.Id)); }
+            // Awaited (fix round 2): the game folder's dependency gate may be held by a download for a while,
+            // and the UI thread must never block on it.
+            try { await _ws.Services.Core.Install.Dependencies.RemoveAllAsync(_ws.Client.GameMiniDir, item.Entry.Id); }
             catch (Exception ex) { depCleanupFailure = ex.Message; }
 
             _ws.Services.Core.Install.Plugins.Remove(_ws.Client.GameMiniDir, item.Entry.Id, item.CanonicalDll);

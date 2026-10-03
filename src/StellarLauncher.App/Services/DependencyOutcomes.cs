@@ -59,20 +59,20 @@ public sealed class RecordingDependencyService : IDependencyService, IDependency
     public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId, IReadOnlyList<PluginDependency> deps,
         ISet<string> skippedIds) => _inner.Status(gameMini, pluginId, deps, skippedIds);
 
-    public void Remove(string gameMini, string pluginId, string dependencyId)
+    public async Task RemoveAsync(string gameMini, string pluginId, string dependencyId, CancellationToken ct = default)
     {
-        _inner.Remove(gameMini, pluginId, dependencyId);
+        await _inner.RemoveAsync(gameMini, pluginId, dependencyId, ct);
         lock (_gate) _problems.Remove((gameMini, pluginId, dependencyId));
     }
 
-    public void RemoveAll(string gameMini, string pluginId)
+    public async Task RemoveAllAsync(string gameMini, string pluginId, CancellationToken ct = default)
     {
-        _inner.RemoveAll(gameMini, pluginId);
+        await _inner.RemoveAllAsync(gameMini, pluginId, ct);
         lock (_gate)
             foreach (var k in _problems.Keys.Where(k => k.GameMini == gameMini && k.PluginId == pluginId).ToList()) _problems.Remove(k);
     }
 
-    public void ParkModdedOnly(string gameMini) => _inner.ParkModdedOnly(gameMini);
-    public void UnparkModdedOnly(string gameMini) => _inner.UnparkModdedOnly(gameMini);
+    public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => _inner.ParkModdedOnlyAsync(gameMini, ct);
+    public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => _inner.UnparkModdedOnlyAsync(gameMini, ct);
     public IReadOnlyList<string> LedgerPluginIds(string gameMini) => _inner.LedgerPluginIds(gameMini);
 }

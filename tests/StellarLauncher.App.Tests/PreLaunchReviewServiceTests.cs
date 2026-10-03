@@ -44,18 +44,20 @@ public class PreLaunchReviewServiceTests
         public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,
             IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds) =>
             deps.Select(d => new DependencyStatus(d.Id, ReportNotInstalled ? DependencyState.NotInstalled : DependencyState.Installed, null)).ToList();
-        public void Remove(string gameMini, string pluginId, string dependencyId) { }
-        public void RemoveAll(string gameMini, string pluginId)
+        public Task RemoveAsync(string gameMini, string pluginId, string dependencyId, CancellationToken ct = default) => Task.CompletedTask;
+        public Task RemoveAllAsync(string gameMini, string pluginId, CancellationToken ct = default)
         {
             Calls.Add($"RemoveAll:{pluginId}");
             if (ThrowOnRemoveAll) throw new IOException("locked");
+            return Task.CompletedTask;
         }
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Ledgers;
-        public void ParkModdedOnly(string gameMini) => Calls.Add("Park");
-        public void UnparkModdedOnly(string gameMini)
+        public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) { Calls.Add("Park"); return Task.CompletedTask; }
+        public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default)
         {
             Calls.Add("Unpark");
             if (ThrowOnUnpark) throw new IOException("boom");
+            return Task.CompletedTask;
         }
     }
 

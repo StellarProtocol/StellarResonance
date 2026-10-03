@@ -41,7 +41,7 @@ public static class PluginDownloads
         // its own try/catch, like PreLaunchReviewService.TryUnpark — the plugin IS installed at this point,
         // so an unpark error must not surface as a failed install (a still-parked file stays parked, and
         // EnsureAsync then reports it on the plugin page).
-        TryUnpark(deps, gameMini);
+        await TryUnparkAsync(deps, gameMini);
         // Fix round 1, Important 2: honour whatever the player already opted out of for THIS plugin —
         // an install/update must not silently re-install a dependency they unticked (optional ones only).
         var skipped = DependencyRunner.Skipped(client, entry.Id, pluginDeps);
@@ -50,9 +50,10 @@ public static class PluginDownloads
                 status?.Invoke(DependencyRunner.Line(entry.Id, s));
     }
 
-    private static void TryUnpark(PluginInstallDeps deps, string gameMini)
+    /// <summary>Awaited, never blocking (fix round 2): this runs on the UI context.</summary>
+    private static async Task TryUnparkAsync(PluginInstallDeps deps, string gameMini)
     {
-        try { deps.Dependencies.UnparkModdedOnly(gameMini); }
+        try { await deps.Dependencies.UnparkModdedOnlyAsync(gameMini); }
         catch (Exception) { /* fail-open — the install already succeeded */ }
     }
 }

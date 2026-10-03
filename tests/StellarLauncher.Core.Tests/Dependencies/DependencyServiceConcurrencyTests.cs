@@ -82,7 +82,7 @@ public sealed class DependencyServiceConcurrencyTests
 
         var ensure = Task.Run(() => gated.EnsureAsync(G, "p", new[] { a }, None, default));
         await _gateStarted.Task;                                      // ensure has read the ledger and is downloading
-        var remove = Task.Run(() => gated.Remove(G, "p", "b"));
+        var remove = Task.Run(() => gated.RemoveAsync(G, "p", "b"));
         await Task.Delay(150);                                        // unserialised: Remove finishes here
         hold.TrySetResult();
         await Task.WhenAll(ensure, remove);
