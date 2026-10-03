@@ -6,11 +6,19 @@ using System.Threading.Tasks;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Model;
+using StellarLauncher.Core.Services;
 
 namespace StellarLauncher.App.Services;
 
+/// <summary>One dependency status line ("&lt;plugin&gt;/&lt;dependency&gt;: &lt;state&gt;[ — detail]");
+/// <see cref="IsProblem"/> for a Failed or Blocked outcome (the always-on log's lines — M-f).</summary>
+public sealed record DependencyLine(string Text, bool IsProblem);
+
 /// <summary>Drives <see cref="IDependencyService"/> for every installed plugin on one client, and resolves
-/// which of a plugin's dependencies the player opted out of (<see cref="ClientProfile.SkippedDependencies"/>).</summary>
+/// which of a plugin's dependencies the player opted out of (<see cref="ClientProfile.SkippedDependencies"/>).
+/// Final review M-g: also the ONE place the Modded "restore parked files, then ensure" sequence lives — the
+/// launch review, an install/update and the plugin page's re-tick all go through
+/// <see cref="RestoreForModdedAsync"/> / <see cref="EnsurePluginAsync"/>.</summary>
 public static class DependencyRunner
 {
     /// <summary>This plugin's opted-out dependency ids — only those that are <c>optional</c> in
@@ -23,13 +31,55 @@ public static class DependencyRunner
             .Select(s => s[(pluginId.Length + 1)..]).Where(optional.Contains).ToHashSet(StringComparer.Ordinal);
     }
 
+    /// <summary>Before anything is ensured on a Modded client: every parked <c>moddedOnly</c> file comes back,
+    /// except those of a DISABLED plugin, which are parked instead (final review I6) and come back once it is
+    /// enabled. Fail-open: a failure writes one always-on log line and never stops the caller. Returns the
+    /// disabled plugins it parked for.</summary>
+    /// <param name="unlessStillDisabled">For a second pass after something that can only DISABLE plugins (the
+    /// pre-launch dialog): nothing is done when exactly these plugins are still the disabled ones.</param>
+    public static async Task<IReadOnlySet<string>> RestoreForModdedAsync(PluginInstallDeps deps, string gameMini,
+        CancellationToken ct, IReadOnlySet<string>? unlessStillDisabled = null)
+    {
+        var disabled = DisabledWithLedger(deps, gameMini);
+        if (unlessStillDisabled is not null && disabled.SetEquals(unlessStillDisabled)) return disabled;
+        try { await deps.Dependencies.UnparkModdedOnlyAsync(gameMini, disabled, ct); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex) { DependencyLog.Failure(gameMini, $"restoring parked dependencies failed — {ex.Message}"); }
+        return disabled;
+    }
+
+    /// <summary>Restore (<see cref="RestoreForModdedAsync"/>), then ensure ONE plugin's dependencies with the
+    /// skip set the caller snapshotted — an install/update and the plugin page's re-tick. Problems are logged
+    /// (always-on) and returned; only a real failure of the ensure itself throws.</summary>
+    public static async Task<IReadOnlyList<DependencyStatus>> EnsurePluginAsync(PluginInstallDeps deps, string gameMini,
+        string pluginId, IReadOnlyList<PluginDependency> pluginDeps, ISet<string> skipped)
+    {
+        await RestoreForModdedAsync(deps, gameMini, CancellationToken.None);
+        var results = await deps.Dependencies.EnsureAsync(gameMini, pluginId, pluginDeps, skipped, CancellationToken.None);
+        foreach (var s in results.Where(IsProblem)) DependencyLog.Failure(gameMini, Line(pluginId, s));
+        return results;
+    }
+
+    /// <summary>Plugin ids that have a dependency ledger here but are disabled (only under plugins-disabled).
+    /// Never throws — on any error nothing is treated as disabled.</summary>
+    private static IReadOnlySet<string> DisabledWithLedger(PluginInstallDeps deps, string gameMini)
+    {
+        try
+        {
+            return deps.Dependencies.LedgerPluginIds(gameMini)
+                .Where(id => deps.Plugins.IsDisabled(gameMini, id) && !deps.Plugins.IsInstalled(gameMini, id))
+                .ToHashSet(StringComparer.Ordinal);
+        }
+        catch (Exception) { return new HashSet<string>(); }
+    }
+
     /// <summary>Ensures every installed plugin's dependencies. Before a plugin whose dependencies still need
     /// downloading, reports "Preparing &lt;plugin&gt;: &lt;dependency names&gt;…" through
     /// <paramref name="progress"/>. Returns one status line per dependency.</summary>
-    public static async Task<IReadOnlyList<string>> EnsureForClientAsync(IDependencyService svc, ClientProfile c,
+    public static async Task<IReadOnlyList<DependencyLine>> EnsureForClientAsync(IDependencyService svc, ClientProfile c,
         IReadOnlyList<(PluginEntry Entry, string Version)> installed, CancellationToken ct, Action<string>? progress = null)
     {
-        var lines = new List<string>();
+        var lines = new List<DependencyLine>();
         var ledgers = LedgerIds(svc, c.GameMiniDir);
         foreach (var (entry, version) in installed)
         {
@@ -43,10 +93,12 @@ public static class DependencyRunner
             if (progress is not null && PendingNames(svc, c.GameMiniDir, entry.Id, deps, skipped) is { Length: > 0 } names)
                 progress($"Preparing {entry.Name}: {names}…");
             foreach (var s in await svc.EnsureAsync(c.GameMiniDir, entry.Id, deps, skipped, ct))
-                lines.Add(Line(entry.Id, s));
+                lines.Add(new DependencyLine(Line(entry.Id, s), IsProblem(s)));
         }
         return lines;
     }
+
+    private static bool IsProblem(DependencyStatus s) => s.State is DependencyState.Failed or DependencyState.Blocked;
 
     private static ISet<string> LedgerIds(IDependencyService svc, string gameMini)
     {

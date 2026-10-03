@@ -35,7 +35,7 @@ public class PluginDownloadsTests
         public Task RemoveAllAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.CompletedTask;
         public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
         public bool ThrowOnUnpark;
-        public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default)
+        public Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default)
         {
             Calls.Add("Unpark");
             if (ThrowOnUnpark) throw new IOException("parked file locked");

@@ -147,7 +147,7 @@ public class ClientPluginsViewModelTests
             return Task.CompletedTask;
         }
         public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
-        public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
+        public Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) => Task.CompletedTask;
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
     }
 
@@ -469,7 +469,7 @@ public class ClientPluginsViewModelTests
         public Task RemoveAsync(string g, string p, string d, CancellationToken ct = default) => inner.RemoveAsync(g, p, d, ct);
         public Task RemoveAllAsync(string g, string p, CancellationToken ct = default) => inner.RemoveAllAsync(g, p, ct);
         public Task ParkModdedOnlyAsync(string g, CancellationToken ct = default) => inner.ParkModdedOnlyAsync(g, ct);
-        public Task UnparkModdedOnlyAsync(string g, CancellationToken ct = default) => inner.UnparkModdedOnlyAsync(g, ct);
+        public Task UnparkModdedOnlyAsync(string g, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) => inner.UnparkModdedOnlyAsync(g, keepParked, ct);
         public IReadOnlyList<string> LedgerPluginIds(string g) => inner.LedgerPluginIds(g);
     }
 

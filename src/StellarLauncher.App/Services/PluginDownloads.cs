@@ -37,23 +37,14 @@ public static class PluginDownloads
         if (v.Dependencies is not { Count: > 0 } pluginDeps) return;
         if (!client.Modded) { status?.Invoke("will be installed at next modded launch"); return; }
 
-        // No EnsureAsync may run while files are parked — unpark first, every time (idempotent). Task 6 (a):
-        // its own try/catch, like PreLaunchReviewService.TryUnpark — the plugin IS installed at this point,
-        // so an unpark error must not surface as a failed install (a still-parked file stays parked, and
-        // EnsureAsync then reports it on the plugin page).
-        await TryUnparkAsync(deps, gameMini);
-        // Fix round 1, Important 2: honour whatever the player already opted out of for THIS plugin —
-        // an install/update must not silently re-install a dependency they unticked (optional ones only).
+        // No EnsureAsync may run while files are parked — restore first, every time (idempotent, fail-open:
+        // the plugin IS installed at this point, so a restore error must not surface as a failed install).
+        // Fix round 1, Important 2: honour whatever the player already opted out of for THIS plugin — an
+        // install/update must not silently re-install a dependency they unticked (optional ones only).
+        // Final review M-g: the same restore-then-ensure as the launch review and the page's re-tick.
         var skipped = DependencyRunner.Skipped(client, entry.Id, pluginDeps);
-        foreach (var s in await deps.Dependencies.EnsureAsync(gameMini, entry.Id, pluginDeps, skipped, CancellationToken.None))
+        foreach (var s in await DependencyRunner.EnsurePluginAsync(deps, gameMini, entry.Id, pluginDeps, skipped))
             if (s.State != DependencyState.Installed)
                 status?.Invoke(DependencyRunner.Line(entry.Id, s));
-    }
-
-    /// <summary>Awaited, never blocking (fix round 2): this runs on the UI context.</summary>
-    private static async Task TryUnparkAsync(PluginInstallDeps deps, string gameMini)
-    {
-        try { await deps.Dependencies.UnparkModdedOnlyAsync(gameMini); }
-        catch (Exception) { /* fail-open — the install already succeeded */ }
     }
 }

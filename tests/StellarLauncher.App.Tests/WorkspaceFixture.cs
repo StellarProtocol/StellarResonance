@@ -99,7 +99,7 @@ public sealed class WorkspaceFixture
         var sessions = new ClientSessions(Store, new Orch(), new NoScan(), new NoProc(), () => DateTimeOffset.UnixEpoch, a => a());
         var http = new HttpClient(new DllHandler(this));
         var dependencies = Dependencies ?? new RecordingDependencyService(new DependencyService(Fs, http));   // as App wires it
-        var deps = new PluginInstallDeps(new Installer(Fs), new PluginInstaller(Fs), http, dependencies, dependencies as IDependencyOutcomes);
+        var deps = new PluginInstallDeps(new Installer(Fs), new PluginInstaller(Fs), http, dependencies);
         var core = new DashboardServices(new ClientInventory(Fs, deps.Installer, deps.Plugins, new DoorstopToggle(Fs)),
             new RegistryCache(new Reg(Registry), () => Store.Load()), new FrameworkManifests(Manifests), new Review(), deps,
             new ClientCandidates(GameDetector, new Platform()));

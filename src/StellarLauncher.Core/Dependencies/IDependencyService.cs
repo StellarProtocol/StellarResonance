@@ -45,8 +45,10 @@ public interface IDependencyService
     Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default);
 
     /// <summary>Moves parked files back, unless something now occupies the destination — in which case
-    /// it stays parked. Idempotent.</summary>
-    Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default);
+    /// it stays parked. A plugin in <paramref name="keepParked"/> (one that is disabled — final review I6) is
+    /// treated as for a vanilla launch instead: its placed <c>moddedOnly</c> files are parked, and restored by
+    /// a later call that no longer lists it. Idempotent.</summary>
+    Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default);
 
     /// <summary>The plugin ids that currently have a dependency ledger in this game folder (valid ids
     /// only; nothing is read or quarantined). Used to find ledgers left behind by a plugin that is no

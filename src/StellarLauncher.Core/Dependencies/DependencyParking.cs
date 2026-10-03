@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Linq;
 
@@ -23,8 +24,31 @@ public sealed class DependencyParking
     /// file already parked (or never placed) is left alone.</summary>
     public void Park(string gameMini)
     {
+        foreach (var ledger in _store.ReadAll(gameMini)) Park(gameMini, ledger);
+    }
+
+    /// <summary>Moves parked files back, unless something now occupies the destination — in which case
+    /// it stays parked. Idempotent — a file with nothing parked is left alone. Final review I6: a plugin in
+    /// <paramref name="keepParked"/> (disabled) is parked instead, exactly as for a vanilla launch.</summary>
+    public void Unpark(string gameMini, IReadOnlySet<string>? keepParked = null)
+    {
         foreach (var ledger in _store.ReadAll(gameMini))
-        foreach (var f in ledger.Entries.SelectMany(e => e.Files).Where(f => f.ModdedOnly))
+        {
+            if (keepParked?.Contains(ledger.PluginId) == true) { Park(gameMini, ledger); continue; }
+            foreach (var f in ModdedOnlyFiles(ledger))
+            {
+                var abs = DependencyPaths.FromLedger(gameMini, f.Path);
+                if (abs is null) continue;
+                var parked = DependencyPaths.ParkedPath(gameMini, ledger.PluginId, f.Path);
+                if (!_fs.File.Exists(parked) || _fs.File.Exists(abs)) continue;
+                Move(parked, abs);
+            }
+        }
+    }
+
+    private void Park(string gameMini, DependencyLedger ledger)
+    {
+        foreach (var f in ModdedOnlyFiles(ledger))
         {
             var abs = DependencyPaths.FromLedger(gameMini, f.Path);
             if (abs is null || !DependencyFileHash.Matches(_fs, abs, f.Sha256)) continue;
@@ -32,20 +56,8 @@ public sealed class DependencyParking
         }
     }
 
-    /// <summary>Moves parked files back, unless something now occupies the destination — in which case
-    /// it stays parked. Idempotent — a file with nothing parked is left alone.</summary>
-    public void Unpark(string gameMini)
-    {
-        foreach (var ledger in _store.ReadAll(gameMini))
-        foreach (var f in ledger.Entries.SelectMany(e => e.Files).Where(f => f.ModdedOnly))
-        {
-            var abs = DependencyPaths.FromLedger(gameMini, f.Path);
-            if (abs is null) continue;
-            var parked = DependencyPaths.ParkedPath(gameMini, ledger.PluginId, f.Path);
-            if (!_fs.File.Exists(parked) || _fs.File.Exists(abs)) continue;
-            Move(parked, abs);
-        }
-    }
+    private static IEnumerable<LedgerFile> ModdedOnlyFiles(DependencyLedger ledger) =>
+        ledger.Entries.SelectMany(e => e.Files).Where(f => f.ModdedOnly);
 
     private void Move(string from, string to)
     {

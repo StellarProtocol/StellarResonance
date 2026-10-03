@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.IO.Abstractions.TestingHelpers;
 using System.Security.Cryptography;
@@ -120,5 +121,30 @@ public sealed class DependencyParkingTests
 
         await s.UnparkModdedOnlyAsync(G); // must not throw
         Assert.True(fs.File.Exists("/game_mini/dxgi.dll"));
+    }
+
+    // Final review I6: a plugin listed as kept-parked (disabled) is parked by an unpark, as for a vanilla
+    // launch, while everyone else's files come back; a later unpark that no longer lists it restores it.
+    [Fact]
+    public async Task Unpark_parks_a_kept_parked_plugins_files_and_restores_them_once_it_is_no_longer_listed()
+    {
+        var (fs, s) = Setup();
+        fs.AddFile("/game_mini/other.dll", new MockFileData(PlainBytes));
+        new DependencyLedgerStore(fs).Write(G, new DependencyLedger("q", new[] { new LedgerEntry("o", "1",
+            new[] { new LedgerFile("other.dll", PlainHash, true) }) }));
+        await s.ParkModdedOnlyAsync(G);                                    // a vanilla launch parked both
+
+        await s.UnparkModdedOnlyAsync(G, new HashSet<string> { "p" });     // modded launch, p disabled
+
+        Assert.False(fs.File.Exists("/game_mini/dxgi.dll"));
+        Assert.True(fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll"));
+        Assert.True(fs.File.Exists("/game_mini/other.dll"));              // q is enabled: restored
+
+        fs.File.Move("/game_mini/stellar/deps-parked/p/dxgi.dll", "/game_mini/dxgi.dll"); // as if p were live again…
+        await s.UnparkModdedOnlyAsync(G, new HashSet<string> { "p" });     // …a placed file of a disabled plugin is parked
+        Assert.False(fs.File.Exists("/game_mini/dxgi.dll"));
+
+        await s.UnparkModdedOnlyAsync(G);                                  // enabled again
+        Assert.Equal(DxgiBytes, fs.File.ReadAllBytes("/game_mini/dxgi.dll"));
     }
 }

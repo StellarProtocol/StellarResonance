@@ -24,7 +24,7 @@ public class DependencyRunnerTests
         public Task RemoveAsync(string gameMini, string pluginId, string dependencyId, CancellationToken ct = default) => Task.CompletedTask;
         public Task RemoveAllAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.CompletedTask;
         public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
-        public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
+        public Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) => Task.CompletedTask;
         public readonly List<string> Ledgers = new();
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Ledgers;
     }
@@ -58,7 +58,7 @@ public class DependencyRunnerTests
         Assert.Equal("/g", call.GameMini);
         Assert.Equal("p1", call.PluginId);
         Assert.Equal(new[] { "a" }, call.SkippedIds.OrderBy(x => x));
-        Assert.Equal(new[] { "p1/a: Installed" }, lines);
+        Assert.Equal(new[] { new DependencyLine("p1/a: Installed", IsProblem: false) }, lines);
     }
 
     [Fact]

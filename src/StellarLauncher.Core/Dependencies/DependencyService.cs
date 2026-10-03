@@ -206,8 +206,8 @@ public sealed partial class DependencyService : IDependencyService
     public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) =>
         LockedAsync(gameMini, () => _parking.Park(gameMini), ct);
 
-    public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default) =>
-        LockedAsync(gameMini, () => _parking.Unpark(gameMini), ct);
+    public Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) =>
+        LockedAsync(gameMini, () => _parking.Unpark(gameMini, keepParked), ct);
 
     /// <summary>The folder's gate. The key is the full path without a trailing separator (case-insensitive
     /// on Windows), so "/g", "/g/" and "/x/../g" share one gate.</summary>

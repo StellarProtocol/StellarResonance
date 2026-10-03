@@ -39,9 +39,10 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
         {
             // Dependencies must be back in place before anything below reads or installs plugins — no
             // EnsureAsync may ever run while a modded-only file is still parked for a vanilla launch.
-            // Fix round 1, Minor 1: its own try/catch (like TryPark) — an unpark failure must not skip
-            // the rest of the review (registry check, dialog, ensure).
-            await TryUnparkAsync(client, ct);
+            // Fix round 1, Minor 1: fail-open on its own (like TryPark) — an unpark failure must not skip
+            // the rest of the review (registry check, dialog, ensure). Final review I6: a disabled plugin's
+            // moddedOnly files stay parked (DependencyRunner.RestoreForModdedAsync).
+            var parkedForDisabled = await DependencyRunner.RestoreForModdedAsync(_deps, client.GameMiniDir, ct);
 
             var registry = await _registry.ForChannelAsync(client.Channel, ct);
             var manifest = await _versions.FetchAsync(ChannelManifests.FrameworkVersion(client.Channel), ct);
@@ -52,14 +53,14 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
             var plan = PreLaunchPlanner.Build(inv.FrameworkVersion, target, AppInfo.LauncherVersion, installed, client.AutoUpdateBeforeLaunch);
             if (plan.IsEmpty)
             {
-                await EnsureDependenciesAsync(client, registry, status, ct);
+                await EnsureDependenciesAsync(client, registry, status, disabledBeforeDialog: null, ct);
                 return true;
             }
 
             var vm = new PreLaunchReviewViewModel(inv.FrameworkVersion, target, AppInfo.LauncherVersion, installed, registry,
                 client.AutoUpdateBeforeLaunch, client.GameMiniDir, _deps.Installer, _deps.Plugins, _deps.Http);
             if (await _prompt(vm) == PreLaunchResult.Cancel) return false;
-            await EnsureDependenciesAsync(client, registry, status, ct);
+            await EnsureDependenciesAsync(client, registry, status, parkedForDisabled, ct);
             return true;
         }
         // Fix round 1, Important 1: HttpClient's own request timeout throws OperationCanceledException
@@ -81,20 +82,26 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
     /// failure (including an HttpClient timeout surfacing as an uncancelled OperationCanceledException —
     /// fix round 1, Important 1): a dependency problem is surfaced on its own plugin page, never here, and
     /// must never be the reason a launch doesn't proceed.</summary>
+    /// <param name="disabledBeforeDialog">Set when the dialog ran: it may have DISABLED plugins (it never enables
+    /// one), so a newly disabled plugin's moddedOnly files are parked now (final review I6).</param>
     private async Task EnsureDependenciesAsync(ClientProfile client, IReadOnlyList<PluginEntry> registry,
-        Action<string?> status, CancellationToken ct)
+        Action<string?> status, IReadOnlySet<string>? disabledBeforeDialog, CancellationToken ct)
     {
         try
         {
             var inv = _inventory.Read(client, registry);
             await SweepOrphansAsync(client, inv.Plugins.Where(p => p.Installed || p.Disabled).Select(p => p.Entry.Id), ct);
+            if (disabledBeforeDialog is not null)
+                await DependencyRunner.RestoreForModdedAsync(_deps, client.GameMiniDir, ct, unlessStillDisabled: disabledBeforeDialog);
             var installed = inv.Plugins.Where(p => p.Installed && p.Version is not null)
                 .Select(p => (p.Entry, p.Version!)).ToList();
             var lines = await DependencyRunner.EnsureForClientAsync(_deps.Dependencies, client, installed, ct, t => status(t));
-            foreach (var line in lines) Log(client, line);
+            foreach (var line in lines)
+                if (line.IsProblem) DependencyLog.Failure(client.Name, line.Text); else Log(client, line.Text);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception ex) { Log(client, $"dependencies: {ex.Message}"); /* fail-open — launch is never blocked by a dependency problem */ }
+        // Fail-open — launch is never blocked by a dependency problem; M-f: one always-on line says so.
+        catch (Exception ex) { DependencyLog.Failure(client.Name, $"dependencies could not be prepared — {ex.Message}"); }
     }
 
     /// <summary>Task 6 (b): a ledger whose plugin is no longer installed on this client (removed by hand,
@@ -117,7 +124,7 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
                 Log(client, $"{id}: plugin no longer installed — its dependencies were removed");
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch (Exception ex) { Log(client, $"{id}: orphaned dependencies could not be removed — {ex.Message}"); }
+            catch (Exception ex) { DependencyLog.Failure(client.Name, $"{id}: orphaned dependencies could not be removed — {ex.Message}"); }
         }
     }
 
@@ -130,16 +137,6 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
     {
         try { await _deps.Dependencies.ParkModdedOnlyAsync(client.GameMiniDir, ct); }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch { /* fail-open */ }
-    }
-
-    /// <summary>Fix round 1, Minor 1: its own try/catch, like <see cref="TryParkAsync"/> — an unpark failure
-    /// must not skip the rest of the review (registry check, dialog, ensure); it only means a still-parked
-    /// file stays parked for one more launch attempt.</summary>
-    private async Task TryUnparkAsync(ClientProfile client, CancellationToken ct)
-    {
-        try { await _deps.Dependencies.UnparkModdedOnlyAsync(client.GameMiniDir, ct); }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch { /* fail-open — never skip the rest of the review */ }
+        catch (Exception ex) { DependencyLog.Failure(client.Name, $"parking for a vanilla launch failed — {ex.Message}"); /* fail-open */ }
     }
 }

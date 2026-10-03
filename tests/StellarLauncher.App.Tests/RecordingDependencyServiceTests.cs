@@ -15,7 +15,7 @@ public class RecordingDependencyServiceTests
         public Task RemoveAsync(string g, string p, string d, CancellationToken ct = default) => Task.CompletedTask;
         public Task RemoveAllAsync(string g, string p, CancellationToken ct = default) => Task.CompletedTask;
         public Task ParkModdedOnlyAsync(string g, CancellationToken ct = default) => Task.CompletedTask;
-        public Task UnparkModdedOnlyAsync(string g, CancellationToken ct = default) => Task.CompletedTask;
+        public Task UnparkModdedOnlyAsync(string g, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) => Task.CompletedTask;
         public IReadOnlyList<string> LedgerPluginIds(string g) => Array.Empty<string>();
     }
 

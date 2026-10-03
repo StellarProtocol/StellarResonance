@@ -12,10 +12,8 @@ public interface IPluginActions
     Task RemoveAsync(PluginItemViewModel item);
     Task EnableAsync(PluginItemViewModel item);
 
-    /// <summary>Read-only status of <see cref="PluginItemViewModel.ShownDependencies"/> on this client.</summary>
-    IReadOnlyList<DependencyStatus> DependencyStatus(PluginItemViewModel item);
-
-    /// <summary>Same as <see cref="DependencyStatus"/>, computed off the calling (UI) thread. Fix round 2,
+    /// <summary>Read-only status of <see cref="PluginItemViewModel.ShownDependencies"/> on this client,
+    /// computed off the calling (UI) thread. Fix round 2,
     /// Minor 1: every implementation must snapshot whatever UI-thread state it reads (the profile's skip
     /// list) BEFORE leaving the thread — deliberately no default body.</summary>
     Task<IReadOnlyList<DependencyStatus>> DependencyStatusAsync(PluginItemViewModel item);

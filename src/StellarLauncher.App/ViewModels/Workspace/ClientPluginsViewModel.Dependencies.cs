@@ -26,10 +26,7 @@ public sealed partial class ClientPluginsViewModel
     /// <summary>The read-only status (Installed / NotInstalled / Skipped / Blocked) — except that a dependency
     /// still NotInstalled whose last install attempt this session was Failed or Blocked (same declaration
     /// since) shows that outcome instead: Status is offline and can't see a download failure, nor a
-    /// collision inside a zip directory mapping. Called off the UI thread (fix round M1).</summary>
-    public IReadOnlyList<DependencyStatus> DependencyStatus(PluginItemViewModel item) => StatusFor(Snapshot(item));
-
-    /// <summary>Fix round 2, Minor 1: everything read from UI-thread state — the shown dependencies, the game
+    /// collision inside a zip directory mapping. Fix round 2, Minor 1: everything read from UI-thread state — the shown dependencies, the game
     /// folder and a COPY of this plugin's skip set (from the profile's live SkippedDependencies list) — is
     /// captured here, on the calling thread, before the ledger reads and hashing move to the pool.</summary>
     public Task<IReadOnlyList<DependencyStatus>> DependencyStatusAsync(PluginItemViewModel item)
@@ -110,17 +107,14 @@ public sealed partial class ClientPluginsViewModel
     {
         var client = _ws.Client;
         if (_ws.Session.IsBusy || !client.Modded || item.InstalledVersion is not { } iv || item.ShownVersion?.Version != iv) return;
-        var svc = _ws.Services.Core.Install.Dependencies;
-        var deps = item.ShownDependencies;
-        var skippedIds = DependencyRunner.Skipped(client, item.Entry.Id, deps);
+        var install = _ws.Services.Core.Install;
+        var (gameMini, pluginId, deps) = (client.GameMiniDir, item.Entry.Id, item.ShownDependencies);
+        var skippedIds = DependencyRunner.Skipped(client, pluginId, deps);   // snapshot on the UI thread
         Status = $"Preparing {item.Name}: {dep.Name}…";
         try
         {
-            var results = await Task.Run(async () =>
-            {
-                try { await svc.UnparkModdedOnlyAsync(client.GameMiniDir); } catch (Exception) { /* fail-open, see PluginDownloads */ }
-                return await svc.EnsureAsync(client.GameMiniDir, item.Entry.Id, deps, skippedIds, CancellationToken.None);
-            });
+            // Final review M-g: the same restore-then-ensure as a launch and an install (off the UI thread).
+            var results = await Task.Run(() => DependencyRunner.EnsurePluginAsync(install, gameMini, pluginId, deps, skippedIds));
             var problems = results.Where(s => s.State is DependencyState.Blocked or DependencyState.Failed)
                 .Select(s => DependencyRunner.Line(item.Entry.Id, s)).ToList();
             Status = problems.Count == 0 ? $"{item.Name}: {dep.Name} installed" : $"{item.Name}: {string.Join("; ", problems)}";

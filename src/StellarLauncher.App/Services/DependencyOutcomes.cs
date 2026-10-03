@@ -73,6 +73,7 @@ public sealed class RecordingDependencyService : IDependencyService, IDependency
     }
 
     public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => _inner.ParkModdedOnlyAsync(gameMini, ct);
-    public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => _inner.UnparkModdedOnlyAsync(gameMini, ct);
+    public Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) =>
+        _inner.UnparkModdedOnlyAsync(gameMini, keepParked, ct);
     public IReadOnlyList<string> LedgerPluginIds(string gameMini) => _inner.LedgerPluginIds(gameMini);
 }

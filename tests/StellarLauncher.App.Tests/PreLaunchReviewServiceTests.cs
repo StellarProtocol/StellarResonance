@@ -53,7 +53,7 @@ public class PreLaunchReviewServiceTests
         }
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Ledgers;
         public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) { Calls.Add("Park"); return Task.CompletedTask; }
-        public Task UnparkModdedOnlyAsync(string gameMini, CancellationToken ct = default)
+        public Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default)
         {
             Calls.Add("Unpark");
             if (ThrowOnUnpark) throw new IOException("boom");

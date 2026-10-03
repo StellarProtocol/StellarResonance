@@ -14,7 +14,7 @@ public class PluginItemDependencyRefreshTests
         public Task InstallAsync(PluginItemViewModel item) => Task.CompletedTask;
         public Task RemoveAsync(PluginItemViewModel item) => Task.CompletedTask;
         public Task EnableAsync(PluginItemViewModel item) => Task.CompletedTask;
-        public IReadOnlyList<DependencyStatus> DependencyStatus(PluginItemViewModel item)
+        private IReadOnlyList<DependencyStatus> DependencyStatus(PluginItemViewModel item)
         {
             StatusThread = Environment.CurrentManagedThreadId;
             Gate.Wait(TimeSpan.FromSeconds(5));

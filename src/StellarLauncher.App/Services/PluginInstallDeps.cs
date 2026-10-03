@@ -5,8 +5,11 @@ using StellarLauncher.Core.Services;
 namespace StellarLauncher.App.Services;
 
 /// <summary>The collaborators every plugin install path needs, bundled to keep constructors ≤ 6 deps
-/// (a record is exempt from that guardrail itself — this IS the bundle). <see cref="Outcomes"/> is the
-/// in-memory record of the last install-time dependency failures (normally the same
-/// <see cref="RecordingDependencyService"/> instance as <see cref="Dependencies"/>); null shows none.</summary>
-public sealed record PluginInstallDeps(IInstaller Installer, IPluginInstaller Plugins, HttpClient Http, IDependencyService Dependencies,
-    IDependencyOutcomes? Outcomes = null);
+/// (a record is exempt from that guardrail itself — this IS the bundle).</summary>
+public sealed record PluginInstallDeps(IInstaller Installer, IPluginInstaller Plugins, HttpClient Http, IDependencyService Dependencies)
+{
+    /// <summary>The in-memory record of the last install-time dependency problems: <see cref="Dependencies"/>
+    /// itself when it is the <see cref="RecordingDependencyService"/> (as the app wires it — final review M-g:
+    /// one instance, not passed twice); null shows none.</summary>
+    public IDependencyOutcomes? Outcomes => Dependencies as IDependencyOutcomes;
+}
