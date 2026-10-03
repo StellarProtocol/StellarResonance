@@ -99,7 +99,7 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
         var version = entry.Versions.First(v => v.Version == cell.TargetVersion);
         return async () =>
         {
-            try { await PluginDownloads.InstallAsync(_svc.Install, col.Client.GameMiniDir, entry, version, s => Status = $"{col.Client.Name}: {entry.Name} — {s}"); }
+            try { await PluginDownloads.InstallAsync(_svc.Install, col.Client.GameMiniDir, col.Client.Modded, entry, version, s => Status = $"{col.Client.Name}: {entry.Name} — {s}"); }
             catch (Exception ex) { Status = $"{col.Client.Name}: {entry.Name} failed — {ex.Message}"; }
             await RefreshAsync();
         };

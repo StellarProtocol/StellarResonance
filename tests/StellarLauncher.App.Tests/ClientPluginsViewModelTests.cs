@@ -1,4 +1,7 @@
+using System.IO.Abstractions.TestingHelpers;
+using System.Security.Cryptography;
 using StellarLauncher.App.ViewModels.Workspace;
+using StellarLauncher.Core.Dependencies;
 using Xunit;
 
 public class ClientPluginsViewModelTests
@@ -88,6 +91,33 @@ public class ClientPluginsViewModelTests
         cm.Enabled = false;
         Assert.True(f.Fs.Directory.Exists($"{Test}/stellar/plugins-disabled/combatmeter"));
         Assert.True(f.Fs.Directory.Exists($"{Main}/stellar/plugins/combatmeter"));
+    }
+
+    // Controller round: removing a plugin also clears whatever its dependencies placed (the ledger +
+    // the files it tracked) and this client's "<id>/<dep>" skip choices for it, then persists — a stale
+    // ledger/skip entry for a plugin that no longer exists would otherwise confuse the next install.
+    [Fact]
+    public async Task Remove_also_clears_its_dependencies_and_skipped_list_and_persists()
+    {
+        var (f, vm) = await Open();
+        var client = f.Shell.Config.Clients.Single(c => c.Id == "c2");
+        client.SkippedDependencies = new List<string> { "combatmeter/shaderpack", "playerhud/x" };
+        f.Store.Save(f.Shell.Config);
+
+        // Seed a dependency ledger for combatmeter, as if an earlier EnsureAsync had placed a file.
+        new DependencyLedgerStore(f.Fs).Write(Test, new DependencyLedger("combatmeter", new[]
+        {
+            new LedgerEntry("shaderpack", "1.0", new[] { new LedgerFile("stellar/deps/combatmeter/shader.pak", Convert.ToHexString(SHA256.HashData(new byte[] { 1 })), false) }),
+        }));
+        f.Fs.AddFile($"{Test}/stellar/deps/combatmeter/shader.pak", new MockFileData(new byte[] { 1 }));
+
+        var cm = vm.Rows.Single(r => r.Item.Entry.Id == "combatmeter");
+        await cm.Item.RemoveCommand.ExecuteAsync(null);
+
+        Assert.False(f.Fs.File.Exists($"{Test}/stellar/deps/combatmeter.json"));
+        Assert.False(f.Fs.File.Exists($"{Test}/stellar/deps/combatmeter/shader.pak"));
+        var updated = f.Store.Load().Clients.Single(c => c.Id == "c2");
+        Assert.Equal(new[] { "playerhud/x" }, updated.SkippedDependencies);
     }
 
     [Fact]

@@ -17,6 +17,7 @@ using StellarLauncher.App.ViewModels.Shell;
 using StellarLauncher.App.ViewModels.Workspace;
 using StellarLauncher.App.Views;
 using StellarLauncher.Core.Clients;
+using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Inventory;
 using StellarLauncher.Core.Launch;
 using StellarLauncher.Core.Platform;
@@ -51,7 +52,7 @@ public partial class App : Application
         MainWindow? mainWindow = null;
         ShellViewModel? shell = null;
 
-        var deps = new PluginInstallDeps(installer, pluginInstaller, http);
+        var deps = new PluginInstallDeps(installer, pluginInstaller, http, new DependencyService(fs, http));
         var inventory = new ClientInventory(fs, installer, pluginInstaller, doorstop);
         var registry = new RegistryCache(new PluginRegistryService(http), () => shell!.Config);
         var versions = new VersionService(http);

@@ -1,6 +1,11 @@
+using System;
+using System.IO;
 using System.IO.Abstractions.TestingHelpers;
+using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using StellarLauncher.Core.Dependencies;
+using StellarLauncher.Core.Model;
 using Xunit;
 namespace StellarLauncher.Core.Tests.Dependencies;
 
@@ -102,5 +107,30 @@ public sealed partial class DependencyServiceTests
         Assert.Equal(DependencyState.Installed, st.State);
         Assert.Null(st.Detail); // no note, even though the .corrupt evidence is still sitting on disk
         Assert.True(_fs.File.Exists("/game_mini/stellar/deps/p.json.corrupt")); // evidence never deleted
+    }
+
+    // Controller round: BuildFiles now runs inside the download/verify try (DependencyService.Placement.cs),
+    // so an archive-shape failure (here, "no files matched") is returned directly — it must never pick up
+    // the unreadable-record note even though this plugin's OWN ledger is corrupt (and gets quarantined)
+    // during this very call. Before the fix, BuildFiles's exception escaped to EnsureAsync's catch-all,
+    // which treated it as ledger-handling fallout and appended the note.
+    [Fact]
+    public async Task An_archive_shape_failure_never_carries_the_unreadable_note_even_with_a_corrupt_ledger()
+    {
+        _fs.AddFile("/game_mini/stellar/deps/p.json", new MockFileData("{ not valid json"));
+
+        using var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true))
+        using (var w = new StreamWriter(zip.CreateEntry("other/thing.txt").Open())) w.Write("x");
+        var bytes = ms.ToArray();
+        _web["https://cdn/nomatch"] = bytes;
+        var d = new PluginDependency("nomatch", "nomatch", "1", "https://cdn/nomatch", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
+            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin");
+
+        var st = Assert.Single(await Make().EnsureAsync(G, "p", new[] { d }, None, default));
+
+        Assert.Equal(DependencyState.Failed, st.State);
+        Assert.Equal("no files matched", st.Detail); // never annotated, even though p.json is corrupt right now
+        Assert.True(_fs.File.Exists("/game_mini/stellar/deps/p.json.corrupt"));
     }
 }

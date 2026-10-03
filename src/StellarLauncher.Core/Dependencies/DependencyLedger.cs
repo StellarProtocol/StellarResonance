@@ -104,15 +104,9 @@ public sealed class DependencyLedgerStore
         if (!_fs.Directory.Exists(dir)) return new DependencyLedger[0];
         return _fs.Directory.GetFiles(dir, "*.json")
             .Select(f => _fs.Path.GetFileNameWithoutExtension(f))
-            .Where(IsValidPluginId) // M3: a bogus stem is never read, let alone trusted as an id
+            .Where(DependencyPaths.IsValidPluginId) // M3: a bogus stem is never read, let alone trusted as an id
             .Select(id => TryRead(gameMini, id, quarantine: true).Ledger)
             .Where(l => l is not null)
             .Select(l => l!).ToList(); // a ledger that failed to parse/validate/read is skipped outright
     }
-
-    /// <summary>M3: a ledger file's stem must look like a plugin id — never empty, ".", "..", or
-    /// containing anything outside [A-Za-z0-9._-] — since it is later used to build a parked-file path.</summary>
-    private static bool IsValidPluginId(string stem) =>
-        stem.Length > 0 && stem != "." && stem != ".."
-        && stem.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-');
 }

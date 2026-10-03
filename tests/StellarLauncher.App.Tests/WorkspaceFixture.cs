@@ -8,6 +8,7 @@ using StellarLauncher.App.ViewModels.Dashboard;
 using StellarLauncher.App.ViewModels.Shell;
 using StellarLauncher.App.ViewModels.Workspace;
 using StellarLauncher.Core.Clients;
+using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Inventory;
 using StellarLauncher.Core.Launch;
 using StellarLauncher.Core.Model;
@@ -90,7 +91,8 @@ public sealed class WorkspaceFixture
     public ShellViewModel Start()
     {
         var sessions = new ClientSessions(Store, new Orch(), new NoScan(), new NoProc(), () => DateTimeOffset.UnixEpoch, a => a());
-        var deps = new PluginInstallDeps(new Installer(Fs), new PluginInstaller(Fs), new HttpClient(new DllHandler()));
+        var http = new HttpClient(new DllHandler());
+        var deps = new PluginInstallDeps(new Installer(Fs), new PluginInstaller(Fs), http, new DependencyService(Fs, http));
         var core = new DashboardServices(new ClientInventory(Fs, deps.Installer, deps.Plugins, new DoorstopToggle(Fs)),
             new RegistryCache(new Reg(Registry), () => Store.Load()), new FrameworkManifests(Manifests), new Review(), deps,
             new ClientCandidates(GameDetector, new Platform()));

@@ -4,6 +4,7 @@ using StellarLauncher.App.Services;
 using StellarLauncher.App.ViewModels.Dashboard;
 using StellarLauncher.App.ViewModels.Shell;
 using StellarLauncher.Core.Clients;
+using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Launch;
 using StellarLauncher.Core.Model;
 using StellarLauncher.Core.Platform;
@@ -57,7 +58,8 @@ public class DashboardViewModelTests
         store.Save(cfg);
         var orch = new Orch();
         var sessions = new ClientSessions(store, orch, new NoScan(), new NoProc(), () => DateTimeOffset.UnixEpoch, a => a());
-        var deps = new PluginInstallDeps(new Installer(fs), new PluginInstaller(fs), new HttpClient());
+        var http = new HttpClient();
+        var deps = new PluginInstallDeps(new Installer(fs), new PluginInstaller(fs), http, new DependencyService(fs, http));
         var svc = new DashboardServices(
             new StellarLauncher.Core.Inventory.ClientInventory(fs, deps.Installer, deps.Plugins, new DoorstopToggle(fs)),
             new RegistryCache(new Registry(), () => store.Load()), new FrameworkManifests(new Versions()),
@@ -156,7 +158,8 @@ public class DashboardViewModelTests
         store.Save(cfg);
 
         var sessions = new ClientSessions(store, new NoOrch(), new NoScan(), new NoProc(), () => DateTimeOffset.UnixEpoch, a => a());
-        var deps = new PluginInstallDeps(new Installer(fs), new PluginInstaller(fs), new HttpClient());
+        var http = new HttpClient();
+        var deps = new PluginInstallDeps(new Installer(fs), new PluginInstaller(fs), http, new DependencyService(fs, http));
 
         // IVersionService that throws (offline scenario)
         var failingVersions = new ThrowingVersions();

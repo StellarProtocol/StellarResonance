@@ -48,4 +48,11 @@ public static class DependencyPaths
         var abs = Path.GetFullPath(Path.Combine(root, string.Join('/', segments)));
         return abs == root || abs.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) ? abs : null;
     }
+
+    /// <summary>The one rule for a trusted plugin id, shared by every place that turns an id into a path
+    /// segment (the ledger file stem, <c>DependencyService</c>'s public entry points): never empty, ".",
+    /// "..", or containing anything outside [A-Za-z0-9._-].</summary>
+    public static bool IsValidPluginId(string? id) =>
+        !string.IsNullOrEmpty(id) && id != "." && id != ".."
+        && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-');
 }

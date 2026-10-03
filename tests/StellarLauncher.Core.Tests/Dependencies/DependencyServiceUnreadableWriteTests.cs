@@ -39,6 +39,28 @@ public sealed partial class DependencyServiceTests
         Assert.False(_fs.File.Exists("/game_mini/newb.dll")); // nothing written for "b"
     }
 
+    // Controller round: a Skip's own Remove (I6) goes through the exact same TryReadForWrite guard — a
+    // transient IOException on the ledger read must surface as Failed "dependency record could not be
+    // read", not throw out of EnsureAsync, and must touch neither the files nor the ledger.
+    [Fact]
+    public async Task Skipped_with_a_transiently_unreadable_ledger_fails_without_touching_anything()
+    {
+        var d = File("fx", new byte[] { 1 }, "dxgi.dll");
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { d }, None, default); // installs; p.json written
+        var originalJson = _fs.File.ReadAllText(LedgerPath);
+
+        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, "ReadAllText");
+        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+
+        var st = Assert.Single(await s2.EnsureAsync(G, "p", new[] { d }, new HashSet<string> { "fx" }, default));
+
+        Assert.Equal(DependencyState.Failed, st.State);
+        Assert.Equal("dependency record could not be read", st.Detail);
+        Assert.Equal(originalJson, _fs.File.ReadAllText(LedgerPath)); // byte-identical — untouched
+        Assert.True(_fs.File.Exists("/game_mini/dxgi.dll")); // the skip never got to delete anything
+    }
+
     [Fact]
     public async Task RemoveAll_does_not_touch_a_present_but_transiently_unreadable_ledger()
     {

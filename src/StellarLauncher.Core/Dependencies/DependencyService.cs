@@ -30,6 +30,12 @@ public sealed partial class DependencyService : IDependencyService
     public async Task<IReadOnlyList<DependencyStatus>> EnsureAsync(string gameMini, string pluginId,
         IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds, CancellationToken ct)
     {
+        // Controller round: pluginId becomes a path segment (ledger file, stellar/deps/<id>/…) in every
+        // branch below — reject it up front with the same rule DependencyLedgerStore uses for file stems,
+        // rather than letting a bogus id reach the filesystem.
+        if (!DependencyPaths.IsValidPluginId(pluginId))
+            return deps.Select(d => new DependencyStatus(d.Id, DependencyState.Failed, "invalid plugin id")).ToList();
+
         var results = new Dictionary<string, DependencyStatus>();
         foreach (var d in deps)
         {
@@ -73,6 +79,10 @@ public sealed partial class DependencyService : IDependencyService
     public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,
         IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds)
     {
+        // Controller round: an invalid id has no ledger to read — Status answers with nothing, same
+        // shape as "never installed", rather than inventing a per-dep status for a bogus id.
+        if (!DependencyPaths.IsValidPluginId(pluginId)) return Array.Empty<DependencyStatus>();
+
         // Minor 3: Status is read-only — it must not have the side effect of quarantining a corrupt
         // ledger (it still reads one as empty, via Read's own fallback, either way).
         var ledger = _store.Read(gameMini, pluginId, quarantine: false);
@@ -91,6 +101,10 @@ public sealed partial class DependencyService : IDependencyService
 
     public void Remove(string gameMini, string pluginId, string dependencyId)
     {
+        // Controller round: an invalid id names no ledger of ours — a no-op, not a throw (there is
+        // nothing to read or fail to read).
+        if (!DependencyPaths.IsValidPluginId(pluginId)) return;
+
         // Important (round 6): a present-but-unreadable ledger must never be treated as empty here —
         // that would silently write/delete over data this call simply couldn't read right now.
         if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
@@ -103,6 +117,7 @@ public sealed partial class DependencyService : IDependencyService
 
     public void RemoveAll(string gameMini, string pluginId)
     {
+        if (!DependencyPaths.IsValidPluginId(pluginId)) return; // controller round: see Remove above
         if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
             throw new InvalidOperationException("dependency record could not be read");
         foreach (var entry in ledger.Entries) DeleteEntryFiles(gameMini, pluginId, entry);

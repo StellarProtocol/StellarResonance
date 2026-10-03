@@ -26,22 +26,28 @@ public sealed partial class DependencyService
             return new DependencyStatus(dep.Id, DependencyState.Installed, null);
 
         byte[] bytes;
+        List<(string Abs, byte[] Bytes)> files;
         try
         {
             bytes = await DownloadCappedAsync(dep.Url, dep.Size, ct);
             if (!string.Equals(DependencyFileHash.Of(bytes), dep.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("checksum mismatch");
+            // Controller round: BuildFiles runs INSIDE this try now — an archive-shape error (archive too
+            // large, path not allowed, duplicate destination, no files matched) is exactly as unrelated to
+            // the ledger as a download/verify failure, so it must be returned directly here too, never left
+            // to escape as an exception that EnsureAsync's catch-all would route through AnnotateIfCorrupt.
+            files = BuildFiles(gameMini, pluginId, dep, bytes);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             // Minor 1 (round 6, narrowing round 5): a download/verify failure (HTTP error, checksum
-            // mismatch, size cap) has nothing to do with the ledger — returned directly, rather than
-            // thrown, so EnsureAsync's caller never runs it through AnnotateIfCorrupt.
+            // mismatch, size cap) — or, as of the controller round, an archive-shape failure — has
+            // nothing to do with the ledger — returned directly, rather than thrown, so EnsureAsync's
+            // caller never runs it through AnnotateIfCorrupt.
             return new DependencyStatus(dep.Id, DependencyState.Failed, ex.Message);
         }
 
-        var files = BuildFiles(gameMini, pluginId, dep, bytes);
         foreach (var f in files)
         {
             // The "unreadable" note (if any) is applied once, uniformly, by EnsureAsync — not here.
