@@ -16,7 +16,7 @@ namespace StellarLauncher.App.ViewModels.Workspace;
 public enum PluginFilter { All, Installed, Updates, Disabled }
 
 /// <summary>This client's plugins (its folder is the target), every other client in view (mockup #plugins).</summary>
-public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginActions
+public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginActions, IDisposable
 {
     private readonly ClientWorkspaceViewModel _ws;
     private readonly List<PluginRowViewModel> _all = new();
@@ -46,6 +46,8 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         _ws = ws;
         _gridView = ws.Shell.Config.Launcher.PluginsGridView;
         _ws.Refreshed += () => _ = ReloadAsync();   // released by the workspace's Dispose (Refreshed = null)
+        _onSession = _ => { if (SelectedPlugin is { } p) p.DependenciesLocked = _ws.Session.IsBusy; };
+        _ws.Session.Changed += _onSession;          // released by Dispose (the workspace disposes its tab VMs)
         _ = ReloadAsync();
     }
 
@@ -156,7 +158,10 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
             // dependency problem) — but its skip entries are KEPT (cleanup never confirmed done) and the
             // failure is logged rather than silently dropped.
             string? depCleanupFailure = null;
-            try { _ws.Services.Core.Install.Dependencies.RemoveAll(_ws.Client.GameMiniDir, item.Entry.Id); }
+            // Off the UI thread: RemoveAll waits for the game folder's dependency gate, which a background
+            // install may hold for the length of a download.
+            var gameMini = _ws.Client.GameMiniDir;
+            try { await Task.Run(() => _ws.Services.Core.Install.Dependencies.RemoveAll(gameMini, item.Entry.Id)); }
             catch (Exception ex) { depCleanupFailure = ex.Message; }
 
             _ws.Services.Core.Install.Plugins.Remove(_ws.Client.GameMiniDir, item.Entry.Id, item.CanonicalDll);
@@ -206,7 +211,8 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     private void OpenPlugin(PluginItemViewModel item)
     {
         SelectedPlugin = item;
-        item.RefreshDependencies();   // re-read every time the page opens: disk may have changed since (a launch, a remove)
+        item.DependenciesLocked = _ws.Session.IsBusy;
+        _ = item.RefreshDependenciesAsync();   // re-read every time the page opens: disk may have changed since (a launch, a remove)
         _ = item.EnsureDetailLoadedAsync(_ws.Services.Core.Install.Http, bmp => LightboxImage = bmp);
     }
     [RelayCommand] private void CloseDetail() => SelectedPlugin = null;

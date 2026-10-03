@@ -226,6 +226,7 @@ public class ClientPluginsViewModelTests
         // Everything installed, as after a Modded launch.
         await f.Services.Core.Install.Dependencies.EnsureAsync(Test, "photo", deps, new HashSet<string>(), CancellationToken.None);
         vm.OpenPluginCommand.Execute(item);
+        await item.DependencyRefresh;
         return (f, vm, item);
     }
 
@@ -246,6 +247,7 @@ public class ClientPluginsViewModelTests
         var (f, vm, item) = await OpenWithDeps();
 
         item.Dependencies.Single(d => d.Id == "opt").Use = false;
+        await vm.DependencyWork;
 
         Assert.Equal(new[] { "photo/opt" }, f.Store.Load().Clients.Single(c => c.Id == "c2").SkippedDependencies);
         Assert.False(f.Fs.File.Exists($"{Test}/stellar/deps/photo/opt.bin"));
@@ -265,6 +267,7 @@ public class ClientPluginsViewModelTests
 
         vm.SetDependencyUse(item, "req", false);
         item.Dependencies.Single(d => d.Id == "withopt").Use = false;
+        await vm.DependencyWork;
 
         Assert.Empty(f.Store.Load().Clients.Single(c => c.Id == "c2").SkippedDependencies);
         Assert.True(f.Fs.File.Exists($"{Test}/stellar/deps/photo/req.bin"));
@@ -276,6 +279,7 @@ public class ClientPluginsViewModelTests
     {
         var (f, vm, item) = await OpenWithDeps();
         item.Dependencies.Single(d => d.Id == "opt").Use = false;
+        await vm.DependencyWork;
 
         item.Dependencies.Single(d => d.Id == "opt").Use = true;
         await vm.DependencyWork;
@@ -292,6 +296,7 @@ public class ClientPluginsViewModelTests
     {
         var (f, vm, item) = await OpenWithDeps(modded: false);
         item.Dependencies.Single(d => d.Id == "opt").Use = false;
+        await vm.DependencyWork;
 
         item.Dependencies.Single(d => d.Id == "opt").Use = true;
         await vm.DependencyWork;
@@ -307,6 +312,7 @@ public class ClientPluginsViewModelTests
         var cm = vm.Rows.Single(r => r.Item.Entry.Id == "combatmeter").Item;
 
         vm.OpenPluginCommand.Execute(cm);
+        await cm.DependencyRefresh;
 
         Assert.False(cm.HasDependencies);
     }
@@ -345,6 +351,7 @@ public class ClientPluginsViewModelTests
         f.Fs.AddFile($"{Test}/dxgi.dll", new MockFileData("player's own"));
 
         vm.OpenPluginCommand.Execute(item);
+        await item.DependencyRefresh;
 
         var row = item.Dependencies.Single();
         Assert.Equal("Blocked — a file you installed is in the way: dxgi.dll", row.StateText);
@@ -363,6 +370,7 @@ public class ClientPluginsViewModelTests
         await f.Services.Core.Install.Dependencies.EnsureAsync(Test, "photo", new[] { bad }, new HashSet<string>(), CancellationToken.None);
 
         vm.OpenPluginCommand.Execute(item);
+        await item.DependencyRefresh;
 
         var row = item.Dependencies.Single();
         Assert.StartsWith("Failed: ", row.StateText);
@@ -376,13 +384,76 @@ public class ClientPluginsViewModelTests
         var (f, vm, item) = await OpenWithGameDeps(bad);
         await f.Services.Core.Install.Dependencies.EnsureAsync(Test, "photo", new[] { bad }, new HashSet<string>(), CancellationToken.None);
         vm.OpenPluginCommand.Execute(item);
+        await item.DependencyRefresh;
 
         item.Dependencies.Single().Use = false;
+        await vm.DependencyWork;
         Assert.Equal("Skipped", item.Dependencies.Single().StateText);
         item.Dependencies.Single().Use = true;
         await vm.DependencyWork;   // re-tick on Modded re-runs EnsureAsync: still fails → still Failed
 
         Assert.Equal("bad", item.Dependencies.Single().StateClass);
         Assert.Contains("Failed", vm.Status);
+    }
+
+    // Task 6 fix round, Important 2: a zip DIRECTORY mapping can't be checked before the download, so only
+    // the install attempt finds the collision — the page must keep showing that Blocked afterwards.
+    [Fact]
+    public async Task An_install_time_Blocked_from_a_zip_directory_mapping_shows_on_the_page()
+    {
+        using var ms = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        using (var w = new StreamWriter(zip.CreateEntry("shaders/a.fx").Open())) w.Write("shader");
+        var bytes = ms.ToArray();
+        var dep = new StellarLauncher.Core.Model.PluginDependency("pack", "Shader pack", "1.0", "https://cdn/deps/pack",
+            Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
+            new[] { new StellarLauncher.Core.Model.PluginDependencyFile("shaders/", "shaders/") }, "game", Optional: true);
+        var (f, vm, item) = await OpenWithGameDeps(dep);
+        f.Downloads["https://cdn/deps/pack"] = bytes;
+        f.Fs.AddFile($"{Test}/shaders/a.fx", new MockFileData("player's own shader"));
+        var ensured = await f.Services.Core.Install.Dependencies.EnsureAsync(Test, "photo", new[] { dep }, new HashSet<string>(), CancellationToken.None);
+        Assert.Equal(StellarLauncher.Core.Dependencies.DependencyState.Blocked, ensured.Single().State);
+
+        vm.OpenPluginCommand.Execute(item);
+        await item.DependencyRefresh;
+
+        var row = item.Dependencies.Single();
+        Assert.Equal("Blocked — a file you installed is in the way: shaders/a.fx", row.StateText);
+        Assert.Equal("warn", row.StateClass);
+    }
+
+    // Fix round M3: while the client's game runs (session busy) the checkboxes are disabled and a toggle
+    // changes nothing — no skip recorded, nothing removed or installed.
+    [Fact]
+    public async Task While_the_game_runs_dependency_checkboxes_are_disabled_and_toggles_change_nothing()
+    {
+        var (f, vm, item) = await OpenWithDeps();
+        var session = f.Shell.Sessions.For(f.Shell.Config.Clients.Single(c => c.Id == "c2"));
+
+        session.Begin(DateTimeOffset.UnixEpoch);   // Launching → IsBusy
+
+        Assert.True(item.DependenciesLocked);
+        Assert.All(item.Dependencies, d => Assert.False(d.CanChange));
+        vm.SetDependencyUse(item, "opt", false);
+        await vm.DependencyWork;
+        Assert.Empty(f.Store.Load().Clients.Single(c => c.Id == "c2").SkippedDependencies);
+        Assert.True(f.Fs.File.Exists($"{Test}/stellar/deps/photo/opt.bin"));
+        Assert.Contains("close the game", vm.Status);
+
+        session.Apply(new StellarLauncher.Core.Launch.ExitedEvent(0));   // game closed → editable again
+        Assert.False(item.DependenciesLocked);
+        Assert.True(item.Dependencies.Single(d => d.Id == "opt").CanChange);
+        Assert.False(item.Dependencies.Single(d => d.Id == "req").CanChange);   // required stays fixed
+    }
+
+    // Fix round M4: a dependency with `requires` carries the mockup's "with <prerequisite>" chip.
+    [Fact]
+    public async Task A_dependency_with_requires_shows_a_with_prerequisite_chip()
+    {
+        var (_, _, item) = await OpenWithDeps();
+
+        Assert.Equal("with opt name", item.Dependencies.Single(d => d.Id == "withopt").RequiresLabel);
+        Assert.Null(item.Dependencies.Single(d => d.Id == "req").RequiresLabel);
+        Assert.False(item.Dependencies.Single(d => d.Id == "req").HasRequires);
     }
 }

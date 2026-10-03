@@ -15,10 +15,14 @@ public sealed partial class DependencyItemViewModel : ObservableObject
     [ObservableProperty] private string _stateText = "";
     [ObservableProperty] private string _stateClass = "off";
 
-    public DependencyItemViewModel(PluginDependency d, DependencyStatus s, bool use, Action<string, bool> setUse)
+    /// <param name="requiresLabel">Fix round M4: "with &lt;prerequisite names&gt;" for a dependency that has
+    /// <c>requires</c>, shown as a chip; null otherwise.</param>
+    public DependencyItemViewModel(PluginDependency d, DependencyStatus s, bool use, Action<string, bool> setUse,
+        string? requiresLabel = null)
     {
         Dependency = d;
         _setUse = setUse;
+        RequiresLabel = requiresLabel;
         _use = use || !d.Optional;   // a required dependency is always used
         ApplyStatus(s);
     }
@@ -35,19 +39,27 @@ public sealed partial class DependencyItemViewModel : ObservableObject
     public string? Notice => Dependency.Notice;
     public bool HasNotice => !string.IsNullOrWhiteSpace(Notice);
     public bool IsOptional => Dependency.Optional;
+    public string? RequiresLabel { get; }
+    public bool HasRequires => RequiresLabel is not null;
+
+    /// <summary>Fix round M3: set while the client's game is running — no toggling then.</summary>
+    [ObservableProperty] private bool _locked;
+    partial void OnLockedChanged(bool value) => OnPropertyChanged(nameof(CanChange));
+    /// <summary>What the checkbox's IsEnabled binds to: optional, and the game isn't running.</summary>
+    public bool CanChange => IsOptional && !Locked;
 
     public string Where => string.Equals(Dependency.Target, "game", StringComparison.OrdinalIgnoreCase)
         ? (Dependency.ModdedOnly ? "game folder · Modded launches only" : "game folder")
         : "plugin folder";
 
     /// <summary>Ticked = install it. Toggling an optional dependency asks the host to record the choice;
-    /// a required one ignores toggles (the checkbox is disabled for it too).</summary>
+    /// a required one — or any while <see cref="Locked"/> — ignores toggles (the checkbox is disabled then too).</summary>
     public bool Use
     {
         get => _use;
         set
         {
-            if (!IsOptional || value == _use) { OnPropertyChanged(); return; }   // re-sync a checkbox that tried to change
+            if (!CanChange || value == _use) { OnPropertyChanged(); return; }   // re-sync a checkbox that tried to change
             SetProperty(ref _use, value);
             _setUse(Id, value);
         }

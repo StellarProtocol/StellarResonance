@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Dependencies;
+using StellarLauncher.Core.Launch;
 using StellarLauncher.Core.Model;
 
 namespace StellarLauncher.App.ViewModels.Workspace;
@@ -14,13 +15,18 @@ namespace StellarLauncher.App.ViewModels.Workspace;
 /// in <see cref="Core.Clients.ClientProfile.SkippedDependencies"/>).</summary>
 public sealed partial class ClientPluginsViewModel
 {
-    /// <summary>The most recent background dependency install started by <see cref="SetDependencyUse"/>
-    /// (completed when none is running) — awaited by tests.</summary>
+    private readonly Action<LaunchSession> _onSession;
+
+    /// <summary>The most recent dependency change started by <see cref="SetDependencyUse"/> — removal,
+    /// background install, and the row refresh after it (completed when idle). Awaited by tests.</summary>
     public Task DependencyWork { get; private set; } = Task.CompletedTask;
 
+    public void Dispose() => _ws.Session.Changed -= _onSession;
+
     /// <summary>The read-only status (Installed / NotInstalled / Skipped / Blocked) — except that a dependency
-    /// still NotInstalled whose last install attempt this session Failed (same declaration since) shows that
-    /// failure instead, so "Failed: …" reaches the page (Status itself is offline and never fails a download).</summary>
+    /// still NotInstalled whose last install attempt this session was Failed or Blocked (same declaration
+    /// since) shows that outcome instead: Status is offline and can't see a download failure, nor a
+    /// collision inside a zip directory mapping. Called off the UI thread (fix round M1).</summary>
     public IReadOnlyList<DependencyStatus> DependencyStatus(PluginItemViewModel item)
     {
         var deps = item.ShownDependencies;
@@ -30,13 +36,19 @@ public sealed partial class ClientPluginsViewModel
         if (install.Outcomes is not { } outcomes) return statuses;
         return statuses.Select(s =>
             s.State == DependencyState.NotInstalled && deps.FirstOrDefault(d => d.Id == s.DependencyId) is { } d
-            && outcomes.LastFailure(gameMini, item.Entry.Id, d) is { } failed ? failed : s).ToList();
+            && outcomes.LastProblem(gameMini, item.Entry.Id, d) is { } problem ? problem : s).ToList();
     }
 
     public void SetDependencyUse(PluginItemViewModel item, string dependencyId, bool use)
     {
         var dep = item.ShownDependencies.FirstOrDefault(d => d.Id == dependencyId);
         if (dep is not { Optional: true }) return;   // Task 6 (e): a required dependency can't be skipped
+        if (_ws.Session.IsBusy)                       // fix round M3: files are in use while the game runs
+        {
+            Status = $"{item.Name}: close the game to change its dependencies";
+            DependencyWork = item.RefreshDependenciesAsync();
+            return;
+        }
 
         var key = $"{item.Entry.Id}/{dependencyId}";
         var skipped = _ws.Client.SkippedDependencies;
@@ -44,33 +56,41 @@ public sealed partial class ClientPluginsViewModel
         else if (!skipped.Contains(key)) skipped.Add(key);
         _ws.SaveProfile();
 
-        if (!use) RemoveNow(item, dep);
-        item.RefreshDependencies();
-        if (use) DependencyWork = EnsureNowAsync(item, dep);
+        DependencyWork = use ? UseAsync(item, dep) : UnuseAsync(item, dep);
     }
 
     /// <summary>Un-using removes the dependency at once — and every dependency that requires it (directly
-    /// or through another), since those would be skipped at the next launch anyway.</summary>
-    private void RemoveNow(PluginItemViewModel item, PluginDependency dep)
+    /// or through another), since those would be skipped at the next launch anyway. Off the UI thread: the
+    /// removal waits for the game folder's dependency gate.</summary>
+    private async Task UnuseAsync(PluginItemViewModel item, PluginDependency dep)
     {
         var gone = new HashSet<string> { dep.Id };
         foreach (var d in item.ShownDependencies)   // manifest order: a prerequisite is listed before its dependents
             if (d.Requires?.Any(gone.Contains) == true) gone.Add(d.Id);
+        var svc = _ws.Services.Core.Install.Dependencies;
+        var gameMini = _ws.Client.GameMiniDir;
         try
         {
-            foreach (var id in gone) _ws.Services.Core.Install.Dependencies.Remove(_ws.Client.GameMiniDir, item.Entry.Id, id);
+            await Task.Run(() => { foreach (var id in gone) svc.Remove(gameMini, item.Entry.Id, id); });
             Status = $"{item.Name}: {dep.Name} skipped";
         }
         catch (Exception ex) { Status = $"{item.Name}: {dep.Name} could not be removed — {ex.Message}"; }
+        await item.RefreshDependenciesAsync();
+    }
+
+    private async Task UseAsync(PluginItemViewModel item, PluginDependency dep)
+    {
+        await item.RefreshDependenciesAsync();
+        await EnsureNowAsync(item, dep);
     }
 
     /// <summary>Re-using a dependency of an installed plugin on a Modded client installs it now, off the UI
-    /// thread, reporting through the status line; otherwise it waits for the next Modded launch (the page
-    /// says so). Never throws.</summary>
+    /// thread, reporting through the status line; otherwise (Vanilla, or the game is running) it waits for
+    /// the next Modded launch (the page says so). Never throws.</summary>
     private async Task EnsureNowAsync(PluginItemViewModel item, PluginDependency dep)
     {
         var client = _ws.Client;
-        if (!client.Modded || item.InstalledVersion is not { } iv || item.ShownVersion?.Version != iv) return;
+        if (_ws.Session.IsBusy || !client.Modded || item.InstalledVersion is not { } iv || item.ShownVersion?.Version != iv) return;
         var svc = _ws.Services.Core.Install.Dependencies;
         var deps = item.ShownDependencies;
         var skippedIds = DependencyRunner.Skipped(client, item.Entry.Id, deps);
@@ -87,6 +107,6 @@ public sealed partial class ClientPluginsViewModel
             Status = problems.Count == 0 ? $"{item.Name}: {dep.Name} installed" : $"{item.Name}: {string.Join("; ", problems)}";
         }
         catch (Exception ex) { Status = $"{item.Name}: {dep.Name} failed — {ex.Message}"; }
-        item.RefreshDependencies();
+        await item.RefreshDependenciesAsync();
     }
 }

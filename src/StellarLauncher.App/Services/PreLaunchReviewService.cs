@@ -104,6 +104,8 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
     /// is fail-open on its own.</summary>
     private void SweepOrphans(ClientProfile client, IEnumerable<string> presentIds)
     {
+        // Id case: ledger stems are the registry id EnsureAsync was given, so ordinal matches; only a registry id
+        // whose CASE changed would read as orphaned, and on Windows the folder-path checks below still find it.
         var present = presentIds.ToHashSet(StringComparer.Ordinal);
         foreach (var id in _deps.Dependencies.LedgerPluginIds(client.GameMiniDir))
         {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Linq;
@@ -18,6 +19,11 @@ public sealed partial class DependencyService : IDependencyService
     private readonly HttpClient _http;
     private readonly DependencyLedgerStore _store;
     private readonly DependencyParking _parking;
+    // Task 6 fix round, Important 1: one gate per game folder, held by every MUTATING member for its whole
+    // run (EnsureAsync spans a download between its ledger read and its ledger write). Read-only Status
+    // never takes it. Not re-entrant — internal callers use the *Core methods.
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _gates =
+        new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     public DependencyService(IFileSystem fs, HttpClient http)
     {
@@ -28,6 +34,15 @@ public sealed partial class DependencyService : IDependencyService
     }
 
     public async Task<IReadOnlyList<DependencyStatus>> EnsureAsync(string gameMini, string pluginId,
+        IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds, CancellationToken ct)
+    {
+        var gate = Gate(gameMini);
+        await gate.WaitAsync(ct);
+        try { return await EnsureCoreAsync(gameMini, pluginId, deps, skippedIds, ct); }
+        finally { gate.Release(); }
+    }
+
+    private async Task<IReadOnlyList<DependencyStatus>> EnsureCoreAsync(string gameMini, string pluginId,
         IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds, CancellationToken ct)
     {
         // Controller round: pluginId becomes a path segment (ledger file, stellar/deps/<id>/…) in every
@@ -48,7 +63,7 @@ public sealed partial class DependencyService : IDependencyService
                 {
                     // I6: a skip's own Remove can fail on IO — that must surface as Failed, never throw.
                     // That failure IS ledger handling, so (minor 1) it's eligible for the note.
-                    try { Remove(gameMini, pluginId, d.Id); status = gate; }
+                    try { RemoveCore(gameMini, pluginId, d.Id); status = gate; }
                     catch (Exception ex) { status = AnnotateIfCorrupt(gameMini, pluginId, new DependencyStatus(d.Id, DependencyState.Failed, ex.Message)); }
                 }
                 else
@@ -106,7 +121,10 @@ public sealed partial class DependencyService : IDependencyService
         return deps.Select(d => results[d.Id]).ToList();
     }
 
-    public void Remove(string gameMini, string pluginId, string dependencyId)
+    public void Remove(string gameMini, string pluginId, string dependencyId) =>
+        Locked(gameMini, () => RemoveCore(gameMini, pluginId, dependencyId));
+
+    private void RemoveCore(string gameMini, string pluginId, string dependencyId)
     {
         // Controller round: an invalid id names no ledger of ours — a no-op, not a throw (there is
         // nothing to read or fail to read).
@@ -122,7 +140,9 @@ public sealed partial class DependencyService : IDependencyService
         _store.Write(gameMini, ledger with { Entries = ledger.Entries.Where(e => e.DependencyId != dependencyId).ToList() });
     }
 
-    public void RemoveAll(string gameMini, string pluginId)
+    public void RemoveAll(string gameMini, string pluginId) => Locked(gameMini, () => RemoveAllCore(gameMini, pluginId));
+
+    private void RemoveAllCore(string gameMini, string pluginId)
     {
         if (!DependencyPaths.IsValidPluginId(pluginId)) return; // controller round: see Remove above
         if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
@@ -131,9 +151,26 @@ public sealed partial class DependencyService : IDependencyService
         _store.Write(gameMini, ledger with { Entries = Array.Empty<LedgerEntry>() });
     }
 
-    public void ParkModdedOnly(string gameMini) => _parking.Park(gameMini);
+    public void ParkModdedOnly(string gameMini) => Locked(gameMini, () => _parking.Park(gameMini));
 
-    public void UnparkModdedOnly(string gameMini) => _parking.Unpark(gameMini);
+    public void UnparkModdedOnly(string gameMini) => Locked(gameMini, () => _parking.Unpark(gameMini));
+
+    /// <summary>The folder's gate. The key is the full path without a trailing separator (case-insensitive
+    /// on Windows), so "/g", "/g/" and "/x/../g" share one gate.</summary>
+    private SemaphoreSlim Gate(string gameMini)
+    {
+        var key = _fs.Path.GetFullPath(gameMini).TrimEnd('/', '\\');
+        return _gates.GetOrAdd(key.Length == 0 ? gameMini : key, _ => new SemaphoreSlim(1, 1));
+    }
+
+    /// <summary>Synchronous members wait synchronously for the folder's gate.</summary>
+    private void Locked(string gameMini, Action action)
+    {
+        var gate = Gate(gameMini);
+        gate.Wait();
+        try { action(); }
+        finally { gate.Release(); }
+    }
 
     public IReadOnlyList<string> LedgerPluginIds(string gameMini) => _store.PluginIds(gameMini);
 

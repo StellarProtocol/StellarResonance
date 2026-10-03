@@ -29,13 +29,13 @@ public class RecordingDependencyServiceTests
         var sut = new RecordingDependencyService(inner);
 
         await sut.EnsureAsync("/g", "p", new[] { Fx }, new HashSet<string>(), default);
-        Assert.Equal("HTTP 404", sut.LastFailure("/g", "p", Fx)?.Detail);
-        Assert.Null(sut.LastFailure("/other", "p", Fx));
-        Assert.Null(sut.LastFailure("/g", "p", Fx with { Version = "1.1" }));   // the plugin now declares another build
+        Assert.Equal("HTTP 404", sut.LastProblem("/g", "p", Fx)?.Detail);
+        Assert.Null(sut.LastProblem("/other", "p", Fx));
+        Assert.Null(sut.LastProblem("/g", "p", Fx with { Version = "1.1" }));   // the plugin now declares another build
 
         inner.Next = DependencyState.Installed;
         await sut.EnsureAsync("/g", "p", new[] { Fx }, new HashSet<string>(), default);
-        Assert.Null(sut.LastFailure("/g", "p", Fx));
+        Assert.Null(sut.LastProblem("/g", "p", Fx));
     }
 
     [Fact]
@@ -44,10 +44,22 @@ public class RecordingDependencyServiceTests
         var sut = new RecordingDependencyService(new Scripted());
         await sut.EnsureAsync("/g", "p", new[] { Fx }, new HashSet<string>(), default);
         sut.Remove("/g", "p", "fx");
-        Assert.Null(sut.LastFailure("/g", "p", Fx));
+        Assert.Null(sut.LastProblem("/g", "p", Fx));
 
         await sut.EnsureAsync("/g", "p", new[] { Fx }, new HashSet<string>(), default);
         sut.RemoveAll("/g", "p");
-        Assert.Null(sut.LastFailure("/g", "p", Fx));
+        Assert.Null(sut.LastProblem("/g", "p", Fx));
+    }
+
+    [Fact]
+    public async Task Remembers_an_install_time_Blocked_like_a_failure()
+    {
+        var inner = new Scripted { Next = DependencyState.Blocked };
+        var sut = new RecordingDependencyService(inner);
+
+        await sut.EnsureAsync("/g", "p", new[] { Fx }, new HashSet<string>(), default);
+
+        Assert.Equal(DependencyState.Blocked, sut.LastProblem("/g", "p", Fx)?.State);
+        Assert.Null(sut.LastProblem("/g", "p", Fx with { Sha256 = new string('b', 64) }));
     }
 }
