@@ -59,14 +59,14 @@ public partial class PluginItemViewModel
     {
         var byId = statuses.ToDictionary(s => s.DependencyId);
         DependencyStatus StatusOf(PluginDependency d) =>
-            byId.TryGetValue(d.Id, out var s) ? s : new DependencyStatus(d.Id, DependencyState.NotInstalled, null);
+            byId.TryGetValue(d.Id, out var s) ? Named(s, deps) : new DependencyStatus(d.Id, DependencyState.NotInstalled, null);
 
         if (Dependencies.Select(r => r.Id).SequenceEqual(deps.Select(d => d.Id)))
         {
             for (var i = 0; i < deps.Count; i++)
             {
                 var st = StatusOf(deps[i]);
-                Dependencies[i].Update(st, st.State != DependencyState.Skipped);
+                Dependencies[i].Update(st, Used(st));
             }
         }
         else
@@ -75,7 +75,7 @@ public partial class PluginItemViewModel
             foreach (var d in deps)
             {
                 var st = StatusOf(d);
-                Dependencies.Add(new DependencyItemViewModel(d, st, st.State != DependencyState.Skipped,
+                Dependencies.Add(new DependencyItemViewModel(d, st, Used(st),
                     (id, use) => _parent.SetDependencyUse(this, id, use), RequiresLabel(d, deps)) { Locked = DependenciesLocked });
             }
         }
@@ -83,6 +83,16 @@ public partial class PluginItemViewModel
         OnPropertyChanged(nameof(DependencyNotices));
         OnPropertyChanged(nameof(DependencyFootnote));
     }
+
+    /// <summary>Ticked unless the player skipped it — a dependency only WAITING for a blocked prerequisite is
+    /// still wanted (M-d).</summary>
+    private static bool Used(DependencyStatus s) =>
+        s.State != DependencyState.Skipped || s.Reason == DependencyReason.WaitingForPrerequisite;
+
+    /// <summary>M-d: a waiting status carries the prerequisite's id; the row shows its name.</summary>
+    private static DependencyStatus Named(DependencyStatus s, IReadOnlyList<PluginDependency> deps) =>
+        s.Reason == DependencyReason.WaitingForPrerequisite && deps.FirstOrDefault(x => x.Id == s.Detail) is { } p
+            ? s with { Detail = p.Name } : s;
 
     /// <summary>Fix round M4: "with &lt;prerequisite names&gt;" (the mockup's chip), or null without <c>requires</c>.</summary>
     private static string? RequiresLabel(PluginDependency d, IReadOnlyList<PluginDependency> all) =>

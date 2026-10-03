@@ -9,9 +9,18 @@ namespace StellarLauncher.Core.Dependencies;
 /// <see cref="IDependencyService.Status"/> looked at it.</summary>
 public enum DependencyState { NotInstalled, Installed, Skipped, Blocked, Failed }
 
+/// <summary>Final review M-d: WHY a Blocked or Skipped outcome is what it is, so the plugin page can say it plainly.
+/// <see cref="OtherOwner"/>: another plugin's (or another dependency's) recorded file is at the destination;
+/// <see cref="PlayerFile"/>: a file nobody's ledger owns (the player's), or one of ours the player changed;
+/// <see cref="WaitingForPrerequisite"/>: Skipped only because a <c>requires</c> prerequisite is Blocked (or is
+/// itself waiting) — <c>Detail</c> is then that prerequisite's id.</summary>
+public enum DependencyReason { None, PlayerFile, OtherOwner, WaitingForPrerequisite }
+
 /// <summary>One dependency's outcome. <paramref name="Detail"/> carries the reason for
-/// <see cref="DependencyState.Blocked"/>/<see cref="DependencyState.Failed"/>, or null otherwise.</summary>
-public sealed record DependencyStatus(string DependencyId, DependencyState State, string? Detail);
+/// <see cref="DependencyState.Blocked"/>/<see cref="DependencyState.Failed"/> (and, with
+/// <see cref="DependencyReason.WaitingForPrerequisite"/>, the prerequisite's id), or null otherwise.</summary>
+public sealed record DependencyStatus(string DependencyId, DependencyState State, string? Detail,
+    DependencyReason Reason = DependencyReason.None);
 
 /// <summary>Downloads, verifies and places a plugin's declared dependencies — generically, without
 /// knowing what any of them are (docs/manifest-standard.md § dependencies).</summary>

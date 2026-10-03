@@ -44,10 +44,21 @@ public sealed partial class DependencyService
             // is our interrupted update, not the player's edit.
             if (IsOurPendingFile(gameMini, pluginId, dependencyId, rel, abs, quarantine: true)) return null;
 
+            // Final review M-e: once dropped from the ledger, a parked copy of this file would be orphaned
+            // forever (nothing would ever restore or remove it) — delete it now, but only if it is still our
+            // exact recorded bytes.
+            TryDeleteParkedCopy(gameMini, pluginId, rel, recorded.Sha256);
             DropFileFromLedger(gameMini, pluginId, dependencyId, rel); // I2
-            return new DependencyStatus(dependencyId, DependencyState.Blocked, $"{rel} (modified)");
+            return new DependencyStatus(dependencyId, DependencyState.Blocked, $"{rel} (modified)", DependencyReason.PlayerFile);
         }
         return null;
+    }
+
+    private void TryDeleteParkedCopy(string gameMini, string pluginId, string rel, string sha256)
+    {
+        var parked = DependencyPaths.ParkedPath(gameMini, pluginId, rel);
+        try { if (DependencyFileHash.Matches(_fs, parked, sha256)) _fs.File.Delete(parked); }
+        catch { /* best effort — the Blocked outcome stands either way */ }
     }
 
     /// <summary>The read-only half of <see cref="CheckDestination"/>, shared with <see cref="Status"/>:
@@ -61,14 +72,14 @@ public sealed partial class DependencyService
         var rel = DependencyPaths.Relative(gameMini, abs);
         var owner = FindOwner(gameMini, rel, quarantine);
         ours = owner is not null && owner.Value.PluginId == pluginId && owner.Value.DependencyId == dependencyId;
-        if (owner is not null && !ours) return new DependencyStatus(dependencyId, DependencyState.Blocked, rel);
+        if (owner is not null && !ours) return new DependencyStatus(dependencyId, DependencyState.Blocked, rel, DependencyReason.OtherOwner);
         if (owner is null && _fs.File.Exists(abs))
         {
             // Final review I2: an unowned file is the player's — UNLESS this very (plugin, dependency)'s pending
             // record lists it with these exact bytes: then the launcher placed it and died before committing.
             // A byte-identical file with no such record (the player's own copy) is never adopted.
             if (IsOurPendingFile(gameMini, pluginId, dependencyId, rel, abs, quarantine)) { ours = true; return null; }
-            return new DependencyStatus(dependencyId, DependencyState.Blocked, rel);
+            return new DependencyStatus(dependencyId, DependencyState.Blocked, rel, DependencyReason.PlayerFile);
         }
         return null;
     }

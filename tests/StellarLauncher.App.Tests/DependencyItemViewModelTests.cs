@@ -101,4 +101,17 @@ public class DependencyItemViewModelTests
         Assert.False(vm.Use);
         Assert.Equal("Skipped", vm.StateText);
     }
+
+    // Final review M-d: the row says WHO is in the way, and that a dependent of a blocked prerequisite waits.
+    [Fact]
+    public void Another_plugins_file_and_a_waiting_dependent_have_their_own_row_text()
+    {
+        var d = Dep();
+        Assert.Equal("Blocked — another plugin's file is in the way: dxgi.dll",
+            new DependencyItemViewModel(d, new DependencyStatus(d.Id, DependencyState.Blocked, "dxgi.dll", DependencyReason.OtherOwner), true, (_, _) => { }).StateText);
+        Assert.Equal("Blocked — a file you installed is in the way: dxgi.dll",
+            new DependencyItemViewModel(d, new DependencyStatus(d.Id, DependencyState.Blocked, "dxgi.dll", DependencyReason.PlayerFile), true, (_, _) => { }).StateText);
+        Assert.Equal("Waiting for Effects runtime",
+            new DependencyItemViewModel(d, new DependencyStatus(d.Id, DependencyState.Skipped, "Effects runtime", DependencyReason.WaitingForPrerequisite), true, (_, _) => { }).StateText);
+    }
 }

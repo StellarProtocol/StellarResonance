@@ -244,7 +244,11 @@ public sealed partial class DependencyService : IDependencyService
         {
             if (!resultsSoFar.TryGetValue(r, out var rs))
                 return new DependencyStatus(d.Id, DependencyState.Failed, $"requires {r} listed earlier");
-            if (rs.State is DependencyState.Skipped or DependencyState.Blocked)
+            // M-d: a Blocked prerequisite (or one itself waiting) makes this one WAIT; a prerequisite the
+            // player skipped makes it plainly Skipped.
+            if (rs.State == DependencyState.Blocked || rs.Reason == DependencyReason.WaitingForPrerequisite)
+                return new DependencyStatus(d.Id, DependencyState.Skipped, r, DependencyReason.WaitingForPrerequisite);
+            if (rs.State == DependencyState.Skipped)
                 return new DependencyStatus(d.Id, DependencyState.Skipped, null);
             if (rs.State == DependencyState.Failed)
                 return new DependencyStatus(d.Id, DependencyState.Failed, $"waiting for {r}");

@@ -11,7 +11,7 @@ public interface IPreLaunchReview
     Task<bool> ReviewAsync(ClientProfile client, CancellationToken ct);
 
     /// <summary>Same as <see cref="ReviewAsync(ClientProfile, CancellationToken)"/>, reporting what it is
-    /// doing (e.g. "Preparing Photo Studio: …") through <paramref name="status"/> — the client's state line.
+    /// doing (e.g. "Preparing &lt;plugin&gt;: …") through <paramref name="status"/> — the client's state line.
     /// A null report clears it.</summary>
     Task<bool> ReviewAsync(ClientProfile client, Action<string?> status, CancellationToken ct) => ReviewAsync(client, ct);
 }

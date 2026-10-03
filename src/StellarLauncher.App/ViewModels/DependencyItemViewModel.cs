@@ -84,7 +84,10 @@ public sealed partial class DependencyItemViewModel : ObservableObject
         {
             DependencyState.Installed => "Installed",
             DependencyState.NotInstalled => "Not installed — installs at next Modded launch",
+            // M-d: Detail is the prerequisite's NAME here (PluginItemViewModel resolves it from the id).
+            DependencyState.Skipped when s.Reason == DependencyReason.WaitingForPrerequisite => $"Waiting for {s.Detail}",
             DependencyState.Skipped => "Skipped",
+            DependencyState.Blocked when s.Reason == DependencyReason.OtherOwner => $"Blocked — another plugin's file is in the way: {s.Detail}",
             DependencyState.Blocked => $"Blocked — a file you installed is in the way: {s.Detail}",
             _ => $"Failed: {s.Detail}",
         };
