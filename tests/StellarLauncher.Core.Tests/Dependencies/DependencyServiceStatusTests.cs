@@ -1,3 +1,4 @@
+using System.IO.Abstractions.TestingHelpers;
 using System.Threading.Tasks;
 using StellarLauncher.Core.Dependencies;
 using Xunit;
@@ -55,5 +56,20 @@ public sealed partial class DependencyServiceTests
 
         Assert.Equal(DependencyState.Skipped, st[0].State);
         Assert.Equal(DependencyState.Skipped, st[1].State);
+    }
+
+    // Minor 3 (round 4): Status is read-only — it must never have the side effect of quarantining a
+    // corrupt ledger, even though it still correctly reads one as empty (NotInstalled) either way.
+    [Fact]
+    public void Status_never_quarantines_a_corrupt_ledger()
+    {
+        _fs.AddFile("/game_mini/stellar/deps/p.json", new MockFileData("{ not valid json"));
+        var d = File("fx", new byte[] { 1 }, "dxgi.dll");
+
+        var st = Assert.Single(Make().Status(G, "p", new[] { d }, None));
+
+        Assert.Equal(DependencyState.NotInstalled, st.State);
+        Assert.False(_fs.File.Exists("/game_mini/stellar/deps/p.json.corrupt")); // never quarantined
+        Assert.True(_fs.File.Exists("/game_mini/stellar/deps/p.json")); // left in place
     }
 }

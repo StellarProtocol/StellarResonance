@@ -1,3 +1,4 @@
+using System.IO.Abstractions.TestingHelpers;
 using StellarLauncher.Core.Dependencies;
 using Xunit;
 namespace StellarLauncher.Core.Tests.Dependencies;
@@ -43,5 +44,29 @@ public sealed partial class DependencyServiceTests
         Assert.Equal(DependencyState.Blocked, st.State);
         Assert.False(_fs.File.Exists("/game_mini/dxgi.dll"));
         Assert.True(_fs.File.Exists("/game_mini/stellar/deps-parked/q/dxgi.dll"));
+    }
+
+    // Minor 1 (round 4): an earlier attempt's INCOMPLETE rollback can leave the live file holding newer
+    // bytes than the ledger while its .stellar-bak still holds exactly what the ledger expects — that's
+    // our own half-finished repair, not the player's edit, so a later attempt must overwrite it rather
+    // than block it as "(modified)" (which would also wrongly drop it from the ledger forever).
+    [Fact]
+    public async Task A_file_left_mid_incomplete_rollback_is_treated_as_ours_not_modified()
+    {
+        var d1 = File("fx", new byte[] { 1 }, "dxgi.dll");
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { d1 }, None, default); // v1 installed; ledger records hash({1})
+
+        // Simulate the aftermath of a rollback whose own restore failed: live file already holds v2 bytes,
+        // but a backup matching the ledger's recorded (v1) hash is still sitting there.
+        _fs.File.WriteAllBytes("/game_mini/dxgi.dll", new byte[] { 2 });
+        _fs.AddFile("/game_mini/dxgi.dll.stellar-bak", new MockFileData(new byte[] { 1 }));
+
+        var d2 = File("fx", new byte[] { 2 }, "dxgi.dll") with { Version = "2.0" };
+        var st = Assert.Single(await s.EnsureAsync(G, "p", new[] { d2 }, None, default));
+
+        Assert.Equal(DependencyState.Installed, st.State); // not Blocked "(modified)"
+        Assert.Equal(new byte[] { 2 }, _fs.File.ReadAllBytes("/game_mini/dxgi.dll"));
+        Assert.Single(new DependencyLedgerStore(_fs).Read(G, "p").Entries); // still tracked, not dropped
     }
 }

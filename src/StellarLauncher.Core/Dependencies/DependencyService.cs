@@ -56,7 +56,9 @@ public sealed partial class DependencyService : IDependencyService
     public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,
         IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds)
     {
-        var ledger = _store.Read(gameMini, pluginId);
+        // Minor 3: Status is read-only — it must not have the side effect of quarantining a corrupt
+        // ledger (it still reads one as empty, via Read's own fallback, either way).
+        var ledger = _store.Read(gameMini, pluginId, quarantine: false);
         var results = new Dictionary<string, DependencyStatus>();
         foreach (var d in deps)
         {

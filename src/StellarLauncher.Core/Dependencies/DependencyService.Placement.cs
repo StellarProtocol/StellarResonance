@@ -166,9 +166,11 @@ public sealed partial class DependencyService
     }
 
     /// <summary>I1: a pre-existing destination is backed up to <c>.stellar-bak</c> before being replaced.
-    /// Minor 1: a stale leftover backup is cleared first, same as the <c>.stellar-tmp</c> handling below.
-    /// Minor 3: a destination's parked copy is only COLLECTED here — <see cref="CleanupParkedCopies"/>
-    /// deletes it later, once the ledger write has actually committed.</summary>
+    /// Minor 1 (round 3): a stale leftover backup is cleared first, same as the <c>.stellar-tmp</c>
+    /// handling below. Minor 2 (round 4): a stale backup is cleared even when there's nothing to back up
+    /// this time (the destination is currently absent). Minor 3 (round 3): a destination's parked copy is
+    /// only COLLECTED here — <see cref="CleanupParkedCopies"/> deletes it later, once the ledger write has
+    /// actually committed.</summary>
     private void WriteAll(string gameMini, List<(string Abs, byte[] Bytes)> files, HashSet<string> backedUp, HashSet<string> parkedToClean)
     {
         foreach (var (abs, bytes) in files)
@@ -179,9 +181,13 @@ public sealed partial class DependencyService
             var bak = abs + ".stellar-bak";
             if (_fs.File.Exists(abs))
             {
-                if (_fs.File.Exists(bak)) _fs.File.Delete(bak); // minor 1
+                if (_fs.File.Exists(bak)) _fs.File.Delete(bak); // minor 1 (round 3)
                 _fs.File.Move(abs, bak, overwrite: true);
                 backedUp.Add(abs);
+            }
+            else if (_fs.File.Exists(bak))
+            {
+                _fs.File.Delete(bak); // minor 2 (round 4): stale debris cleared even with nothing to back up
             }
 
             var tmp = abs + ".stellar-tmp";

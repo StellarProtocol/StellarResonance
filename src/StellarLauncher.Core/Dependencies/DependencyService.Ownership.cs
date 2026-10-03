@@ -27,6 +27,11 @@ public sealed partial class DependencyService
         var recorded = existing?.Files.FirstOrDefault(f => f.Path == rel);
         if (recorded is not null && !DependencyFileHash.Matches(_fs, abs, recorded.Sha256))
         {
+            // Minor 1 (round 4): a prior attempt's incomplete rollback can leave the live file holding
+            // NEWER bytes than the ledger while its .stellar-bak still holds what the ledger expects —
+            // that's our own half-finished repair, not the player's edit, so it's safe to overwrite.
+            if (DependencyFileHash.Matches(_fs, abs + ".stellar-bak", recorded.Sha256)) return null;
+
             DropFileFromLedger(gameMini, pluginId, dependencyId, rel); // I2
             return new DependencyStatus(dependencyId, DependencyState.Blocked, $"{rel} (modified)");
         }

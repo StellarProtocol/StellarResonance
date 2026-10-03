@@ -124,4 +124,26 @@ public sealed class DependencyLedgerStoreTests
         Assert.False(fs.File.Exists("/game_mini/stellar/deps/p.json.tmp"));
         Assert.True(fs.File.Exists("/game_mini/stellar/deps/p.json"));
     }
+
+    // Important 1 (round 4): an IOException while reading is transient/environmental, not evidence the
+    // ledger's CONTENT is corrupt — it must not quarantine a perfectly valid file.
+    [Fact]
+    public void An_IOException_while_reading_does_not_quarantine_a_valid_ledger()
+    {
+        var fs = new MockFileSystem(); fs.AddDirectory("/game_mini");
+        new DependencyLedgerStore(fs).Write("/game_mini", new DependencyLedger("p", new[] { new LedgerEntry("fx", "1", new LedgerFile[0]) }));
+
+        var ledgerPath = "/game_mini/stellar/deps/p.json";
+        var faulty = new FaultInjectingFileSystem(fs, ledgerPath, "ReadAllText"); // fires once
+        var store = new DependencyLedgerStore(faulty);
+
+        var unreadableThisPass = store.Read("/game_mini", "p");
+
+        Assert.Empty(unreadableThisPass.Entries); // unreadable for this call only
+        Assert.True(fs.File.Exists(ledgerPath)); // still in place, never renamed
+        Assert.False(fs.File.Exists(ledgerPath + ".corrupt"));
+
+        var retried = store.Read("/game_mini", "p"); // the fault already fired once — this read succeeds
+        Assert.Single(retried.Entries);
+    }
 }

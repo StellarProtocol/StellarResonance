@@ -161,4 +161,19 @@ public sealed partial class DependencyServiceTests
         Assert.True(_fs.File.Exists("/game_mini/stellar/deps-parked/p/dxgi.dll")); // never deleted — the write never committed
         Assert.Equal(new byte[] { 0xAA }, _fs.File.ReadAllBytes("/game_mini/stellar/deps-parked/p/dxgi.dll"));
     }
+
+    // Minor 2 (round 4): a stale .stellar-bak must be cleared even when the destination is currently
+    // absent (nothing to back up this time) — otherwise it lingers as debris indefinitely.
+    [Fact]
+    public async Task A_stale_backup_is_cleared_even_when_the_destination_is_absent()
+    {
+        _fs.AddFile("/game_mini/fresh.dll.stellar-bak", new MockFileData("STALE"));
+        var d = File("fx", new byte[] { 9 }, "fresh.dll");
+
+        var st = Assert.Single(await Make().EnsureAsync(G, "p", new[] { d }, None, default));
+
+        Assert.Equal(DependencyState.Installed, st.State);
+        Assert.Equal(new byte[] { 9 }, _fs.File.ReadAllBytes("/game_mini/fresh.dll"));
+        Assert.False(_fs.File.Exists("/game_mini/fresh.dll.stellar-bak")); // cleaned up even though nothing was backed up
+    }
 }
