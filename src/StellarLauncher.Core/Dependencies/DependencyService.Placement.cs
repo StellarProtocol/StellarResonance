@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using StellarLauncher.Core.Model;
@@ -12,7 +10,9 @@ using StellarLauncher.Core.Model;
 namespace StellarLauncher.Core.Dependencies;
 
 /// <summary>Download/verify/place mechanics for a single dependency (rules 2-5 of the dependency-service
-/// contract). See <see cref="DependencyService.EnsureAsync"/> for the skip/requires handling around this.</summary>
+/// contract, plus C1's transactional placement). See <see cref="DependencyService.EnsureAsync"/> for the
+/// skip/requires handling around this, <c>.Zip</c> for building the file list, and <c>.Ownership</c> for
+/// the foreign-file check.</summary>
 public sealed partial class DependencyService
 {
     private async Task<DependencyStatus> EnsureOneAsync(string gameMini, string pluginId, PluginDependency dep, CancellationToken ct)
@@ -23,25 +23,46 @@ public sealed partial class DependencyService
             return new DependencyStatus(dep.Id, DependencyState.Installed, null);
 
         var bytes = await DownloadCappedAsync(dep.Url, dep.Size, ct);
-        var hash = Convert.ToHexString(SHA256.HashData(bytes));
-        if (!string.Equals(hash, dep.Sha256, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(DependencyFileHash.Of(bytes), dep.Sha256, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("checksum mismatch");
 
         var files = BuildFiles(gameMini, pluginId, dep, bytes);
         foreach (var f in files)
-            if (IsForeign(gameMini, f.Abs))
+            if (IsForeign(gameMini, pluginId, dep.Id, f.Abs))
                 return new DependencyStatus(dep.Id, DependencyState.Blocked, DependencyPaths.Relative(gameMini, f.Abs));
 
-        WriteAll(files);
-        PruneStaleFiles(gameMini, existing, files.Select(f => DependencyPaths.Relative(gameMini, f.Abs)));
-
-        var newEntry = new LedgerEntry(dep.Id, dep.Version, files.Select(f => new LedgerFile(
-            DependencyPaths.Relative(gameMini, f.Abs), Convert.ToHexString(SHA256.HashData(f.Bytes)),
-            dep.ModdedOnly && dep.Target == "game")).ToList());
-        var entries = ledger.Entries.Where(e => e.DependencyId != dep.Id).Append(newEntry).ToList();
-        _store.Write(gameMini, new DependencyLedger(pluginId, entries));
+        // C1: placement is transactional — anything this attempt creates is rolled back on any failure,
+        // and the ledger is written only once every file is safely in place.
+        var preExisting = new HashSet<string>(files.Select(f => f.Abs).Where(_fs.File.Exists), StringComparer.Ordinal);
+        try
+        {
+            WriteAll(gameMini, pluginId, files);
+            PruneStaleFiles(gameMini, pluginId, existing, files.Select(f => DependencyPaths.Relative(gameMini, f.Abs)));
+            var newEntry = new LedgerEntry(dep.Id, dep.Version, files.Select(f => new LedgerFile(
+                DependencyPaths.Relative(gameMini, f.Abs), DependencyFileHash.Of(f.Bytes),
+                dep.ModdedOnly && dep.Target == "game")).ToList());
+            var entries = ledger.Entries.Where(e => e.DependencyId != dep.Id).Append(newEntry).ToList();
+            _store.Write(gameMini, new DependencyLedger(pluginId, entries));
+        }
+        catch
+        {
+            RollbackCreatedFiles(files, preExisting);
+            throw;
+        }
 
         return new DependencyStatus(dep.Id, DependencyState.Installed, null);
+    }
+
+    /// <summary>C1: undoes everything THIS attempt put on disk — a file that did not exist before (so is
+    /// safe to remove) and any leftover <c>.stellar-tmp</c> — so a retry never self-blocks on its own debris.</summary>
+    private void RollbackCreatedFiles(List<(string Abs, byte[] Bytes)> files, HashSet<string> preExisting)
+    {
+        foreach (var (abs, _) in files)
+        {
+            if (!preExisting.Contains(abs) && _fs.File.Exists(abs)) _fs.File.Delete(abs);
+            var tmp = abs + ".stellar-tmp";
+            if (_fs.File.Exists(tmp)) _fs.File.Delete(tmp);
+        }
     }
 
     private bool IsInstalled(string gameMini, LedgerEntry? entry, PluginDependency dep)
@@ -49,10 +70,8 @@ public sealed partial class DependencyService
         if (entry is null || entry.Version != dep.Version) return false;
         foreach (var f in entry.Files)
         {
-            var abs = _fs.Path.Combine(gameMini, f.Path);
-            if (!_fs.File.Exists(abs)) return false;
-            var hash = Convert.ToHexString(SHA256.HashData(_fs.File.ReadAllBytes(abs)));
-            if (!string.Equals(hash, f.Sha256, StringComparison.OrdinalIgnoreCase)) return false;
+            var abs = DependencyPaths.FromLedger(gameMini, f.Path); // I2
+            if (abs is null || !DependencyFileHash.Matches(_fs, abs, f.Sha256)) return false;
         }
         return true;
     }
@@ -73,74 +92,41 @@ public sealed partial class DependencyService
         return buffer.ToArray();
     }
 
-    private List<(string Abs, byte[] Bytes)> BuildFiles(string gameMini, string pluginId, PluginDependency dep, byte[] bytes)
-    {
-        if (dep.Kind != "zip")
-        {
-            var to = dep.Files[0].To;
-            var abs = DependencyPaths.Resolve(gameMini, pluginId, dep.Target, to)
-                      ?? throw new InvalidDataException($"path not allowed: {to}");
-            return new List<(string, byte[])> { (abs, bytes) };
-        }
-
-        var result = new List<(string Abs, byte[] Bytes)>();
-        using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
-        foreach (var entry in zip.Entries)
-        {
-            var name = entry.FullName.Replace('\\', '/');
-            if (name.EndsWith('/')) continue; // directory entry
-            foreach (var mapping in dep.Files)
-            {
-                var dest = MapZipEntry(mapping, name);
-                if (dest is null) continue;
-                var abs = DependencyPaths.Resolve(gameMini, pluginId, dep.Target, dest)
-                          ?? throw new InvalidDataException($"path not allowed: {dest}");
-                using var es = entry.Open();
-                using var buf = new MemoryStream();
-                es.CopyTo(buf);
-                result.Add((abs, buf.ToArray()));
-            }
-        }
-        return result;
-    }
-
-    private static string? MapZipEntry(PluginDependencyFile mapping, string entryName)
-    {
-        if (mapping.From is null) return null;
-        if (mapping.From.EndsWith('/'))
-            return entryName.StartsWith(mapping.From, StringComparison.Ordinal) ? mapping.To + entryName[mapping.From.Length..] : null;
-        return entryName == mapping.From ? mapping.To : null;
-    }
-
-    private bool IsForeign(string gameMini, string abs)
-    {
-        if (!_fs.File.Exists(abs)) return false;
-        var rel = DependencyPaths.Relative(gameMini, abs);
-        return !_store.ReadAll(gameMini).Any(l => l.Entries.Any(e => e.Files.Any(f =>
-            string.Equals(f.Path, rel, StringComparison.OrdinalIgnoreCase))));
-    }
-
-    private void WriteAll(List<(string Abs, byte[] Bytes)> files)
+    /// <summary>M12: a stale <c>.stellar-tmp</c> left by a previous crashed attempt is always safe to
+    /// delete (the suffix is our own naming pattern, never anything a user or tool would create), and the
+    /// temp file is cleaned up again if the final move fails. M8: a freshly (re)written destination drops
+    /// any stale parked copy, so a later Unpark can never restore outdated bytes over it.</summary>
+    private void WriteAll(string gameMini, string pluginId, List<(string Abs, byte[] Bytes)> files)
     {
         foreach (var (abs, bytes) in files)
         {
             var dir = _fs.Path.GetDirectoryName(abs);
             if (!string.IsNullOrEmpty(dir)) _fs.Directory.CreateDirectory(dir);
             var tmp = abs + ".stellar-tmp";
+            if (_fs.File.Exists(tmp)) _fs.File.Delete(tmp);
             _fs.File.WriteAllBytes(tmp, bytes);
-            _fs.File.Move(tmp, abs, overwrite: true);
+            try { _fs.File.Move(tmp, abs, overwrite: true); }
+            catch { if (_fs.File.Exists(tmp)) _fs.File.Delete(tmp); throw; }
+
+            var parked = DependencyPaths.ParkedPath(gameMini, pluginId, DependencyPaths.Relative(gameMini, abs));
+            if (_fs.File.Exists(parked)) _fs.File.Delete(parked);
         }
     }
 
-    private void PruneStaleFiles(string gameMini, LedgerEntry? existing, IEnumerable<string> kept)
+    /// <summary>I2: an old recorded path is only acted on once validated. I3: a file whose content no
+    /// longer matches the recorded hash was replaced by someone else and is left alone.</summary>
+    private void PruneStaleFiles(string gameMini, string pluginId, LedgerEntry? existing, IEnumerable<string> kept)
     {
         if (existing is null) return;
-        var keptSet = new HashSet<string>(kept, StringComparer.OrdinalIgnoreCase);
+        var keptSet = new HashSet<string>(kept, StringComparer.Ordinal); // M11
         foreach (var old in existing.Files)
         {
             if (keptSet.Contains(old.Path)) continue;
-            var abs = _fs.Path.Combine(gameMini, old.Path);
-            if (_fs.File.Exists(abs)) _fs.File.Delete(abs);
+            var abs = DependencyPaths.FromLedger(gameMini, old.Path);
+            if (abs is null) continue;
+            if (DependencyFileHash.Matches(_fs, abs, old.Sha256)) _fs.File.Delete(abs);
+            var parked = DependencyPaths.ParkedPath(gameMini, pluginId, old.Path); // M8
+            if (_fs.File.Exists(parked)) _fs.File.Delete(parked);
         }
     }
 }

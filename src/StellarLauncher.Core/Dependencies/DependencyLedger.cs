@@ -21,8 +21,9 @@ public sealed class DependencyLedgerStore
     {
         var path = DependencyPaths.LedgerFile(gameMini, pluginId);
         if (!_fs.File.Exists(path)) return new DependencyLedger(pluginId, new LedgerEntry[0]);
-        return JsonSerializer.Deserialize<DependencyLedger>(_fs.File.ReadAllText(path), Json)
-               ?? new DependencyLedger(pluginId, new LedgerEntry[0]);
+        var ledger = JsonSerializer.Deserialize<DependencyLedger>(_fs.File.ReadAllText(path), Json);
+        // I2: the file NAME is the only trusted source of PluginId — never whatever the JSON body claims.
+        return (ledger ?? new DependencyLedger(pluginId, new LedgerEntry[0])) with { PluginId = pluginId };
     }
 
     public void Write(string gameMini, DependencyLedger ledger)

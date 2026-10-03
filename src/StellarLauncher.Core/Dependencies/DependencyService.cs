@@ -10,7 +10,8 @@ using StellarLauncher.Core.Model;
 namespace StellarLauncher.Core.Dependencies;
 
 /// <summary>Generic dependency installer (see <see cref="IDependencyService"/>). Placement/download
-/// mechanics live in the <c>.Placement</c> partial; vanilla-launch parking in <see cref="DependencyParking"/>.</summary>
+/// mechanics live in the <c>.Placement</c> partial, zip handling in <c>.Zip</c>, ownership checks in
+/// <c>.Ownership</c>; vanilla-launch parking in <see cref="DependencyParking"/>.</summary>
 public sealed partial class DependencyService : IDependencyService
 {
     private readonly IFileSystem _fs;
@@ -33,10 +34,16 @@ public sealed partial class DependencyService : IDependencyService
         foreach (var d in deps)
         {
             ct.ThrowIfCancellationRequested();
-            if (skippedIds.Contains(d.Id) || (d.Requires ?? Array.Empty<string>()).Any(r => results.TryGetValue(r, out var rs) && rs.State != DependencyState.Installed))
+            var gate = GateStatus(d, skippedIds, results);
+            if (gate is not null)
             {
-                Remove(gameMini, pluginId, d.Id);
-                results[d.Id] = new DependencyStatus(d.Id, DependencyState.Skipped, null);
+                // I6: a skip's own Remove can fail on IO — that must surface as Failed, never throw.
+                try
+                {
+                    if (gate.State == DependencyState.Skipped) Remove(gameMini, pluginId, d.Id);
+                    results[d.Id] = gate;
+                }
+                catch (Exception ex) { results[d.Id] = new DependencyStatus(d.Id, DependencyState.Failed, ex.Message); }
                 continue;
             }
             try { results[d.Id] = await EnsureOneAsync(gameMini, pluginId, d, ct); }
@@ -53,11 +60,8 @@ public sealed partial class DependencyService : IDependencyService
         var results = new Dictionary<string, DependencyStatus>();
         foreach (var d in deps)
         {
-            if (skippedIds.Contains(d.Id) || (d.Requires ?? Array.Empty<string>()).Any(r => results.TryGetValue(r, out var rs) && rs.State != DependencyState.Installed))
-            {
-                results[d.Id] = new DependencyStatus(d.Id, DependencyState.Skipped, null);
-                continue;
-            }
+            var gate = GateStatus(d, skippedIds, results);
+            if (gate is not null) { results[d.Id] = gate; continue; }
             var entry = ledger.Entries.FirstOrDefault(e => e.DependencyId == d.Id);
             results[d.Id] = IsInstalled(gameMini, entry, d)
                 ? new DependencyStatus(d.Id, DependencyState.Installed, null)
@@ -86,12 +90,39 @@ public sealed partial class DependencyService : IDependencyService
 
     public void UnparkModdedOnly(string gameMini) => _parking.Unpark(gameMini);
 
+    /// <summary>R1/R2: resolves whether <paramref name="d"/> is gated by <paramref name="skippedIds"/> or
+    /// by its <c>requires</c> chain, given every earlier dependency's outcome in <paramref name="resultsSoFar"/>.
+    /// Null means "not gated — evaluate normally". A forward reference (R2) and a Failed prerequisite both
+    /// report Failed without removing anything; only a Skipped/Blocked prerequisite propagates a Skip.</summary>
+    private static DependencyStatus? GateStatus(PluginDependency d, ISet<string> skippedIds,
+        IReadOnlyDictionary<string, DependencyStatus> resultsSoFar)
+    {
+        if (skippedIds.Contains(d.Id))
+            return new DependencyStatus(d.Id, DependencyState.Skipped, null);
+
+        foreach (var r in d.Requires ?? Array.Empty<string>())
+        {
+            if (!resultsSoFar.TryGetValue(r, out var rs))
+                return new DependencyStatus(d.Id, DependencyState.Failed, $"requires {r} listed earlier");
+            if (rs.State is DependencyState.Skipped or DependencyState.Blocked)
+                return new DependencyStatus(d.Id, DependencyState.Skipped, null);
+            if (rs.State == DependencyState.Failed)
+                return new DependencyStatus(d.Id, DependencyState.Failed, $"waiting for {r}");
+        }
+        return null;
+    }
+
+    /// <summary>I2: resolves each recorded file through <see cref="DependencyPaths.FromLedger"/> — an
+    /// unsafe path is skipped rather than acted on. I3: a file whose live content no longer matches the
+    /// recorded hash was replaced by the user or another tool and is left alone (dropped from the ledger
+    /// regardless, since the whole entry is rebuilt/removed by the caller either way).</summary>
     private void DeleteEntryFiles(string gameMini, string pluginId, LedgerEntry entry)
     {
         foreach (var f in entry.Files)
         {
-            var abs = _fs.Path.Combine(gameMini, f.Path);
-            if (_fs.File.Exists(abs)) _fs.File.Delete(abs);
+            var abs = DependencyPaths.FromLedger(gameMini, f.Path);
+            if (abs is null) continue; // I2: an unsafe recorded path is never resolved or acted on
+            if (DependencyFileHash.Matches(_fs, abs, f.Sha256)) _fs.File.Delete(abs);
             var parked = DependencyPaths.ParkedPath(gameMini, pluginId, f.Path);
             if (_fs.File.Exists(parked)) _fs.File.Delete(parked);
         }

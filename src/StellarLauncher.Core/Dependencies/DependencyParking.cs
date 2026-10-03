@@ -4,7 +4,10 @@ using System.Linq;
 namespace StellarLauncher.Core.Dependencies;
 
 /// <summary>Moves <c>moddedOnly</c> dependency files out of the game tree for a vanilla launch, and back
-/// afterwards (rule 8 of the dependency-service contract). Operates across every plugin's ledger.</summary>
+/// afterwards (rule 8 of the dependency-service contract). Operates across every plugin's ledger.
+/// I2: every recorded path is validated via <see cref="DependencyPaths.FromLedger"/> before use. I3: a
+/// file whose content no longer matches the recorded hash was replaced by the user or another tool and
+/// is left where it is.</summary>
 public sealed class DependencyParking
 {
     private readonly IFileSystem _fs;
@@ -16,15 +19,15 @@ public sealed class DependencyParking
         _store = store;
     }
 
-    /// <summary>Moves every present <c>moddedOnly</c> file to its parked path. Idempotent — a file
-    /// already parked (or never placed) is left alone.</summary>
+    /// <summary>Moves every present, untouched <c>moddedOnly</c> file to its parked path. Idempotent — a
+    /// file already parked (or never placed) is left alone.</summary>
     public void Park(string gameMini)
     {
         foreach (var ledger in _store.ReadAll(gameMini))
         foreach (var f in ledger.Entries.SelectMany(e => e.Files).Where(f => f.ModdedOnly))
         {
-            var abs = _fs.Path.Combine(gameMini, f.Path);
-            if (!_fs.File.Exists(abs)) continue;
+            var abs = DependencyPaths.FromLedger(gameMini, f.Path);
+            if (abs is null || !DependencyFileHash.Matches(_fs, abs, f.Sha256)) continue;
             Move(abs, DependencyPaths.ParkedPath(gameMini, ledger.PluginId, f.Path));
         }
     }
@@ -36,7 +39,8 @@ public sealed class DependencyParking
         foreach (var ledger in _store.ReadAll(gameMini))
         foreach (var f in ledger.Entries.SelectMany(e => e.Files).Where(f => f.ModdedOnly))
         {
-            var abs = _fs.Path.Combine(gameMini, f.Path);
+            var abs = DependencyPaths.FromLedger(gameMini, f.Path);
+            if (abs is null) continue;
             var parked = DependencyPaths.ParkedPath(gameMini, ledger.PluginId, f.Path);
             if (!_fs.File.Exists(parked) || _fs.File.Exists(abs)) continue;
             Move(parked, abs);

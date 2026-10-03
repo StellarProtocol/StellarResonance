@@ -13,11 +13,13 @@ public static class DependencyPaths
     public static string? Resolve(string gameMini, string pluginId, string target, string to)
     {
         if (string.IsNullOrEmpty(to) || to.Contains('\\') || to.StartsWith('/') || to.Contains(':')) return null;
-        if (to.Split('/').Any(p => p == "..")) return null;
+        var segments = to.Split('/');
+        if (segments.Any(p => p.Length == 0 || p == "." || p == "..")) return null;
+        var normalized = string.Join('/', segments); // I5: forbidden-prefix check runs on the normalised form
         return target switch
         {
-            "game" when !Forbidden.Any(f => to.StartsWith(f, StringComparison.OrdinalIgnoreCase)) => Path.Combine(gameMini, to),
-            "plugin" => Path.Combine(gameMini, "stellar", "deps", pluginId, to),
+            "game" when !Forbidden.Any(f => normalized.StartsWith(f, StringComparison.OrdinalIgnoreCase)) => Path.Combine(gameMini, normalized),
+            "plugin" => Path.Combine(gameMini, "stellar", "deps", pluginId, normalized),
             _ => null,
         };
     }
@@ -31,4 +33,19 @@ public static class DependencyPaths
 
     public static string ParkedPath(string gameMini, string pluginId, string relative) =>
         Path.Combine(gameMini, "stellar", "deps-parked", pluginId, relative);
+
+    /// <summary>Resolves a path recorded in a ledger back to an absolute path — never trusting it blindly
+    /// (I2): rejects rooted paths, backslashes, colons, and any <c>..</c>/<c>.</c>/empty segment, and
+    /// refuses anything that would not stay under <paramref name="gameMini"/>.</summary>
+    public static string? FromLedger(string gameMini, string relPath)
+    {
+        if (string.IsNullOrEmpty(relPath) || relPath.StartsWith('/') || relPath.Contains('\\') || relPath.Contains(':'))
+            return null;
+        var segments = relPath.Split('/');
+        if (segments.Any(p => p.Length == 0 || p == "." || p == "..")) return null;
+
+        var root = Path.GetFullPath(gameMini);
+        var abs = Path.GetFullPath(Path.Combine(root, string.Join('/', segments)));
+        return abs == root || abs.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) ? abs : null;
+    }
 }
