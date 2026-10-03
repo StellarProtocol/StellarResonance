@@ -92,7 +92,27 @@ runs on** so the launcher can gate it against the installed/selected framework.
           "sourceRepository": "https://github.com/StellarProtocol/StellarPartyOverlayPlugin.git",
           "sourceCommit": "<full 40-char sha CI built>",
           "sourceTag": "v2.1.0",
-          "changelog": { "added": ["…"], "changed": [], "fixed": ["…"], "removed": [] }
+          "changelog": { "added": ["…"], "changed": [], "fixed": ["…"], "removed": [] },
+          "dependencies": [
+            {
+              "id": "dependency-id",
+              "name": "Dependency Name",
+              "version": "1.0.0",
+              "url": "https://cdn.revette.io/dependencies/dep-1.0.0.zip",
+              "sha256": "<hex sha256>",
+              "size": 1024000,
+              "kind": "zip",
+              "files": [{ "from": "some/", "to": "destination/" }],
+              "target": "game",
+              "moddedOnly": false,
+              "optional": false,
+              "requires": [],
+              "license": "MIT",
+              "licenseUrl": "https://...",
+              "sourceUrl": "https://...",
+              "notice": "..."
+            }
+          ]
         },
         { "version": "2.0.0", "...": "…" }
       ]
@@ -115,6 +135,9 @@ runs on** so the launcher can gate it against the installed/selected framework.
   is authoritative.
 - `sourceTag` — optional, **display-only** provenance. CI verifies the tag resolves to `sourceCommit`
   but never builds from a tag alone (tags are mutable; the pinned commit is not).
+- `dependencies` — optional array of **runtime dependencies** (runtime interop, helper libraries, assets,
+  tools) the plugin requires. Each dependency is downloaded, verified, and placed by the launcher
+  without interpreting it. See § 3.2 for the field table.
 
 **Plugin-level presentation fields (all optional)** — powering the launcher's plugin **detail page**
 (added 2026-07-25; older launchers ignore them, and the new launcher renders registries without
@@ -202,6 +225,47 @@ first, old versions never dropped — rollback), splits by channel (stable → `
 `plugins-testing.json`), and uploads each DLL under a version-specific key. `capPriorVersionsAt`
 retro-caps older published versions' `maxModSystemVersion` (when still null) at the named framework
 version. See `StellarResonancePlugins/CONTRIBUTING.md` for the contributor flow and lifecycle scripts.
+
+### 3.2 Plugin dependencies
+
+A plugin version may declare **runtime dependencies** — any file or archive the plugin requires the
+launcher to download, verify, and place alongside it (e.g. native interop libraries, helper tools,
+shared assets). The launcher is generic: it downloads, hashes, and installs each dependency without
+interpreting what it is.
+
+**Per-dependency fields (all required unless noted):**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | ✓ | unique dependency id within the plugin; URL-safe (no `/` or `..`) |
+| `name` | string | ✓ | display name |
+| `version` | string (semver) | ✓ | dependency version |
+| `url` | string (URL) | ✓ | version-specific download URL (http(s)) |
+| `sha256` | string (hex) | ✓ | **hex** sha256 hash; launcher verifies before install |
+| `size` | integer | ✓ | file size in bytes; launcher may skip re-download if present and hash matches |
+| `kind` | `"file"` \| `"zip"` | ✓ | how to interpret `files[]`: `"file"` = place single file, `"zip"` = extract entries |
+| `files` | array | ✓ | array of `{ from?, to }` objects (see below) |
+| `target` | string | ✓ | install target (e.g. `"game"`, `"prefix"`, `"bepinex"`); launcher uses this to resolve `to` paths |
+| `moddedOnly` | boolean | — | optional install: plugin uses it only in modded environments; launcher skips it on unmodded clients (default `false`) |
+| `optional` | boolean | — | optional install: plugin continues if this fails (default `false`) |
+| `requires` | string[] | — | array of other dependency ids in the same version that this depends on; launcher installs them first |
+| `license` | string | — | SPDX identifier or freeform text (default `""`) |
+| `licenseUrl` | string (URL) | — | license text or legal link (http(s)) |
+| `sourceUrl` | string (URL) | — | source repository or home page (http(s)) |
+| `notice` | string | — | copyright notice or attribution text |
+
+**File placement** (`files[]`):
+
+For `kind: "file"`:
+- `{ "to": "path/name.ext" }` — place the downloaded file at the target path
+- `from` is unused (must be `null` or omitted)
+
+For `kind: "zip"`:
+- `{ "from": "entry/in/archive", "to": "dest/in/target" }` — extract the archive entry to the target path
+- `{ "from": "prefix/", "to": "dest/" }` — extract all entries under `prefix/` (trailing `/`) to `dest/` 
+- `from: null` — extract the entire archive to the root of `target`
+
+Paths are **target-relative** (e.g. `"game"` → `<game_mini>/`, `"prefix"` → the game installation prefix).
 
 ### Compatibility rule
 

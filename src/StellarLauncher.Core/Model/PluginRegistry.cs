@@ -16,7 +16,8 @@ public sealed record PluginVersion(
     [property: JsonPropertyName("maxModSystemVersion")] string? MaxModSystemVersion,
     [property: JsonPropertyName("changelog")]           Changelog? Changelog,
     [property: JsonPropertyName("sourceRepository")]    string? SourceRepository = null,   // display-only provenance
-    [property: JsonPropertyName("sourceTag")]           string? SourceTag = null);
+    [property: JsonPropertyName("sourceTag")]           string? SourceTag = null,
+    [property: JsonPropertyName("dependencies")]        IReadOnlyList<PluginDependency>? Dependencies = null);
 
 // One media item on a plugin's detail page: a screenshot or a YouTube video.
 // "image" → Url is the picture itself; "youtube" → Url is a watch/short/embed link the
