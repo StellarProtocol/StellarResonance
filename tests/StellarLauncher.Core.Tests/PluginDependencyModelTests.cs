@@ -19,10 +19,24 @@ public sealed class PluginDependencyModelTests
     {
         var reg = JsonSerializer.Deserialize<PluginRegistry>(Json, PluginRegistry.JsonOptions)!;
         var d = Assert.Single(reg.Plugins[0].Versions[0].Dependencies!);
-        Assert.Equal(("fx", "6.8.0", "file", "game", 42L), (d.Id, d.Version, d.Kind, d.Target, d.Size));
-        Assert.True(d.ModdedOnly && d.Optional);
+        // Core identity fields
+        Assert.Equal("fx", d.Id);
+        Assert.Equal("FX", d.Name);
+        Assert.Equal("6.8.0", d.Version);
+        Assert.Equal("https://cdn/fx.dll", d.Url);
+        Assert.Equal("ab", d.Sha256);
+        Assert.Equal(42L, d.Size);
+        // Kind and placement
+        Assert.Equal("file", d.Kind);
+        Assert.Equal("game", d.Target);
         Assert.Equal("dxgi.dll", Assert.Single(d.Files).To);
-        Assert.Equal(("BSD-3-Clause", "n"), (d.License, d.Notice));
+        // Flags and optional fields
+        Assert.True(d.ModdedOnly && d.Optional);
+        Assert.Empty(d.Requires!);
+        Assert.Equal("BSD-3-Clause", d.License);
+        Assert.Equal("https://l", d.LicenseUrl);
+        Assert.Equal("https://s", d.SourceUrl);
+        Assert.Equal("n", d.Notice);
     }
 
     [Fact]

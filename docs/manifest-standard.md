@@ -240,15 +240,15 @@ interpreting what it is.
 | `id` | string | ✓ | unique dependency id within the plugin; URL-safe (no `/` or `..`) |
 | `name` | string | ✓ | display name |
 | `version` | string (semver) | ✓ | dependency version |
-| `url` | string (URL) | ✓ | version-specific download URL (http(s)) |
-| `sha256` | string (hex) | ✓ | **hex** sha256 hash; launcher verifies before install |
-| `size` | integer | ✓ | file size in bytes; launcher may skip re-download if present and hash matches |
+| `url` | string (URL) | ✓ | version-specific download URL; **https only** |
+| `sha256` | string (hex) | ✓ | **hex** sha256 hash; bytes verified against this before extraction or placement |
+| `size` | integer | ✓ | file size in bytes |
 | `kind` | `"file"` \| `"zip"` | ✓ | how to interpret `files[]`: `"file"` = place single file, `"zip"` = extract entries |
 | `files` | array | ✓ | array of `{ from?, to }` objects (see below) |
-| `target` | string | ✓ | install target (e.g. `"game"`, `"prefix"`, `"bepinex"`); launcher uses this to resolve `to` paths |
-| `moddedOnly` | boolean | — | optional install: plugin uses it only in modded environments; launcher skips it on unmodded clients (default `false`) |
+| `target` | `"plugin"` \| `"game"` | ✓ | install target: `"plugin"` → `game_mini/stellar/deps/<pluginId>/<to>`; `"game"` → `game_mini/<to>` |
+| `moddedOnly` | boolean | — | optional install (valid only with `target: "game"`): launcher skips on unmodded clients (default `false`) |
 | `optional` | boolean | — | optional install: plugin continues if this fails (default `false`) |
-| `requires` | string[] | — | array of other dependency ids in the same version that this depends on; launcher installs them first |
+| `requires` | string[] | — | array of other dependency ids in the same `dependencies[]` that appear **earlier**; launcher installs them first |
 | `license` | string | — | SPDX identifier or freeform text (default `""`) |
 | `licenseUrl` | string (URL) | — | license text or legal link (http(s)) |
 | `sourceUrl` | string (URL) | — | source repository or home page (http(s)) |
@@ -265,7 +265,12 @@ For `kind: "zip"`:
 - `{ "from": "prefix/", "to": "dest/" }` — extract all entries under `prefix/` (trailing `/`) to `dest/` 
 - `from: null` — extract the entire archive to the root of `target`
 
-Paths are **target-relative** (e.g. `"game"` → `<game_mini>/`, `"prefix"` → the game installation prefix).
+**Path rules** for `to`:
+- Relative; uses `/` separators; contains no `..` and is not rooted (no leading `/`)
+- A `game` target must not place files under `BepInEx/`, `stellar/plugins`, or `stellar/deps` (case-insensitive scan paths)
+- An existing file that no plugin's ledger entry owns is never overwritten; shown as "Blocked"
+- A dependency whose ledger entry has the same version and whose files still match their sha256 hashes is not downloaded again
+- Ledger lives at `game_mini/stellar/deps/<pluginId>.json`; parked (uninstalled) copies at `game_mini/stellar/deps-parked/<pluginId>/<to>`
 
 ### Compatibility rule
 
