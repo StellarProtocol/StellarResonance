@@ -50,7 +50,7 @@ public sealed class DependencyServiceConcurrencyTests
         var bytes = new[] { b };
         _web[$"https://cdn/{id}"] = bytes;
         return new PluginDependency(id, id, "1.0", $"https://cdn/{id}", Convert.ToHexString(SHA256.HashData(bytes)), 1, "file",
-            new[] { new PluginDependencyFile(null, $"{id}.dll") }, "plugin");
+            new[] { new PluginDependencyFile(null, $"{id}.dll") }, "plugin", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
     }
 
     private static readonly ISet<string> None = new HashSet<string>();

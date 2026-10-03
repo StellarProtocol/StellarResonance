@@ -76,7 +76,7 @@ public sealed partial class DependencyServiceTests
         _fs.AddFile("/game_mini/fx.dll", new MockFileData(new byte[] { 9 }));
         _fs.AddFile("/game_mini/shaders/a.fx", new MockFileData(new byte[] { 9 }));
         PluginDependency Zip(params PluginDependencyFile[] files) =>
-            new("z", "z", "1.0", "https://cdn/z", new string('a', 64), 10, "zip", files, "game");
+            new("z", "z", "1.0", "https://cdn/z", new string('a', 64), 10, "zip", files, "game", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
         var exact = Assert.Single(Make().Status(G, "p", new[] { Zip(new PluginDependencyFile("bin/fx.dll", "fx.dll")) }, None));
         var dir = Assert.Single(Make().Status(G, "p", new[] { Zip(new PluginDependencyFile("shaders/", "shaders/")) }, None));

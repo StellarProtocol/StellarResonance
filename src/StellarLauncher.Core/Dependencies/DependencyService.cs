@@ -25,6 +25,13 @@ public sealed partial class DependencyService : IDependencyService
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _gates =
         new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
+    /// <summary>Final review I4: a download that delivers no bytes for this long is abandoned ("download timed
+    /// out") — a stalled server must never hold a launch forever.</summary>
+    public TimeSpan DownloadInactivityTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>Final review I4: no single download may take longer than this, however steadily it trickles.</summary>
+    public TimeSpan DownloadOverallTimeout { get; init; } = TimeSpan.FromMinutes(10);
+
     public DependencyService(IFileSystem fs, HttpClient http)
     {
         _fs = fs;
@@ -63,6 +70,11 @@ public sealed partial class DependencyService : IDependencyService
         {
             ct.ThrowIfCancellationRequested();
             DependencyStatus status;
+            if (DependencyDeclaration.Problem(d) is { } problem)   // I5/M-a/M-b: never downloaded, nothing touched
+            {
+                results[Key(d)] = new DependencyStatus(d.Id, DependencyState.Failed, problem);
+                continue;
+            }
             var gate = GateStatus(d, skippedIds, results);
             if (gate is not null)
             {
@@ -96,10 +108,13 @@ public sealed partial class DependencyService : IDependencyService
                     status = AnnotateIfCorrupt(gameMini, pluginId, new DependencyStatus(d.Id, DependencyState.Failed, ex.Message));
                 }
             }
-            results[d.Id] = status;
+            results[Key(d)] = status;
         }
-        return deps.Select(d => results[d.Id]).ToList();
+        return deps.Select(d => results[Key(d)]).ToList();
     }
+
+    /// <summary>A dependency's results key — "" for a declaration with no id at all (reported Failed).</summary>
+    private static string Key(PluginDependency d) => d.Id ?? "";
 
     /// <summary>Final review I3: a dependency this plugin no longer declares (dropped or renamed by an update —
     /// or every one of them, when the new version declares none) is removed exactly like an unticked one:
@@ -133,6 +148,11 @@ public sealed partial class DependencyService : IDependencyService
         var results = new Dictionary<string, DependencyStatus>();
         foreach (var d in deps)
         {
+            if (DependencyDeclaration.Problem(d) is { } problem)
+            {
+                results[Key(d)] = new DependencyStatus(d.Id, DependencyState.Failed, problem);
+                continue;
+            }
             var gate = GateStatus(d, skippedIds, results);
             if (gate is not null) { results[d.Id] = gate; continue; }
             var entry = ledger.Entries.FirstOrDefault(e => e.DependencyId == d.Id);
@@ -142,7 +162,7 @@ public sealed partial class DependencyService : IDependencyService
                 ? new DependencyStatus(d.Id, DependencyState.Installed, null)
                 : StatusBlocked(gameMini, pluginId, d) ?? new DependencyStatus(d.Id, DependencyState.NotInstalled, null);
         }
-        return deps.Select(d => results[d.Id]).ToList();
+        return deps.Select(d => results[Key(d)]).ToList();
     }
 
     public Task RemoveAsync(string gameMini, string pluginId, string dependencyId, CancellationToken ct = default) =>

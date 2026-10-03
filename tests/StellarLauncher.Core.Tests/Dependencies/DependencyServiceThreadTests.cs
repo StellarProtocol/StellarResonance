@@ -92,7 +92,7 @@ public sealed class DependencyServiceThreadTests
         var mock = new MockFileSystem(); mock.AddDirectory(G);
         var bytes = new byte[] { 1, 2, 3 };
         var dep = new PluginDependency("fx", "fx", "1.0", "https://cdn/fx", Convert.ToHexString(SHA256.HashData(bytes)), 3, "file",
-            new[] { new PluginDependencyFile(null, "fx.dll") }, "game", ModdedOnly: true);
+            new[] { new PluginDependencyFile(null, "fx.dll") }, "game", ModdedOnly: true, License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
         var http = new HttpClient(new Web(bytes));
         await new DependencyService(mock, http).EnsureAsync(G, "p", new[] { dep }, new HashSet<string>(), default); // installed
         var fs = new RecordingFs(mock);

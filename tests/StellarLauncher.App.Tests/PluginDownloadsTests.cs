@@ -73,7 +73,7 @@ public class PluginDownloadsTests
     private static PluginEntry EntryWithDependency(bool optional = false)
     {
         var dep = new PluginDependency("dep1", "Dep One", "1.0", "https://cdn/dep1", new string('a', 64), 1, "file",
-            new[] { new PluginDependencyFile(null, "dep1.dll") }, "game", Optional: optional);
+            new[] { new PluginDependencyFile(null, "dep1.dll") }, "game", Optional: optional, License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
         var sha = Convert.ToHexString(SHA256.HashData(DllBytes)).ToLowerInvariant();
         var version = new PluginVersion("1.0.0", null, "P1.dll", "https://cdn/p1.dll", sha, "0.1.0", null, null, Dependencies: new[] { dep });
         return new PluginEntry("p1", "Plugin One", "d", null, new[] { version });
@@ -151,7 +151,7 @@ public class PluginDownloadsTests
         var deps = new PluginInstallDeps(new Installer(fs), new PluginInstaller(fs), http, real);
 
         var dep = new PluginDependency("dep1", "Dep One", "1.0", "https://cdn/dep1", depSha, depBytes.Length, "file",
-            new[] { new PluginDependencyFile(null, "dep1.dll") }, "game", Optional: true);
+            new[] { new PluginDependencyFile(null, "dep1.dll") }, "game", Optional: true, License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
         var sha = Convert.ToHexString(SHA256.HashData(DllBytes)).ToLowerInvariant();
         var version = new PluginVersion("1.0.0", null, "P1.dll", "https://cdn/p1.dll", sha, "0.1.0", null, null, Dependencies: new[] { dep });
         var entry = new PluginEntry("p1", "Plugin One", "d", null, new[] { version });

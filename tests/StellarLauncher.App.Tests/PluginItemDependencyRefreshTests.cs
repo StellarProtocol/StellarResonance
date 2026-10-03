@@ -28,7 +28,7 @@ public class PluginItemDependencyRefreshTests
     private static PluginItemViewModel Item(IPluginActions actions)
     {
         var dep = new PluginDependency("fx", "Fx", "1.0", "https://cdn/fx", new string('a', 64), 1, "file",
-            new[] { new PluginDependencyFile(null, "fx.dll") }, "game");
+            new[] { new PluginDependencyFile(null, "fx.dll") }, "game", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
         var entry = new PluginEntry("p", "P", "d", null, new[]
         {
             new PluginVersion("1.0.0", null, "P.dll", "https://cdn/p.dll", "sha", "0.1.0", null, null, Dependencies: new[] { dep }),

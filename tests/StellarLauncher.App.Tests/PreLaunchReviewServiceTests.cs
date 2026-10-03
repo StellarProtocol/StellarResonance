@@ -65,7 +65,7 @@ public class PreLaunchReviewServiceTests
     private static PluginEntry OnePluginWithDependency()
     {
         var dependency = new PluginDependency("dep1", "Dep One", "1.0", "https://cdn/dep1", new string('a', 64), 1, "file",
-            new[] { new PluginDependencyFile(null, "dep1.dll") }, "game");
+            new[] { new PluginDependencyFile(null, "dep1.dll") }, "game", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
         var version = new PluginVersion("1.0.0", null, "P1.dll", "https://cdn/p1.dll", "sha", "0.1.0", null, null,
             Dependencies: new[] { dependency });
         return new PluginEntry("p1", "Plugin One", "d", null, new[] { version });

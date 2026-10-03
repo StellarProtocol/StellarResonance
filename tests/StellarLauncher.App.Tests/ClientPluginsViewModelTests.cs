@@ -201,7 +201,7 @@ public class ClientPluginsViewModelTests
     private static StellarLauncher.Core.Model.PluginDependency DepCase(string id, bool optional, params string[] requires) =>
         new(id, $"{id} name", "1.0", $"https://cdn/deps/{id}", WorkspaceFixture.DllSha,
             WorkspaceFixture.DllBytes.Length, "file", new[] { new StellarLauncher.Core.Model.PluginDependencyFile(null, $"{id}.bin") },
-            "plugin", Optional: optional, Requires: requires.Length == 0 ? null : requires);
+            "plugin", Optional: optional, Requires: requires.Length == 0 ? null : requires, License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
     /// <summary>One installed plugin ("photo", v1.0.0) on client c2 declaring opt (optional), withopt
     /// (required, requires opt) and req (required).</summary>
@@ -342,7 +342,7 @@ public class ClientPluginsViewModelTests
 
     private static StellarLauncher.Core.Model.PluginDependency GameDep(string id, string to, string? sha = null) =>
         new(id, $"{id} name", "1.0", $"https://cdn/deps/{id}", sha ?? WorkspaceFixture.DllSha, WorkspaceFixture.DllBytes.Length, "file",
-            new[] { new StellarLauncher.Core.Model.PluginDependencyFile(null, to) }, "game", ModdedOnly: true, Optional: true);
+            new[] { new StellarLauncher.Core.Model.PluginDependencyFile(null, to) }, "game", ModdedOnly: true, Optional: true, License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
     // The main case: the player's own dxgi.dll sits where the dependency goes — the row says so before any launch.
     [Fact]
@@ -408,7 +408,7 @@ public class ClientPluginsViewModelTests
         var bytes = ms.ToArray();
         var dep = new StellarLauncher.Core.Model.PluginDependency("pack", "Shader pack", "1.0", "https://cdn/deps/pack",
             Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
-            new[] { new StellarLauncher.Core.Model.PluginDependencyFile("shaders/", "shaders/") }, "game", Optional: true);
+            new[] { new StellarLauncher.Core.Model.PluginDependencyFile("shaders/", "shaders/") }, "game", Optional: true, License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
         var (f, vm, item) = await OpenWithGameDeps(dep);
         f.Downloads["https://cdn/deps/pack"] = bytes;
         f.Fs.AddFile($"{Test}/shaders/a.fx", new MockFileData("player's own shader"));

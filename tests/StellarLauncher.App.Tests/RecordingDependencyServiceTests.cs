@@ -20,7 +20,7 @@ public class RecordingDependencyServiceTests
     }
 
     private static readonly PluginDependency Fx = new("fx", "Fx", "1.0", "https://cdn/fx", new string('a', 64), 1, "file",
-        new[] { new PluginDependencyFile(null, "fx.dll") }, "game");
+        new[] { new PluginDependencyFile(null, "fx.dll") }, "game", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
     [Fact]
     public async Task Remembers_a_failure_until_a_later_outcome_or_a_changed_declaration()

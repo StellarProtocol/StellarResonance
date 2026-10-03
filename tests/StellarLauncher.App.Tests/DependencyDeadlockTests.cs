@@ -46,7 +46,7 @@ public class DependencyDeadlockTests
 
     private static PluginDependency Dep(string id) =>
         new(id, id, "1.0", $"https://cdn/deps/{id}", DllSha, DllBytes.Length, "file",
-            new[] { new PluginDependencyFile(null, $"{id}.bin") }, "game", ModdedOnly: true);
+            new[] { new PluginDependencyFile(null, $"{id}.bin") }, "game", ModdedOnly: true, License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
     [Fact]
     public async Task Launch_review_and_install_on_the_UI_context_never_deadlock_behind_a_UI_started_ensure()

@@ -125,7 +125,7 @@ public sealed partial class DependencyServiceTests
         var bytes = ms.ToArray();
         _web["https://cdn/nomatch"] = bytes;
         var d = new PluginDependency("nomatch", "nomatch", "1", "https://cdn/nomatch", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
-            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin");
+            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
         var st = Assert.Single(await Make().EnsureAsync(G, "p", new[] { d }, None, default));
 

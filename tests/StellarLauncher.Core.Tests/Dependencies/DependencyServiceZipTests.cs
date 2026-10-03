@@ -22,7 +22,7 @@ public sealed partial class DependencyServiceTests
         var bytes = ms.ToArray();
         _web["https://cdn/evil"] = bytes;
         var d = new PluginDependency("evil", "evil", "1", "https://cdn/evil", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
-            new[] { new PluginDependencyFile("pack/", "out/") }, "game");
+            new[] { new PluginDependencyFile("pack/", "out/") }, "game", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
         var st = Assert.Single(await Make().EnsureAsync(G, "p", new[] { d }, None, default));
 
@@ -41,7 +41,7 @@ public sealed partial class DependencyServiceTests
         var bytes = ms.ToArray();
         _web["https://cdn/nomatch"] = bytes;
         var d = new PluginDependency("nomatch", "nomatch", "1", "https://cdn/nomatch", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
-            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin");
+            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
         var st = Assert.Single(await Make().EnsureAsync(G, "p", new[] { d }, None, default));
 
@@ -62,7 +62,7 @@ public sealed partial class DependencyServiceTests
         var bytes = ms.ToArray();
         _web["https://cdn/dup"] = bytes;
         var d = new PluginDependency("dup", "dup", "1", "https://cdn/dup", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
-            new[] { new PluginDependencyFile("a/", "out/"), new PluginDependencyFile("b/", "out/") }, "plugin");
+            new[] { new PluginDependencyFile("a/", "out/"), new PluginDependencyFile("b/", "out/") }, "plugin", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
         var st = Assert.Single(await Make().EnsureAsync(G, "p", new[] { d }, None, default));
 
@@ -87,7 +87,7 @@ public sealed partial class DependencyServiceTests
         var bytes = ms.ToArray();
         _web["https://cdn/bomb"] = bytes;
         var d = new PluginDependency("bomb", "bomb", "1", "https://cdn/bomb", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
-            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin");
+            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
         var st = Assert.Single(await Make().EnsureAsync(G, "p", new[] { d }, None, default));
 

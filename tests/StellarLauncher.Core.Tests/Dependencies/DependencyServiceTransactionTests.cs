@@ -29,7 +29,7 @@ public sealed partial class DependencyServiceTests
         var bytes = ms.ToArray();
         _web["https://cdn/z3"] = bytes;
         var d = new PluginDependency("z3", "z3", "1", "https://cdn/z3", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
-            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin");
+            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
         const string bPath = "/game_mini/stellar/deps/p/out/b.fx";
         var faulty = new FaultInjectingFileSystem(_fs, bPath, "Move"); // fails the 2nd of 3 writes, once

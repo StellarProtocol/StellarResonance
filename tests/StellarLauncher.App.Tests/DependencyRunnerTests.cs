@@ -31,7 +31,7 @@ public class DependencyRunnerTests
 
     private static PluginDependency Dep(string id, bool optional = false) =>
         new(id, $"{id}-name", "1.0", $"https://cdn/{id}", new string('a', 64), 1, "file",
-            new[] { new PluginDependencyFile(null, $"{id}.dll") }, "game", Optional: optional);
+            new[] { new PluginDependencyFile(null, $"{id}.dll") }, "game", Optional: optional, License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
     private static PluginEntry EntryWithVersion(string id, string version, IReadOnlyList<PluginDependency>? deps = null, string? name = null) =>
         new(id, name ?? id, "d", null, new[] { new PluginVersion(version, null, $"{id}.dll", $"https://cdn/{id}.dll", "sha", "0.1.0", null, null, Dependencies: deps) });

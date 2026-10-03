@@ -22,9 +22,9 @@ public sealed partial class DependencyServiceTests
         var v1Bytes = ZipOf(("pack/a.fx", "A1"), ("pack/b.fx", "B1"), ("pack/c.fx", "C1"));
         var v2Bytes = ZipOf(("pack/a.fx", "A2"), ("pack/b.fx", "B2"), ("pack/c.fx", "C2"));
         var v1 = new PluginDependency("upd", "upd", "1", "https://cdn/upd", Convert.ToHexString(SHA256.HashData(v1Bytes)), v1Bytes.Length, "zip",
-            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin");
+            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
         var v2 = new PluginDependency("upd", "upd", "2", "https://cdn/upd", Convert.ToHexString(SHA256.HashData(v2Bytes)), v2Bytes.Length, "zip",
-            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin");
+            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
         return (v1, v2, v1Bytes, v2Bytes);
     }
 
@@ -98,7 +98,7 @@ public sealed partial class DependencyServiceTests
         var bytes = ZipOf(("pack/a.fx", "A"), ("pack/b.fx", "B"), ("pack/c.fx", "C"));
         _web["https://cdn/fresh"] = bytes;
         var d = new PluginDependency("fresh", "fresh", "1", "https://cdn/fresh", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
-            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin");
+            new[] { new PluginDependencyFile("pack/", "out/") }, "plugin", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
         var aPath = UpdPath + "a.fx";
         var bPath = UpdPath + "b.fx";

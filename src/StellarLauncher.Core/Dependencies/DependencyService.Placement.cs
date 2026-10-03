@@ -29,7 +29,8 @@ public sealed partial class DependencyService
         List<(string Abs, byte[] Bytes)> files;
         try
         {
-            bytes = await DownloadCappedAsync(dep.Url, dep.Size, ct).ConfigureAwait(false);
+            // M-a: the registry's hard ceiling caps the download whatever the manifest's size says.
+            bytes = await DownloadCappedAsync(dep.Url, Math.Min(dep.Size, DependencyDeclaration.MaxBytes), ct).ConfigureAwait(false);
             if (!string.Equals(DependencyFileHash.Of(bytes), dep.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("checksum mismatch");
             // Controller round: BuildFiles runs INSIDE this try now — an archive-shape error (archive too
@@ -210,19 +211,31 @@ public sealed partial class DependencyService
         return true;
     }
 
+    /// <summary>Final review I4: bounded twice — <see cref="DownloadInactivityTimeout"/> without a single byte
+    /// (the timer restarts on every read that delivers some) and <see cref="DownloadOverallTimeout"/> in total.
+    /// Either fires as an OperationCanceledException with the caller's <paramref name="ct"/> uncancelled, which
+    /// <see cref="EnsureOneAsync"/> reports as "download timed out". Each read is also awaited through
+    /// <c>WaitAsync</c>, so a stream that ignores its token can't outlive the timers either.</summary>
     private async Task<byte[]> DownloadCappedAsync(string url, long cap, CancellationToken ct)
     {
-        using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        using var overall = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        overall.CancelAfter(DownloadOverallTimeout);
+        using var idle = CancellationTokenSource.CreateLinkedTokenSource(overall.Token);
+        idle.CancelAfter(DownloadInactivityTimeout);
+        var token = idle.Token;
+
+        using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
-        var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        var src = await resp.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
         await using var _ = src.ConfigureAwait(false);
         using var buffer = new MemoryStream();
         var chunk = new byte[81920];
         int n;
-        while ((n = await src.ReadAsync(chunk, ct).ConfigureAwait(false)) > 0)
+        while ((n = await src.ReadAsync(chunk, token).AsTask().WaitAsync(token).ConfigureAwait(false)) > 0)
         {
+            idle.CancelAfter(DownloadInactivityTimeout);   // bytes arrived: the inactivity clock restarts
             if (buffer.Length + n > cap) throw new InvalidDataException("larger than declared");
-            await buffer.WriteAsync(chunk.AsMemory(0, n), ct).ConfigureAwait(false);
+            await buffer.WriteAsync(chunk.AsMemory(0, n), token).ConfigureAwait(false);
         }
         return buffer.ToArray();
     }

@@ -44,7 +44,7 @@ public sealed partial class DependencyServiceTests
         var url = $"https://cdn/{id}";
         _web[url] = bytes;
         return new PluginDependency(id, id, "1.0", url, Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "file",
-            new[] { new PluginDependencyFile(null, to) }, "game", modded, optional, requires, "MIT");
+            new[] { new PluginDependencyFile(null, to) }, "game", modded, optional, requires, "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
     }
 
     private static readonly ISet<string> None = new HashSet<string>();
@@ -111,7 +111,7 @@ public sealed partial class DependencyServiceTests
         var bytes = ms.ToArray();
         _web["https://cdn/z"] = bytes;
         var d = new PluginDependency("z", "z", "1", "https://cdn/z", Convert.ToHexString(SHA256.HashData(bytes)), bytes.Length, "zip",
-            new[] { new PluginDependencyFile("pack/Shaders/", "fx/Shaders/") }, "plugin");
+            new[] { new PluginDependencyFile("pack/Shaders/", "fx/Shaders/") }, "plugin", License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
         Assert.Equal(DependencyState.Installed, Assert.Single(await Make().EnsureAsync(G, "p", new[] { d }, None, default)).State);
         Assert.Equal("A", _fs.File.ReadAllText("/game_mini/stellar/deps/p/fx/Shaders/a.fx"));
         Assert.False(_fs.File.Exists("/game_mini/stellar/deps/p/fx/README"));
