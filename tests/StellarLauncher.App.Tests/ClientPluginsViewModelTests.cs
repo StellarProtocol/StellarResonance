@@ -120,6 +120,68 @@ public class ClientPluginsViewModelTests
         Assert.Equal(new[] { "playerhud/x" }, updated.SkippedDependencies);
     }
 
+    // Fix round 1, Minor 2: records whether the plugin's own DLL still existed on disk at the moment
+    // RemoveAll ran, proving the call ORDER (dependency cleanup before plugin removal) without needing to
+    // fake IPluginInstaller too.
+    private sealed class OrderTrackingDependencyService : IDependencyService
+    {
+        private readonly System.IO.Abstractions.IFileSystem _fs;
+        private readonly string _dllPath;
+        public bool ThrowOnRemoveAll;
+        public int RemoveAllCalls;
+        public bool DllStillPresentWhenRemoveAllRan;
+
+        public OrderTrackingDependencyService(System.IO.Abstractions.IFileSystem fs, string dllPath) { _fs = fs; _dllPath = dllPath; }
+
+        public Task<IReadOnlyList<DependencyStatus>> EnsureAsync(string gameMini, string pluginId,
+            IReadOnlyList<StellarLauncher.Core.Model.PluginDependency> deps, ISet<string> skippedIds, CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<DependencyStatus>>(Array.Empty<DependencyStatus>());
+        public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,
+            IReadOnlyList<StellarLauncher.Core.Model.PluginDependency> deps, ISet<string> skippedIds) => Array.Empty<DependencyStatus>();
+        public void Remove(string gameMini, string pluginId, string dependencyId) { }
+        public void RemoveAll(string gameMini, string pluginId)
+        {
+            RemoveAllCalls++;
+            DllStillPresentWhenRemoveAllRan = _fs.File.Exists(_dllPath);
+            if (ThrowOnRemoveAll) throw new InvalidOperationException("ledger busy");
+        }
+        public void ParkModdedOnly(string gameMini) { }
+        public void UnparkModdedOnly(string gameMini) { }
+    }
+
+    [Fact]
+    public async Task Remove_runs_dependency_cleanup_before_plugin_removal_and_keeps_skip_entries_if_cleanup_fails()
+    {
+        var f = new WorkspaceFixture();
+        f.Registry.Add(WorkspaceFixture.Entry("combatmeter", "CombatMeter", "2.0.0", "2.10.0"));
+        f.AddClient("c2", "Test", Test, channel: "testing", framework: "2.7.4", accent: "#ffb347");
+        f.InstallPlugin(Test, "combatmeter", "Stellar.CombatMeter.dll", "2.10.0");
+
+        var seeded = f.Store.Load();
+        seeded.Clients.Single(c => c.Id == "c2").SkippedDependencies.Add("combatmeter/shaderpack");
+        f.Store.Save(seeded);
+
+        var dllPath = $"{Test}/stellar/plugins/combatmeter/Stellar.CombatMeter.dll";
+        var fake = new OrderTrackingDependencyService(f.Fs, dllPath) { ThrowOnRemoveAll = true };
+        f.Dependencies = fake;
+        f.Tabs = f.Tabs with { Plugins = w => new ClientPluginsViewModel(w) };
+        f.Start();
+        var ws = await f.OpenAsync("c2");
+        ws.ShowPluginsCommand.Execute(null);
+        var vm = (ClientPluginsViewModel)ws.TabContent!;
+        await vm.ReloadAsync();
+
+        var cm = vm.Rows.Single(r => r.Item.Entry.Id == "combatmeter");
+        await cm.Item.RemoveCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, fake.RemoveAllCalls);
+        Assert.True(fake.DllStillPresentWhenRemoveAllRan); // RemoveAll ran BEFORE Plugins.Remove deleted the dll
+        Assert.False(f.Fs.File.Exists(dllPath));           // the plugin was still removed despite the cleanup failure
+        var updated = f.Store.Load().Clients.Single(c => c.Id == "c2");
+        Assert.Equal(new[] { "combatmeter/shaderpack" }, updated.SkippedDependencies); // kept — cleanup never confirmed done
+        Assert.Contains("removed", vm.Status, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task Copy_set_from_Main_installs_what_Test_lacks_after_confirm()
     {

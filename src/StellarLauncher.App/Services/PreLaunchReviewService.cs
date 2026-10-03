@@ -34,7 +34,9 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
         {
             // Dependencies must be back in place before anything below reads or installs plugins — no
             // EnsureAsync may ever run while a modded-only file is still parked for a vanilla launch.
-            _deps.Dependencies.UnparkModdedOnly(client.GameMiniDir);
+            // Fix round 1, Minor 1: its own try/catch (like TryPark) — an unpark failure must not skip
+            // the rest of the review (registry check, dialog, ensure).
+            TryUnpark(client);
 
             var registry = await _registry.ForChannelAsync(client.Channel, ct);
             var manifest = await _versions.FetchAsync(ChannelManifests.FrameworkVersion(client.Channel), ct);
@@ -55,17 +57,23 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
             await EnsureDependenciesAsync(client, registry, ct);
             return true;
         }
-        catch (OperationCanceledException) { throw; }   // a cancelled review never answers "proceed"
+        // Fix round 1, Important 1: HttpClient's own request timeout throws OperationCanceledException
+        // (as TaskCanceledException) too, independent of OUR ct — a cancelled review never answers
+        // "proceed", but only when the CALLER actually asked to cancel; an unrelated OCE (a timeout
+        // somewhere in registry/manifest fetch) must fail open just like any other exception, never
+        // unwind as a silent "don't launch" (ClientSessions reads an escaping OCE as a user cancel).
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         // Fail-open over the WHOLE review path (unpark, registry/manifest offline, inventory read,
-        // planner, dialog): the pre-launch review is advisory and must never trap the player out of
-        // their game.
+        // planner, dialog, an uncancelled OCE): the pre-launch review is advisory and must never trap
+        // the player out of their game.
         catch (Exception) { return true; }
     }
 
     /// <summary>The dialog may have installed/updated/disabled plugins, so this re-reads the inventory
     /// rather than reusing the plan's — then brings every installed plugin's dependencies up to date.
-    /// Swallows any non-cancel failure: a dependency problem is surfaced on its own plugin page, never
-    /// here, and must never be the reason a launch doesn't proceed.</summary>
+    /// Swallows any non-cancel failure (including an HttpClient timeout surfacing as an uncancelled
+    /// OperationCanceledException — fix round 1, Important 1): a dependency problem is surfaced on its
+    /// own plugin page, never here, and must never be the reason a launch doesn't proceed.</summary>
     private async Task EnsureDependenciesAsync(ClientProfile client, IReadOnlyList<PluginEntry> registry, CancellationToken ct)
     {
         try
@@ -75,7 +83,7 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
                 .Select(p => (p.Entry, p.Version!)).ToList();
             await DependencyRunner.EnsureForClientAsync(_deps.Dependencies, client, installed, ct);
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception) { /* fail-open — launch is never blocked by a dependency problem */ }
     }
 
@@ -85,5 +93,14 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
     {
         try { _deps.Dependencies.ParkModdedOnly(client.GameMiniDir); }
         catch { /* fail-open */ }
+    }
+
+    /// <summary>Fix round 1, Minor 1: its own try/catch, like <see cref="TryPark"/> — an unpark failure
+    /// must not skip the rest of the review (registry check, dialog, ensure); it only means a still-parked
+    /// file stays parked for one more launch attempt.</summary>
+    private void TryUnpark(ClientProfile client)
+    {
+        try { _deps.Dependencies.UnparkModdedOnly(client.GameMiniDir); }
+        catch { /* fail-open — never skip the rest of the review */ }
     }
 }

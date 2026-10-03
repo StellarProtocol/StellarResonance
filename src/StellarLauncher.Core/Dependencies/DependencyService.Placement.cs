@@ -38,7 +38,15 @@ public sealed partial class DependencyService
             // to escape as an exception that EnsureAsync's catch-all would route through AnnotateIfCorrupt.
             files = BuildFiles(gameMini, pluginId, dep, bytes);
         }
-        catch (OperationCanceledException) { throw; }
+        // Fix round 1, Important 1: HttpClient's own request timeout throws OperationCanceledException
+        // (as TaskCanceledException) too, independent of OUR ct — only rethrow when the CALLER actually
+        // asked to cancel; otherwise it is exactly as unrelated to the ledger as any other download
+        // failure, and must become a Failed status rather than silently unwind the whole launch.
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException)
+        {
+            return new DependencyStatus(dep.Id, DependencyState.Failed, "download timed out");
+        }
         catch (Exception ex)
         {
             // Minor 1 (round 6, narrowing round 5): a download/verify failure (HTTP error, checksum

@@ -29,6 +29,9 @@ public sealed class WorkspaceFixture
     public WorkspaceTabFactories Tabs { get; set; }
     /// <summary>Framework manifest source; swap for <c>new ManifestVersions("99.0.0")</c> to simulate a too-old launcher.</summary>
     public IVersionService Manifests { get; set; } = new ManifestVersions();
+    /// <summary>Override the dependency service built in <see cref="Start"/> (e.g. to record/fault-inject
+    /// calls); null (default) uses a real <see cref="DependencyService"/> over <see cref="Fs"/>.</summary>
+    public IDependencyService? Dependencies { get; set; }
 
     private sealed class Platform : IPlatformInfo { public bool IsWindows => false; public string AppDataDir => "/cfg"; }
     private sealed class Reg(List<PluginEntry> entries) : IPluginRegistryService
@@ -92,7 +95,7 @@ public sealed class WorkspaceFixture
     {
         var sessions = new ClientSessions(Store, new Orch(), new NoScan(), new NoProc(), () => DateTimeOffset.UnixEpoch, a => a());
         var http = new HttpClient(new DllHandler());
-        var deps = new PluginInstallDeps(new Installer(Fs), new PluginInstaller(Fs), http, new DependencyService(Fs, http));
+        var deps = new PluginInstallDeps(new Installer(Fs), new PluginInstaller(Fs), http, Dependencies ?? new DependencyService(Fs, http));
         var core = new DashboardServices(new ClientInventory(Fs, deps.Installer, deps.Plugins, new DoorstopToggle(Fs)),
             new RegistryCache(new Reg(Registry), () => Store.Load()), new FrameworkManifests(Manifests), new Review(), deps,
             new ClientCandidates(GameDetector, new Platform()));

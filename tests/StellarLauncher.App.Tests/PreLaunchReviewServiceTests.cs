@@ -26,11 +26,15 @@ public class PreLaunchReviewServiceTests
     {
         public readonly List<string> Calls = new();
         public bool ThrowOnUnpark;
+        public bool ThrowOnEnsure;
 
         public Task<IReadOnlyList<DependencyStatus>> EnsureAsync(string gameMini, string pluginId,
             IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds, CancellationToken ct)
         {
             Calls.Add($"Ensure:{pluginId}");
+            // Fix round 1: simulates an HttpClient request timeout — TaskCanceledException with no
+            // relation to the caller's OWN ct (never cancelled here).
+            if (ThrowOnEnsure) throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout of 100 seconds elapsing.");
             return Task.FromResult<IReadOnlyList<DependencyStatus>>(
                 deps.Select(d => new DependencyStatus(d.Id, DependencyState.Installed, null)).ToList());
         }
@@ -44,6 +48,25 @@ public class PreLaunchReviewServiceTests
             Calls.Add("Unpark");
             if (ThrowOnUnpark) throw new IOException("boom");
         }
+    }
+
+    // Shared by any test that needs one installed plugin whose installed version declares a dependency.
+    private static PluginEntry OnePluginWithDependency()
+    {
+        var dependency = new PluginDependency("dep1", "Dep One", "1.0", "https://cdn/dep1", new string('a', 64), 1, "file",
+            new[] { new PluginDependencyFile(null, "dep1.dll") }, "game");
+        var version = new PluginVersion("1.0.0", null, "P1.dll", "https://cdn/p1.dll", "sha", "0.1.0", null, null,
+            Dependencies: new[] { dependency });
+        return new PluginEntry("p1", "Plugin One", "d", null, new[] { version });
+    }
+
+    private static (PluginInstallDeps Deps, ClientInventory Inventory) BuildInstalledP1(MockFileSystem fs, IDependencyService dependencies)
+    {
+        fs.AddFile("/g/stellar/plugins/p1/P1.dll", new MockFileData("x"));
+        fs.AddFile("/g/stellar/plugins/p1/.plugin-version", new MockFileData("1.0.0"));
+        var deps = new PluginInstallDeps(new Installer(fs), new PluginInstaller(fs), new HttpClient(), dependencies);
+        var inventory = new ClientInventory(fs, deps.Installer, deps.Plugins, new DoorstopToggle(fs));
+        return (deps, inventory);
     }
 
     private static PreLaunchReviewService Sut(IVersionService versions, Func<PreLaunchReviewViewModel, Task<PreLaunchResult>> prompt,
@@ -107,18 +130,9 @@ public class PreLaunchReviewServiceTests
     public async Task Modded_client_unparks_before_ensuring_dependencies()
     {
         var fs = new MockFileSystem();
-        var depFile = new PluginDependencyFile(null, "dep1.dll");
-        var dependency = new PluginDependency("dep1", "Dep One", "1.0", "https://cdn/dep1", new string('a', 64), 1, "file",
-            new[] { depFile }, "game");
-        var version = new PluginVersion("1.0.0", null, "P1.dll", "https://cdn/p1.dll", "sha", "0.1.0", null, null,
-            Dependencies: new[] { dependency });
-        var entry = new PluginEntry("p1", "Plugin One", "d", null, new[] { version });
-        fs.AddFile("/g/stellar/plugins/p1/P1.dll", new MockFileData("x"));
-        fs.AddFile("/g/stellar/plugins/p1/.plugin-version", new MockFileData("1.0.0"));
-
+        var entry = OnePluginWithDependency();
         var fake = new FakeDependencyService();
-        var deps = new PluginInstallDeps(new Installer(fs), new PluginInstaller(fs), new HttpClient(), fake);
-        var inventory = new ClientInventory(fs, deps.Installer, deps.Plugins, new DoorstopToggle(fs));
+        var (deps, inventory) = BuildInstalledP1(fs, fake);
         var oneEntryRegistry = new RegistryCache(new OneEntryRegistry(entry), () => new LauncherConfig());
         var sut = new PreLaunchReviewService(oneEntryRegistry, inventory, new Online(), deps,
             _ => Task.FromResult(PreLaunchResult.Proceed));
@@ -140,6 +154,45 @@ public class PreLaunchReviewServiceTests
 
         Assert.True(result);
         Assert.Equal(0, prompt.Calls);
+    }
+
+    // Fix round 1, Minor 1: UnparkModdedOnly failing must not skip the rest of the review — the registry
+    // check and EnsureDependenciesAsync still run afterward (before the fix, the bare call sat inside the
+    // outer try, so its failure fell straight into the whole-path catch and "Ensure:p1" never ran).
+    [Fact]
+    public async Task Unpark_failure_does_not_skip_the_rest_of_the_review()
+    {
+        var fs = new MockFileSystem();
+        var entry = OnePluginWithDependency();
+        var fake = new FakeDependencyService { ThrowOnUnpark = true };
+        var (deps, inventory) = BuildInstalledP1(fs, fake);
+        var oneEntryRegistry = new RegistryCache(new OneEntryRegistry(entry), () => new LauncherConfig());
+        var sut = new PreLaunchReviewService(oneEntryRegistry, inventory, new Online(), deps,
+            _ => Task.FromResult(PreLaunchResult.Proceed));
+
+        var result = await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g", AutoUpdateBeforeLaunch = true }, CancellationToken.None);
+
+        Assert.True(result);
+        Assert.Equal(new[] { "Unpark", "Ensure:p1" }, fake.Calls); // unpark attempted (and failed) but ensure still ran
+    }
+
+    // Fix round 1, Important 1: an HttpClient request timeout surfaces as TaskCanceledException with the
+    // CALLER's own ct never cancelled — EnsureDependenciesAsync must swallow it (fail-open), never let it
+    // unwind as a "cancelled review" that ClientSessions would silently read as "don't launch".
+    [Fact]
+    public async Task HttpClient_timeout_during_ensure_still_fails_open()
+    {
+        var fs = new MockFileSystem();
+        var entry = OnePluginWithDependency();
+        var fake = new FakeDependencyService { ThrowOnEnsure = true };
+        var (deps, inventory) = BuildInstalledP1(fs, fake);
+        var oneEntryRegistry = new RegistryCache(new OneEntryRegistry(entry), () => new LauncherConfig());
+        var sut = new PreLaunchReviewService(oneEntryRegistry, inventory, new Online(), deps,
+            _ => Task.FromResult(PreLaunchResult.Proceed));
+
+        var result = await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g", AutoUpdateBeforeLaunch = true }, CancellationToken.None);
+
+        Assert.True(result);
     }
 
     private sealed class OneEntryRegistry : IPluginRegistryService

@@ -64,7 +64,10 @@ public sealed partial class DependencyService : IDependencyService
                     // A Failed returned HERE (not thrown) is always a download/verify failure — never annotated (minor 1).
                     if (status.State == DependencyState.Blocked) status = AnnotateIfCorrupt(gameMini, pluginId, status);
                 }
-                catch (OperationCanceledException) { throw; }
+                // Fix round 1, Important 1: EnsureOneAsync already converts an uncancelled OCE (e.g. an
+                // HttpClient timeout) to a Failed status rather than throwing — this guard is defense in
+                // depth for the same rule, never relying on EnsureOneAsync alone to apply it.
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception ex)
                 {
                     // Anything that escaped as an exception came from placement or ledger handling — eligible.
@@ -79,9 +82,11 @@ public sealed partial class DependencyService : IDependencyService
     public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,
         IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds)
     {
-        // Controller round: an invalid id has no ledger to read — Status answers with nothing, same
-        // shape as "never installed", rather than inventing a per-dep status for a bogus id.
-        if (!DependencyPaths.IsValidPluginId(pluginId)) return Array.Empty<DependencyStatus>();
+        // Fix round 1, Minor 5: same shape as EnsureAsync for an invalid id — one Failed "invalid plugin
+        // id" entry per dependency, not an empty list (which was indistinguishable from "no dependencies
+        // declared").
+        if (!DependencyPaths.IsValidPluginId(pluginId))
+            return deps.Select(d => new DependencyStatus(d.Id, DependencyState.Failed, "invalid plugin id")).ToList();
 
         // Minor 3: Status is read-only — it must not have the side effect of quarantining a corrupt
         // ledger (it still reads one as empty, via Read's own fallback, either way).

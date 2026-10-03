@@ -22,11 +22,21 @@ public sealed partial class DependencyServiceTests
         Assert.False(_fs.File.Exists("/game_mini/dxgi.dll"));
     }
 
+    // Fix round 1, Minor 5: Status must answer in the SAME shape as EnsureAsync for an invalid id — one
+    // Failed "invalid plugin id" entry per dependency, not an empty list (which looked indistinguishable
+    // from "no dependencies declared").
     [Fact]
-    public void Status_with_an_invalid_plugin_id_is_empty()
+    public void Status_with_an_invalid_plugin_id_fails_every_dependency_same_shape_as_EnsureAsync()
     {
-        var d = File("fx", new byte[] { 1 }, "dxgi.dll");
-        Assert.Empty(Make().Status(G, BadId, new[] { d }, None));
+        var a = File("fx", new byte[] { 1 }, "dxgi.dll");
+        var b = File("fx2", new byte[] { 2 }, "other.dll");
+
+        var st = Make().Status(G, BadId, new[] { a, b }, None);
+
+        Assert.Equal(2, st.Count);
+        Assert.All(st, s => Assert.Equal(DependencyState.Failed, s.State));
+        Assert.All(st, s => Assert.Equal("invalid plugin id", s.Detail));
+        Assert.Equal(new[] { "fx", "fx2" }, st.Select(s => s.DependencyId));
     }
 
     [Fact]

@@ -129,7 +129,7 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     {
         var v = row.Item.Entry.Versions.FirstOrDefault(x => x.Version == version) ?? row.Item.SelectedVersion;
         if (v is null) return;
-        try { await PluginDownloads.InstallAsync(_ws.Services.Core.Install, _ws.Client.GameMiniDir, _ws.Client.Modded, row.Item.Entry, v, s => Status = $"{row.Name}: {s}"); }
+        try { await PluginDownloads.InstallAsync(_ws.Services.Core.Install, _ws.Client, row.Item.Entry, v, s => Status = $"{row.Name}: {s}"); }
         catch (Exception ex) { Status = $"{row.Name} failed: {ex.Message}"; }
         await _ws.RefreshAsync();
     }
@@ -151,11 +151,26 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     {
         try
         {
+            // Fix round 1, Minor 2: dependency cleanup runs BEFORE the plugin DLL is removed. If it
+            // fails, the plugin is still removed (the player's "remove" request must not get stuck on a
+            // dependency problem) — but its skip entries are KEPT (cleanup never confirmed done) and the
+            // failure is logged rather than silently dropped.
+            string? depCleanupFailure = null;
+            try { _ws.Services.Core.Install.Dependencies.RemoveAll(_ws.Client.GameMiniDir, item.Entry.Id); }
+            catch (Exception ex) { depCleanupFailure = ex.Message; }
+
             _ws.Services.Core.Install.Plugins.Remove(_ws.Client.GameMiniDir, item.Entry.Id, item.CanonicalDll);
-            _ws.Services.Core.Install.Dependencies.RemoveAll(_ws.Client.GameMiniDir, item.Entry.Id);
-            _ws.Client.SkippedDependencies.RemoveAll(s => s.StartsWith(item.Entry.Id + "/", StringComparison.Ordinal));
-            _ws.SaveProfile();
-            item.MarkRemoved(); Status = $"{item.Name}: removed";
+
+            if (depCleanupFailure is null)
+            {
+                _ws.Client.SkippedDependencies.RemoveAll(s => s.StartsWith(item.Entry.Id + "/", StringComparison.Ordinal));
+                _ws.SaveProfile();
+            }
+
+            item.MarkRemoved();
+            Status = depCleanupFailure is null
+                ? $"{item.Name}: removed"
+                : $"{item.Name}: removed (dependency cleanup failed — {depCleanupFailure})";
         }
         catch (Exception ex) { Status = $"{item.Name} failed: {ex.Message}"; }
         await _ws.RefreshAsync();
@@ -177,7 +192,7 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         foreach (var i in installs)
         {
             var v = i.Entry.Versions.First(x => x.Version == i.TargetVersion);
-            try { await PluginDownloads.InstallAsync(_ws.Services.Core.Install, _ws.Client.GameMiniDir, _ws.Client.Modded, i.Entry, v, null); ok++; }
+            try { await PluginDownloads.InstallAsync(_ws.Services.Core.Install, _ws.Client, i.Entry, v, null); ok++; }
             catch (Exception ex) { Status = $"{i.Entry.Name} failed: {ex.Message}"; }
         }
         Status = $"copied from {source.Name}: {ok} installed, {plan.Count - installs.Count} skipped";
