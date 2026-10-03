@@ -20,6 +20,8 @@ public class PluginItemDependencyRefreshTests
             Gate.Wait(TimeSpan.FromSeconds(5));
             return item.ShownDependencies.Select(d => new DependencyStatus(d.Id, DependencyState.Installed, null)).ToList();
         }
+        // Nothing UI-bound to snapshot in this fake; it only hops threads like the real one.
+        public Task<IReadOnlyList<DependencyStatus>> DependencyStatusAsync(PluginItemViewModel item) => Task.Run(() => DependencyStatus(item));
         public void SetDependencyUse(PluginItemViewModel item, string dependencyId, bool use) { }
     }
 

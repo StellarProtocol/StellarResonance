@@ -40,7 +40,9 @@ public sealed partial class DependencyService : IDependencyService
         // Fix round 2: ConfigureAwait(false) on every await in this service — none of it needs the caller's
         // (UI) context, and a continuation queued behind a busy UI thread would hold the gate meanwhile.
         await gate.WaitAsync(ct).ConfigureAwait(false);
-        try { return await EnsureCoreAsync(gameMini, pluginId, deps, skippedIds, ct).ConfigureAwait(false); }
+        // Off the caller's thread even when the gate was free (WaitAsync then completes synchronously): the
+        // ledger reads and hashing below must never run on a UI thread.
+        try { return await Task.Run(() => EnsureCoreAsync(gameMini, pluginId, deps, skippedIds, ct)).ConfigureAwait(false); }
         finally { gate.Release(); }
     }
 
@@ -170,12 +172,12 @@ public sealed partial class DependencyService : IDependencyService
 
     /// <summary>Fix round 2, Critical: the gate is only ever AWAITED — never a blocking Wait(). A caller on
     /// the UI thread blocked in Wait() behind an EnsureAsync whose continuations need that same thread would
-    /// deadlock the launcher. The work itself is short and synchronous once the gate is held.</summary>
+    /// deadlock the launcher. The work itself runs on the pool once the gate is held.</summary>
     private async Task LockedAsync(string gameMini, Action action, CancellationToken ct)
     {
         var gate = Gate(gameMini);
         await gate.WaitAsync(ct).ConfigureAwait(false);
-        try { action(); }
+        try { await Task.Run(action).ConfigureAwait(false); }   // never on the caller's (UI) thread, even with a free gate
         finally { gate.Release(); }
     }
 
