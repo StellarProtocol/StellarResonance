@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using StellarLauncher.Core.Model;
 
 namespace StellarLauncher.Core.Dependencies;
 
@@ -16,12 +18,8 @@ public sealed partial class DependencyService
     private DependencyStatus? CheckDestination(string gameMini, string pluginId, string dependencyId, LedgerEntry? existing, string abs)
     {
         var rel = DependencyPaths.Relative(gameMini, abs);
-        var owner = FindOwner(gameMini, rel);
-        if (owner is not null && (owner.Value.PluginId != pluginId || owner.Value.DependencyId != dependencyId))
-            return new DependencyStatus(dependencyId, DependencyState.Blocked, rel); // M1: foreign regardless of presence
-
-        if (owner is null)
-            return _fs.File.Exists(abs) ? new DependencyStatus(dependencyId, DependencyState.Blocked, rel) : null;
+        var foreign = ForeignClaim(gameMini, pluginId, dependencyId, abs, quarantine: true, out var ours);
+        if (foreign is not null || !ours) return foreign; // not ours: Blocked if claimed/occupied, else safe to place
 
         if (!_fs.File.Exists(abs)) return null; // ours, but currently absent (e.g. parked) — safe to (re)write
 
@@ -48,9 +46,47 @@ public sealed partial class DependencyService
         return null;
     }
 
-    private (string PluginId, string DependencyId)? FindOwner(string gameMini, string relativePath)
+    /// <summary>The read-only half of <see cref="CheckDestination"/>, shared with <see cref="Status"/>:
+    /// Blocked (detail = the game_mini-relative path) when another (plugin, dependency) claims
+    /// <paramref name="abs"/> — M1: whether or not it exists — or when nobody claims it and a file is there
+    /// (the player's own file). <paramref name="ours"/> says whether this (plugin, dependency) owns it.
+    /// Reads only; <paramref name="quarantine"/> false never renames a corrupt ledger.</summary>
+    private DependencyStatus? ForeignClaim(string gameMini, string pluginId, string dependencyId, string abs,
+        bool quarantine, out bool ours)
     {
-        foreach (var ledger in _store.ReadAll(gameMini))
+        var rel = DependencyPaths.Relative(gameMini, abs);
+        var owner = FindOwner(gameMini, rel, quarantine);
+        ours = owner is not null && owner.Value.PluginId == pluginId && owner.Value.DependencyId == dependencyId;
+        if (owner is not null && !ours) return new DependencyStatus(dependencyId, DependencyState.Blocked, rel);
+        if (owner is null && _fs.File.Exists(abs)) return new DependencyStatus(dependencyId, DependencyState.Blocked, rel);
+        return null;
+    }
+
+    /// <summary>Task 6: the destinations knowable WITHOUT downloading — a file-kind dependency's single
+    /// <c>to</c>, and a zip's exact-entry mappings (<c>from</c> naming one entry). A zip directory mapping
+    /// (<c>from</c> ending in '/') places whatever the archive holds, so it can't be checked up front.
+    /// Paths the manifest isn't allowed to use are skipped (EnsureAsync reports those).</summary>
+    private static IEnumerable<string> KnownDestinations(string gameMini, string pluginId, PluginDependency d)
+    {
+        var tos = d.Kind == "zip"
+            ? d.Files.Where(f => f.From is not null && !f.From.EndsWith('/')).Select(f => f.To)
+            : d.Files.Take(1).Select(f => f.To);
+        foreach (var to in tos)
+            if (DependencyPaths.Resolve(gameMini, pluginId, d.Target, to) is { } abs) yield return abs;
+    }
+
+    /// <summary>Read-only Blocked check for a dependency that isn't installed: the first known destination
+    /// that is claimed by someone else or occupied by an unowned file.</summary>
+    private DependencyStatus? StatusBlocked(string gameMini, string pluginId, PluginDependency d)
+    {
+        foreach (var abs in KnownDestinations(gameMini, pluginId, d))
+            if (ForeignClaim(gameMini, pluginId, d.Id, abs, quarantine: false, out _) is { } blocked) return blocked;
+        return null;
+    }
+
+    private (string PluginId, string DependencyId)? FindOwner(string gameMini, string relativePath, bool quarantine = true)
+    {
+        foreach (var ledger in _store.ReadAll(gameMini, quarantine))
         foreach (var entry in ledger.Entries)
         foreach (var f in entry.Files)
         {

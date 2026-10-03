@@ -18,11 +18,19 @@ public sealed partial class ClientPluginsViewModel
     /// (completed when none is running) — awaited by tests.</summary>
     public Task DependencyWork { get; private set; } = Task.CompletedTask;
 
+    /// <summary>The read-only status (Installed / NotInstalled / Skipped / Blocked) — except that a dependency
+    /// still NotInstalled whose last install attempt this session Failed (same declaration since) shows that
+    /// failure instead, so "Failed: …" reaches the page (Status itself is offline and never fails a download).</summary>
     public IReadOnlyList<DependencyStatus> DependencyStatus(PluginItemViewModel item)
     {
         var deps = item.ShownDependencies;
-        return _ws.Services.Core.Install.Dependencies.Status(_ws.Client.GameMiniDir, item.Entry.Id, deps,
-            DependencyRunner.Skipped(_ws.Client, item.Entry.Id, deps));
+        var install = _ws.Services.Core.Install;
+        var gameMini = _ws.Client.GameMiniDir;
+        var statuses = install.Dependencies.Status(gameMini, item.Entry.Id, deps, DependencyRunner.Skipped(_ws.Client, item.Entry.Id, deps));
+        if (install.Outcomes is not { } outcomes) return statuses;
+        return statuses.Select(s =>
+            s.State == DependencyState.NotInstalled && deps.FirstOrDefault(d => d.Id == s.DependencyId) is { } d
+            && outcomes.LastFailure(gameMini, item.Entry.Id, d) is { } failed ? failed : s).ToList();
     }
 
     public void SetDependencyUse(PluginItemViewModel item, string dependencyId, bool use)

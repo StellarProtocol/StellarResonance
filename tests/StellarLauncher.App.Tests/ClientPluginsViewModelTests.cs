@@ -310,4 +310,79 @@ public class ClientPluginsViewModelTests
 
         Assert.False(cm.HasDependencies);
     }
+
+    // ---- Task 6 follow-up: Blocked and Failed reach the page ----
+
+    private static async Task<(WorkspaceFixture f, ClientPluginsViewModel vm, StellarLauncher.App.ViewModels.PluginItemViewModel item)> OpenWithGameDeps(
+        params StellarLauncher.Core.Model.PluginDependency[] deps)
+    {
+        var f = new WorkspaceFixture();
+        f.Registry.Add(new StellarLauncher.Core.Model.PluginEntry("photo", "Photo", "d", "a", new[]
+        {
+            new StellarLauncher.Core.Model.PluginVersion("1.0.0", null, "Stellar.Photo.dll", "https://cdn/photo/1.0.0.dll",
+                WorkspaceFixture.DllSha, "2.0.0", null, null, Dependencies: deps),
+        }));
+        f.AddClient("c2", "Test", Test, framework: "2.7.4");
+        f.InstallPlugin(Test, "photo", "Stellar.Photo.dll", "1.0.0");
+        f.Tabs = f.Tabs with { Plugins = w => new ClientPluginsViewModel(w) };
+        f.Start();
+        var ws = await f.OpenAsync("c2");
+        ws.ShowPluginsCommand.Execute(null);
+        var vm = (ClientPluginsViewModel)ws.TabContent!;
+        await vm.ReloadAsync();
+        return (f, vm, vm.Rows.Single().Item);
+    }
+
+    private static StellarLauncher.Core.Model.PluginDependency GameDep(string id, string to, string? sha = null) =>
+        new(id, $"{id} name", "1.0", $"https://cdn/deps/{id}", sha ?? WorkspaceFixture.DllSha, WorkspaceFixture.DllBytes.Length, "file",
+            new[] { new StellarLauncher.Core.Model.PluginDependencyFile(null, to) }, "game", ModdedOnly: true, Optional: true);
+
+    // The main case: the player's own dxgi.dll sits where the dependency goes — the row says so before any launch.
+    [Fact]
+    public async Task A_players_own_file_at_the_destination_shows_Blocked_on_the_page()
+    {
+        var (f, vm, item) = await OpenWithGameDeps(GameDep("fx", "dxgi.dll"));
+        f.Fs.AddFile($"{Test}/dxgi.dll", new MockFileData("player's own"));
+
+        vm.OpenPluginCommand.Execute(item);
+
+        var row = item.Dependencies.Single();
+        Assert.Equal("Blocked — a file you installed is in the way: dxgi.dll", row.StateText);
+        Assert.Equal("warn", row.StateClass);
+        Assert.True(row.IsWarn);
+        Assert.Equal("player's own", f.Fs.File.ReadAllText($"{Test}/dxgi.dll"));
+    }
+
+    // Failed is install-time only: the page shows the LAST EnsureAsync failure of this session while the
+    // dependency is still not installed and its declaration is unchanged.
+    [Fact]
+    public async Task The_last_install_failure_shows_Failed_on_the_page()
+    {
+        var bad = GameDep("fx", "dxgi.dll", sha: new string('0', 64));   // served bytes never match
+        var (f, vm, item) = await OpenWithGameDeps(bad);
+        await f.Services.Core.Install.Dependencies.EnsureAsync(Test, "photo", new[] { bad }, new HashSet<string>(), CancellationToken.None);
+
+        vm.OpenPluginCommand.Execute(item);
+
+        var row = item.Dependencies.Single();
+        Assert.StartsWith("Failed: ", row.StateText);
+        Assert.Equal("bad", row.StateClass);
+    }
+
+    [Fact]
+    public async Task Skipping_forgets_a_failure_and_re_ticking_shows_the_new_attempts_failure()
+    {
+        var bad = GameDep("fx", "dxgi.dll", sha: new string('0', 64));
+        var (f, vm, item) = await OpenWithGameDeps(bad);
+        await f.Services.Core.Install.Dependencies.EnsureAsync(Test, "photo", new[] { bad }, new HashSet<string>(), CancellationToken.None);
+        vm.OpenPluginCommand.Execute(item);
+
+        item.Dependencies.Single().Use = false;
+        Assert.Equal("Skipped", item.Dependencies.Single().StateText);
+        item.Dependencies.Single().Use = true;
+        await vm.DependencyWork;   // re-tick on Modded re-runs EnsureAsync: still fails → still Failed
+
+        Assert.Equal("bad", item.Dependencies.Single().StateClass);
+        Assert.Contains("Failed", vm.Status);
+    }
 }

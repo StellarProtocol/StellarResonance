@@ -111,14 +111,16 @@ public sealed class DependencyLedgerStore
             .OrderBy(id => id, StringComparer.Ordinal).ToList();
     }
 
-    public IReadOnlyList<DependencyLedger> ReadAll(string gameMini)
+    /// <summary><paramref name="quarantine"/> false for read-only callers (Status's ownership check), which
+    /// must not rename a corrupt ledger aside — they still skip it either way.</summary>
+    public IReadOnlyList<DependencyLedger> ReadAll(string gameMini, bool quarantine = true)
     {
         var dir = DependencyPaths.LedgerDir(gameMini);
         if (!_fs.Directory.Exists(dir)) return new DependencyLedger[0];
         return _fs.Directory.GetFiles(dir, "*.json")
             .Select(f => _fs.Path.GetFileNameWithoutExtension(f))
             .Where(DependencyPaths.IsValidPluginId) // M3: a bogus stem is never read, let alone trusted as an id
-            .Select(id => TryRead(gameMini, id, quarantine: true).Ledger)
+            .Select(id => TryRead(gameMini, id, quarantine).Ledger)
             .Where(l => l is not null)
             .Select(l => l!).ToList(); // a ledger that failed to parse/validate/read is skipped outright
     }

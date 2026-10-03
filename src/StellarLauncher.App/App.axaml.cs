@@ -52,7 +52,10 @@ public partial class App : Application
         MainWindow? mainWindow = null;
         ShellViewModel? shell = null;
 
-        var deps = new PluginInstallDeps(installer, pluginInstaller, http, new DependencyService(fs, http));
+        // One recorder wraps the real service so every EnsureAsync (launch, install, page re-tick) leaves its last
+        // failures for the plugin page to show.
+        var dependencies = new RecordingDependencyService(new DependencyService(fs, http));
+        var deps = new PluginInstallDeps(installer, pluginInstaller, http, dependencies, dependencies);
         var inventory = new ClientInventory(fs, installer, pluginInstaller, doorstop);
         var registry = new RegistryCache(new PluginRegistryService(http), () => shell!.Config);
         var versions = new VersionService(http);

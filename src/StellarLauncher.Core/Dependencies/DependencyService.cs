@@ -97,9 +97,11 @@ public sealed partial class DependencyService : IDependencyService
             var gate = GateStatus(d, skippedIds, results);
             if (gate is not null) { results[d.Id] = gate; continue; }
             var entry = ledger.Entries.FirstOrDefault(e => e.DependencyId == d.Id);
+            // Task 6: a destination already occupied by a file nobody's ledger owns (or claimed by another
+            // dependency) reads as Blocked here too, exactly as EnsureAsync would report it — read-only.
             results[d.Id] = IsInstalled(gameMini, entry, d)
                 ? new DependencyStatus(d.Id, DependencyState.Installed, null)
-                : new DependencyStatus(d.Id, DependencyState.NotInstalled, null);
+                : StatusBlocked(gameMini, pluginId, d) ?? new DependencyStatus(d.Id, DependencyState.NotInstalled, null);
         }
         return deps.Select(d => results[d.Id]).ToList();
     }
