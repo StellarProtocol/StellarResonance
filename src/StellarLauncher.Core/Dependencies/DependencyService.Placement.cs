@@ -15,14 +15,23 @@ namespace StellarLauncher.Core.Dependencies;
 /// for the foreign/modified-file check.</summary>
 public sealed partial class DependencyService
 {
-    private async Task<DependencyStatus> EnsureOneAsync(string gameMini, string pluginId, PluginDependency dep, CancellationToken ct)
+    /// <summary><paramref name="force"/> (final-review I-1): skips the "already installed, nothing to do"
+    /// short-circuit below even when <paramref name="dep"/> already reads Installed — used for a requested
+    /// reinstall, so the dependency goes through the normal download/verify/<see cref="CommitPlacement"/>
+    /// update path (backup the live file, replace, roll back on any failure) instead of being deleted up
+    /// front. A download/verify failure returns Failed here WITHOUT ever touching the existing file —
+    /// <see cref="CommitPlacement"/> itself only backs it up once a verified replacement is ready to write,
+    /// and restores that backup on any failure — so a failed forced reinstall always leaves the previous,
+    /// still-Installed file exactly as it was. <see cref="CheckDestination"/> still blocks a file the player
+    /// changed, same as for an ordinary update.</summary>
+    private async Task<DependencyStatus> EnsureOneAsync(string gameMini, string pluginId, PluginDependency dep, bool force, CancellationToken ct)
     {
         // Important (round 6): a present-but-unreadable ledger must abort immediately — never silently
         // treated as empty, which could overwrite or delete whatever it actually holds.
         if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
             throw new InvalidOperationException("dependency record could not be read");
         var existing = ledger.Entries.FirstOrDefault(e => e.DependencyId == dep.Id);
-        if (IsInstalled(gameMini, existing, dep))
+        if (!force && IsInstalled(gameMini, existing, dep))
             return new DependencyStatus(dep.Id, DependencyState.Installed, null);
 
         byte[] bytes;

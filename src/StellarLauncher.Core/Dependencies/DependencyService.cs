@@ -64,8 +64,9 @@ public sealed partial class DependencyService : IDependencyService
 
         // Final review I3: FIRST, so a dependency renamed by a plugin update can reuse its old destination.
         var seen = RemoveUndeclared(gameMini, pluginId, deps);
-        // v3 V3/V2: adopt a kept ledger; prepare a requested reinstall (no extra ledger read unless a flag is set).
-        var reinstall = Adopt(gameMini, pluginId, seen, deps, skippedIds);
+        // v3 V3/V2: adopt a kept ledger; the ids (if any) a requested reinstall must FORCE through the loop below
+        // (no extra ledger read unless a flag is set).
+        var force = Adopt(gameMini, pluginId, seen, deps, skippedIds);
 
         var results = new Dictionary<string, DependencyStatus>();
         foreach (var d in deps)
@@ -77,9 +78,13 @@ public sealed partial class DependencyService : IDependencyService
             else if (GateStatus(d, skippedIds, results) is { } gate)
                 results[Key(d)] = ApplyGate(gameMini, pluginId, d, gate);
             else
-                results[Key(d)] = await EnsureGuardedAsync(gameMini, pluginId, d, ct).ConfigureAwait(false);
+                results[Key(d)] = await EnsureGuardedAsync(gameMini, pluginId, d, force?.Contains(d.Id) == true, ct).ConfigureAwait(false);
         }
-        if (reinstall) ClearReinstallRequest(gameMini, pluginId);
+        // Final-review I-1: cleared only once every FORCED dependency's real outcome (after the loop actually
+        // ran it through download/verify/commit) reads Installed — never pre-emptively, and never when one of
+        // them is still wrong (Failed/Blocked), so a failed reinstall attempt keeps the flag set for a retry.
+        if (force is not null && force.All(id => results.TryGetValue(id, out var s) && s.State == DependencyState.Installed))
+            ClearReinstallRequest(gameMini, pluginId);
         return deps.Select(d => results[Key(d)]).ToList();
     }
 
@@ -93,12 +98,14 @@ public sealed partial class DependencyService : IDependencyService
         catch (Exception ex) { return AnnotateIfCorrupt(gameMini, pluginId, new DependencyStatus(d.Id, DependencyState.Failed, ex.Message)); }
     }
 
-    /// <summary><see cref="EnsureOneAsync"/>, turning anything but the caller's own cancel into a status.</summary>
-    private async Task<DependencyStatus> EnsureGuardedAsync(string gameMini, string pluginId, PluginDependency d, CancellationToken ct)
+    /// <summary><see cref="EnsureOneAsync"/>, turning anything but the caller's own cancel into a status.
+    /// <paramref name="force"/>: final-review I-1 — true for a dependency a requested reinstall must FORCE
+    /// through the normal update path even though it already reads Installed.</summary>
+    private async Task<DependencyStatus> EnsureGuardedAsync(string gameMini, string pluginId, PluginDependency d, bool force, CancellationToken ct)
     {
         try
         {
-            var status = await EnsureOneAsync(gameMini, pluginId, d, ct).ConfigureAwait(false);
+            var status = await EnsureOneAsync(gameMini, pluginId, d, force, ct).ConfigureAwait(false);
             // A Failed returned HERE (not thrown) is always a download/verify failure — never annotated (minor 1).
             return status.State == DependencyState.Blocked ? AnnotateIfCorrupt(gameMini, pluginId, status) : status;
         }

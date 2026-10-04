@@ -120,6 +120,28 @@ public sealed partial class DependencyServiceTests
         Assert.False(LedgerOf().Kept);
     }
 
+    // Final-review I-1: Adopt must never delete a dependency's files before the re-download succeeds — if the
+    // download then fails, the previously installed file (and its ledger entry) are untouched, so the
+    // dependency still reads Installed and the flag stays set for a retry.
+    [Fact]
+    public async Task A_requested_reinstall_whose_download_fails_leaves_the_old_file_installed_and_the_flag_set()
+    {
+        var a = File("a", new byte[] { 1 }, "a.dll");
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { a }, None, default);
+        await s.RequestReinstallAsync(G, "p");
+        _web.Remove("https://cdn/a");   // the next download attempt 404s
+        _downloads = 0;
+
+        var st = await s.EnsureAsync(G, "p", new[] { a }, None, default);
+
+        Assert.Equal(DependencyState.Failed, Assert.Single(st).State);
+        Assert.Equal(1, _downloads);
+        Assert.Equal(new byte[] { 1 }, _fs.File.ReadAllBytes("/game_mini/a.dll"));
+        Assert.Equal(DependencyState.Installed, Assert.Single(s.Status(G, "p", new[] { a }, None)).State);
+        Assert.True(LedgerOf().ReinstallRequested);
+    }
+
     [Fact]
     public async Task A_requested_reinstall_downloads_and_verifies_every_used_dependency_once_then_clears()
     {
@@ -216,58 +238,38 @@ public sealed partial class DependencyServiceTests
         Assert.Equal(1, _downloads);   // re-downloaded even though adopted, not merely left alone
     }
 
-    // Review fix round 1, minor 1: a remove that fails but leaves the dependency reading Installed anyway (a
-    // transient read hiccup here — nothing on disk was actually touched) must NOT force a retry: the flag
-    // clears, so a persistently read-only (but otherwise correct) file doesn't force re-removing-and-redownloading
-    // every OTHER dependency on every future launch.
+    // Final-review I-1: replaces the former "a remove that fails…" pair, which pinned the OLD delete-then-
+    // recheck retry mechanism inside Adopt — that mechanism no longer exists (Adopt deletes nothing; see
+    // above). The real guarantee those tests protected still holds under the new force-through-the-normal-
+    // update-path design: a reinstall covering several dependencies where only one's download fails keeps the
+    // flag set (a genuine retry is still needed), while a later retry re-forces EVERY non-skipped dependency
+    // again — including the one that already succeeded — since there is no per-dependency "already redone"
+    // memory.
     [Fact]
-    public async Task A_remove_that_fails_but_leaves_the_dependency_reading_installed_clears_the_flag_anyway()
+    public async Task A_requested_reinstall_that_partly_fails_keeps_the_flag_set_then_a_retry_redoes_both()
     {
         var a = File("a", new byte[] { 1 }, "a.dll");
         var b = File("b", new byte[] { 2 }, "b.dll");
         var s = Make();
         await s.EnsureAsync(G, "p", new[] { a, b }, None, default);
         await s.RequestReinstallAsync(G, "p");
-
-        // Let RemoveUndeclared's own read (call 1) and "a"'s RemoveCore read (call 2) through; fail "b"'s — "b" is
-        // never touched by this attempt, so its ledger entry and file are untouched and still match each other.
-        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, once: true, afterCalls: 2, "ReadAllText");
-        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+        _web.Remove("https://cdn/b");   // "b"'s next download 404s; "a"'s still succeeds
         _downloads = 0;
 
-        var st = await s2.EnsureAsync(G, "p", new[] { a, b }, None, default);
+        var st = await s.EnsureAsync(G, "p", new[] { a, b }, None, default);
 
         Assert.Equal(DependencyState.Installed, st[0].State);
-        Assert.Equal(DependencyState.Installed, st[1].State);
-        Assert.Equal(1, _downloads);                 // only "a" was actually re-fetched; "b" already matched
-        Assert.False(LedgerOf().ReinstallRequested);  // "b" still reads Installed — nothing left to retry
-    }
+        Assert.Equal(DependencyState.Failed, st[1].State);
+        Assert.Equal(2, _downloads);                  // both were attempted
+        Assert.True(LedgerOf().ReinstallRequested);   // "b" is still wrong — keep the flag for a retry
 
-    // Review fix round 1, minor 1 (the other half): a remove that fails and GENUINELY leaves the dependency
-    // wrong (its ledger entry now names a file that no longer exists) keeps the flag set for a real retry.
-    [Fact]
-    public async Task A_remove_that_fails_and_leaves_the_dependency_genuinely_wrong_keeps_the_flag_set()
-    {
-        // Three dependencies, not two: removing "b" (the middle one) must still leave "c" in the ledger, so the
-        // write it attempts takes the normal rewrite path rather than DependencyLedgerStore's "last entry gone ⇒
-        // delete the whole file" shortcut — which would otherwise wipe ReinstallRequested along with it and
-        // defeat this test regardless of Adopt's own logic.
-        var a = File("a", new byte[] { 1 }, "a.dll");
-        var b = File("b", new byte[] { 2 }, "b.dll");
-        var c = File("c", new byte[] { 3 }, "c.dll");
-        var s = Make();
-        await s.EnsureAsync(G, "p", new[] { a, b, c }, None, default);
-        await s.RequestReinstallAsync(G, "p");
+        _web["https://cdn/b"] = new byte[] { 2 };     // "b" becomes downloadable again
+        _downloads = 0;
+        var st2 = await s.EnsureAsync(G, "p", new[] { a, b }, None, default);
 
-        // Let "a"'s own remove-and-rewrite through; fail the SECOND ledger write — "b"'s file is already deleted
-        // (DeleteEntryFiles ran first) by the time the write that would have dropped its ledger entry fails, so
-        // the ledger still names a file that no longer exists: genuinely broken, not merely unlucky timing.
-        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath + ".tmp", once: true, afterCalls: 1, "WriteAllText");
-        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
-
-        await s2.EnsureAsync(G, "p", new[] { a, b, c }, None, default);
-
-        Assert.True(LedgerOf().ReinstallRequested);   // "b" really was left wrong by the failed remove — must retry
+        Assert.All(st2, x => Assert.Equal(DependencyState.Installed, x.State));
+        Assert.Equal(2, _downloads);                  // the retry re-forces "a" too, not just "b"
+        Assert.False(LedgerOf().ReinstallRequested);
     }
 
     // Review carry-over (a): the gated check used by the orphan sweep — a present-but-unreadable ledger is

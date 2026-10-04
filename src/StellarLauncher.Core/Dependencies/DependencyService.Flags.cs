@@ -35,21 +35,23 @@ public sealed partial class DependencyService
     }
 
     /// <summary>V3: an ensure runs only for an installed plugin, so a KEPT ledger is adopted again (flag cleared;
-    /// <see cref="RemoveUndeclared"/> has already dropped what the new version no longer declares). V2: when a reinstall
-    /// was requested, each declared, non-skipped dependency's files are removed first — hash-checked, so a file the
-    /// player changed stays and the loop then reports it Blocked — and the loop downloads + verifies them afresh. A
-    /// RETRY (the flag still set from a previous failed pass) re-removes and re-downloads EVERY non-skipped dependency
-    /// again, not just the one(s) that failed before — there is no per-dependency "already redone" memory.
-    /// Works from <paramref name="seen"/> (the ledger RemoveUndeclared already read) and reads NOTHING more unless a flag
-    /// is set: the fault-injection tests pin the exact number of ledger reads an ensure makes. The Kept clear is
-    /// independent best effort (a failure there just leaves it for the next ensure to adopt). Review carry-over (b) +
-    /// fix round 1 minor 1: returns whether the REINSTALL flag should now be cleared — true when every remove
-    /// succeeded, OR when every dependency whose remove failed still reads Installed (hash-verified) right now anyway
-    /// (e.g. its file delete failed because the file is currently read-only, but its content already matches what a
-    /// fresh download would place) — clearing in that case too, so a persistently read-only file doesn't force a
-    /// pointless re-remove-and-re-download of every OTHER dependency on every future launch. Only a dependency that
-    /// is genuinely still wrong (its remove failed AND it does not read Installed) keeps the flag set for a retry.</summary>
-    private bool Adopt(string gameMini, string pluginId, DependencyLedger seen,
+    /// <see cref="RemoveUndeclared"/> has already dropped what the new version no longer declares). V2: when a
+    /// reinstall was requested, returns the ids of every declared, non-skipped dependency to FORCE through the
+    /// main loop below — never deletes anything itself. Final-review I-1: a premature delete-then-download here
+    /// left a dependency with NO file in place the instant a download failed (the window between Adopt's delete
+    /// and the main loop's own download/verify/commit) — the old file must stay Installed until a replacement is
+    /// actually ready. The main loop's <see cref="EnsureOneAsync"/> does the forcing (skips its "already
+    /// installed" short-circuit) and goes through its own transactional update path (backup, replace, rollback
+    /// on failure) — <see cref="DependencyService.Ownership"/>'s <c>CheckDestination</c> still blocks a file the
+    /// player changed, exactly as for a normal update. Works from <paramref name="seen"/> (the ledger
+    /// RemoveUndeclared already read) and reads NOTHING more: the fault-injection tests pin the exact number of
+    /// ledger reads an ensure makes. The Kept clear is independent best effort (a failure there just leaves it
+    /// for the next ensure to adopt). Whether the REINSTALL flag should now be cleared is decided by the caller
+    /// once every dependency's real outcome is known (<see cref="EnsureCoreAsync"/>) — true only when every
+    /// forced dependency comes back Installed; a RETRY (the flag still set) forces every non-skipped dependency
+    /// again next time, not just the one(s) that failed before — there is no per-dependency "already redone"
+    /// memory.</summary>
+    private HashSet<string>? Adopt(string gameMini, string pluginId, DependencyLedger seen,
         IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds)
     {
         if (seen.Kept)
@@ -57,17 +59,9 @@ public sealed partial class DependencyService
             try { WriteFlags(gameMini, pluginId, l => l with { Kept = false }); }
             catch (Exception) { /* best effort: the next ensure adopts it */ }
         }
-        if (!seen.ReinstallRequested) return false;
-        List<PluginDependency>? failed = null;
-        foreach (var d in deps)
-        {
-            if (skippedIds.Contains(d.Id) || DependencyDeclaration.Problem(d) is not null) continue;
-            try { RemoveCore(gameMini, pluginId, d.Id); }
-            catch (Exception) { (failed ??= new List<PluginDependency>()).Add(d); /* checked below before deciding to retry */ }
-        }
-        if (failed is null) return true;
-        var now = _store.Read(gameMini, pluginId, quarantine: false);
-        return failed.All(d => IsInstalled(gameMini, now.Entries.FirstOrDefault(e => e.DependencyId == d.Id), d));
+        if (!seen.ReinstallRequested) return null;
+        return deps.Where(d => !skippedIds.Contains(d.Id) && DependencyDeclaration.Problem(d) is null)
+            .Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
     }
 
     /// <summary>V2: the request is consumed once every declared, non-skipped dependency's remove ran clean (an ensure
