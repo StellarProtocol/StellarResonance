@@ -87,12 +87,15 @@ public sealed class ClientSessions
     /// <summary>R-2: splits a review progress line between the transient state-line text ("Preparing …",
     /// cleared however the review ends) and the owner's sticky "Added &lt;dependency&gt; for &lt;plugin&gt;"
     /// announcement, which also gets one always-on log line so it's on record even if the player never
-    /// notices the tile.</summary>
+    /// notices the tile. N-2: one launch attempt reviews every installed plugin, so more than one can gain a
+    /// new optional dependency — joined onto the existing notice (set earlier THIS SAME attempt; cleared at
+    /// the top of <see cref="LaunchAsync"/>) rather than overwriting it, so the player sees all of them, not
+    /// just the last plugin reviewed. Each line is still logged on its own.</summary>
     private static void ReportReviewText(LaunchSession s, ClientProfile c, string? text)
     {
         if (text is { } t && t.StartsWith("Added ", StringComparison.Ordinal))
         {
-            s.SetDependencyNotice(t);
+            s.SetDependencyNotice(s.DependencyNotice is { Length: > 0 } existing ? $"{existing} · {t}" : t);
             DependencyLog.Notice(c.Name, t);
         }
         else s.SetReviewText(text);

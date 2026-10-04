@@ -300,6 +300,29 @@ public class ClientSessionsTests
         }
     }
 
+    // N-2: a review covering several installed plugins can report MORE than one "Added …" line in a single
+    // launch attempt (one per plugin that gained a new optional dependency).
+    private sealed class TwoNoticesReview : IPreLaunchReview
+    {
+        public Task<bool> ReviewAsync(ClientProfile c, CancellationToken ct) => throw new InvalidOperationException("status overload expected");
+        public Task<bool> ReviewAsync(ClientProfile c, Action<string?> status, CancellationToken ct)
+        {
+            status("Added ReShade for Photo Studio");
+            status("Added X for Y");
+            return Task.FromResult(true);
+        }
+    }
+
+    [Fact]
+    public async Task Two_dependency_notices_in_one_launch_are_joined_not_overwritten()
+    {
+        var (sut, _, _, c) = Build();
+
+        await sut.LaunchAsync(c, new TwoNoticesReview(), CancellationToken.None);
+
+        Assert.Equal("Added ReShade for Photo Studio · Added X for Y", sut.For(c).DependencyNotice);
+    }
+
     // R-2: the owner's "tell me" announcement must actually reach the player — not vanish within
     // milliseconds behind Begin's "launching…" and the review's own ReviewText=null cleanup. Asserts what
     // LaunchSession (what the client tile binds to) actually holds right after Begin, through the launch,
