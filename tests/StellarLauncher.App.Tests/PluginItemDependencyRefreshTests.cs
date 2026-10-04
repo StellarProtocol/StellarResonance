@@ -10,6 +10,7 @@ public class PluginItemDependencyRefreshTests
     private sealed class SlowActions : IPluginActions
     {
         public readonly ManualResetEventSlim Gate = new(false);
+        public readonly ManualResetEventSlim Entered = new(false);
         public int? StatusThread;
         public Task InstallAsync(PluginItemViewModel item) => Task.CompletedTask;
         public Task RemoveAsync(PluginItemViewModel item) => Task.CompletedTask;
@@ -17,6 +18,7 @@ public class PluginItemDependencyRefreshTests
         private IReadOnlyList<DependencyStatus> DependencyStatus(PluginItemViewModel item)
         {
             StatusThread = Environment.CurrentManagedThreadId;
+            Entered.Set();
             Gate.Wait(TimeSpan.FromSeconds(5));
             return item.ShownDependencies.Select(d => new DependencyStatus(d.Id, DependencyState.Installed, null)).ToList();
         }
@@ -90,6 +92,11 @@ public class PluginItemDependencyRefreshTests
         var started = System.Diagnostics.Stopwatch.StartNew();
         var refresh = item.RefreshDependenciesAsync();
         var returnedAfter = started.ElapsedMilliseconds;
+        // Hold the calling thread until the status work has started. Releasing the gate first and then awaiting
+        // let the caller's own pool thread go back to the pool and pick up the queued status work itself, so the
+        // thread ids could match by chance (CI run 37201407333). While the caller blocks here, the status work can
+        // only be running on another thread.
+        Assert.True(actions.Entered.Wait(TimeSpan.FromSeconds(5)), "the status work never started");
         actions.Gate.Set();
         await refresh;
 
