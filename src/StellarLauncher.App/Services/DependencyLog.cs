@@ -13,9 +13,15 @@ public static class DependencyLog
     /// <summary>stellar-launcher.log when debug logging is OFF; null otherwise (Trace already writes it then).</summary>
     public static string? AlwaysOnFile { get; set; }
 
-    public static void Failure(string where, string message)
+    public static void Failure(string where, string message) => WriteLine($"[deps] {where}: {message}");
+
+    /// <summary>R-2: the owner's "tell me" announcement — a non-failure dependency event (currently just
+    /// "Added &lt;dependency&gt; for &lt;plugin&gt;") — gets the same always-on line a failure does, so it's
+    /// on record even if the player never notices the tile's sticky notice.</summary>
+    public static void Notice(string where, string message) => WriteLine($"[deps] {where}: {message}");
+
+    private static void WriteLine(string line)
     {
-        var line = $"[deps] {where}: {message}";
         Trace.WriteLine(line);
         if (AlwaysOnFile is not { } path) return;
         try { File.AppendAllText(path, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {line}{Environment.NewLine}"); }

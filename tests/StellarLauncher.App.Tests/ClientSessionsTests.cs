@@ -289,4 +289,52 @@ public class ClientSessionsTests
         Assert.Null(s.ReviewText);
         Assert.Equal("idle", StellarLauncher.App.Services.SessionPresenter.StateLine(s, inv, true));
     }
+
+    private sealed class NoticeReview(string text) : IPreLaunchReview
+    {
+        public Task<bool> ReviewAsync(ClientProfile c, CancellationToken ct) => throw new InvalidOperationException("status overload expected");
+        public Task<bool> ReviewAsync(ClientProfile c, Action<string?> status, CancellationToken ct)
+        {
+            status(text);
+            return Task.FromResult(true);
+        }
+    }
+
+    // R-2: the owner's "tell me" announcement must actually reach the player — not vanish within
+    // milliseconds behind Begin's "launching…" and the review's own ReviewText=null cleanup. Asserts what
+    // LaunchSession (what the client tile binds to) actually holds right after Begin, through the launch,
+    // and once the game is no longer busy — then that the NEXT launch retires it.
+    [Fact]
+    public async Task A_dependency_notice_survives_Begin_shows_once_not_busy_and_is_also_logged()
+    {
+        var (sut, _, _, c) = Build();
+        var s = sut.For(c);
+        var inv = new StellarLauncher.Core.Inventory.InventorySnapshot(true, null, null,
+            Array.Empty<StellarLauncher.Core.Inventory.InstalledPlugin>(), Array.Empty<StellarLauncher.Core.Inventory.DuplicateSlot>(), 0);
+        var path = Path.Combine(Path.GetTempPath(), $"deps-log-{Guid.NewGuid():N}.log");
+        DependencyLog.AlwaysOnFile = path;
+
+        try
+        {
+            await sut.LaunchAsync(c, new NoticeReview("Added ReShade for Photo Studio"), CancellationToken.None);
+
+            // Begin() ran (FakeOrchestrator takes it straight to Running) — the notice must have survived it.
+            Assert.Equal("Added ReShade for Photo Studio", s.DependencyNotice);
+            Assert.Null(s.ReviewText);   // the transient slot is unaffected — this never went through it
+
+            // Once the game is no longer busy, the tile's own state-line mechanism surfaces the notice.
+            s.Apply(new ExitedEvent(0));
+            Assert.Equal("Added ReShade for Photo Studio", StellarLauncher.App.Services.SessionPresenter.StateLine(s, inv, true));
+
+            // Always-on log: the announcement is on record even if the player never looks at the tile.
+            var lines = File.Exists(path) ? File.ReadAllLines(path).Where(l => l.Contains("Added ReShade for Photo Studio")).ToArray() : Array.Empty<string>();
+            Assert.Contains("Main: Added ReShade for Photo Studio", Assert.Single(lines));
+
+            // The NEXT launch attempt retires the old notice ("until the next launch") — this review reports
+            // nothing, so after it the notice is gone.
+            await sut.LaunchAsync(c, new Review(true), CancellationToken.None);
+            Assert.Null(s.DependencyNotice);
+        }
+        finally { DependencyLog.AlwaysOnFile = null; try { File.Delete(path); } catch { } }
+    }
 }

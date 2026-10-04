@@ -36,6 +36,16 @@ public class DashboardViewModelTests
         public string? DetectRunner() => "/p/proton"; public string? DetectUmu() => null;
     }
     private sealed class Review : IPreLaunchReview { public Task<bool> ReviewAsync(ClientProfile c, CancellationToken ct) => Task.FromResult(true); }
+    // R-2: a review that reports the owner's sticky "Added <dependency> for <plugin>" announcement.
+    private sealed class NoticeReview : IPreLaunchReview
+    {
+        public Task<bool> ReviewAsync(ClientProfile c, CancellationToken ct) => throw new InvalidOperationException("status overload expected");
+        public Task<bool> ReviewAsync(ClientProfile c, Action<string?> status, CancellationToken ct)
+        {
+            status("Added ReShade for Photo Studio");
+            return Task.FromResult(true);
+        }
+    }
     private sealed class Orch : ILaunchOrchestrator
     {
         public readonly List<string> Launched = new();
@@ -44,7 +54,7 @@ public class DashboardViewModelTests
     private sealed class NoScan : IRunningProcessScanner { public IReadOnlyList<RunningProcess> Snapshot() => Array.Empty<RunningProcess>(); }
     private sealed class NoProc : IProcessFactory { public IGameProcess? Start(ProcessStartInfo p) => null; public IGameProcess? Attach(int pid) => null; }
 
-    private static (DashboardViewModel dash, ShellViewModel shell, Orch orch) Build()
+    private static (DashboardViewModel dash, ShellViewModel shell, Orch orch) Build(IPreLaunchReview? review = null)
     {
         var fs = new MockFileSystem();
         fs.AddFile($"{Main}/BepInEx/plugins/Stellar.Framework/.stellar-version", new MockFileData("2.7.4"));
@@ -63,7 +73,7 @@ public class DashboardViewModelTests
         var svc = new DashboardServices(
             new StellarLauncher.Core.Inventory.ClientInventory(fs, deps.Installer, deps.Plugins, new DoorstopToggle(fs)),
             new RegistryCache(new Registry(), () => store.Load()), new FrameworkManifests(new Versions()),
-            new Review(), deps, new ClientCandidates(new Detector(), new Platform()), new WorkspaceFixture.ScriptedSteps());
+            review ?? new Review(), deps, new ClientCandidates(new Detector(), new Platform()), new WorkspaceFixture.ScriptedSteps());
         ShellViewModel shell = null!;
         shell = new ShellViewModel(store, sessions, new ShellPages(s => new DashboardViewModel(s, svc), (s, c) => new object(), s => new object(), s => new object()));
         shell.Start();
@@ -114,6 +124,28 @@ public class DashboardViewModelTests
         Assert.Equal(SessionState.Running, shell.Sessions.For(shell.Config.Clients[0]).State);
         Assert.True(dash.Tiles[0].IsRunningVisible);
         Assert.Contains("1 running", dash.SummaryLine);
+    }
+
+    // R-2: the owner's "tell me" announcement must actually reach the DASHBOARD TILE (the full pipeline:
+    // ClientSessions → LaunchSession.DependencyNotice → SessionPresenter → ClientTileViewModel.StateLine) —
+    // surviving Begin and showing once the game is no longer busy — with a dismiss link that clears it.
+    [Fact]
+    public async Task Dependency_notice_shows_on_the_tile_once_not_busy_and_clears_on_dismiss()
+    {
+        var (dash, shell, _) = Build(new NoticeReview());
+        await dash.RefreshAsync();
+
+        await dash.Tiles[0].LaunchCommand.ExecuteAsync(null);   // Orch takes it straight to Running
+        var session = shell.Sessions.For(shell.Config.Clients[0]);
+        Assert.False(dash.Tiles[0].HasDependencyNotice);        // busy (Running) — the elapsed-time line wins
+
+        session.Apply(new ExitedEvent(0));                      // not busy again
+        Assert.True(dash.Tiles[0].HasDependencyNotice);
+        Assert.Equal("Added ReShade for Photo Studio", dash.Tiles[0].StateLine);
+
+        dash.Tiles[0].DismissDependencyNoticeCommand.Execute(null);
+        Assert.False(dash.Tiles[0].HasDependencyNotice);
+        Assert.NotEqual("Added ReShade for Photo Studio", dash.Tiles[0].StateLine);
     }
 
     [Fact]

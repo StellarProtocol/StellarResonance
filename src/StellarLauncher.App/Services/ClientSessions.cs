@@ -47,10 +47,16 @@ public sealed class ClientSessions
         if (!s.CanLaunch || !_pending.Add(c.Id)) return;
         try
         {
+            // R-2: a fresh launch attempt retires the PREVIOUS attempt's sticky notice ("until the next
+            // launch") — before the review runs, so a new one from THIS review (set below) is never
+            // immediately wiped by this same line.
+            _marshal(() => s.ClearDependencyNotice());
             bool proceed;
             // The review reports its progress (dependency downloads) on the client's state line; it is
-            // cleared however the review ends, and Begin clears it too.
-            try { proceed = await review.ReviewAsync(c, text => _marshal(() => s.SetReviewText(text)), ct); }
+            // cleared however the review ends, and Begin clears it too — EXCEPT the owner's "tell me"
+            // announcement ("Added <dependency> for <plugin>"), which is STICKY (R-2): it goes to the
+            // session's DependencyNotice instead, which Begin leaves alone, and to the always-on log.
+            try { proceed = await review.ReviewAsync(c, text => _marshal(() => ReportReviewText(s, c, text)), ct); }
             catch (OperationCanceledException) { return; }   // cancelled review = no launch; session stays Idle
             finally { _marshal(() => s.SetReviewText(null)); }
             if (!proceed) return;
@@ -76,6 +82,20 @@ public sealed class ClientSessions
         {
             _pending.Remove(c.Id);
         }
+    }
+
+    /// <summary>R-2: splits a review progress line between the transient state-line text ("Preparing …",
+    /// cleared however the review ends) and the owner's sticky "Added &lt;dependency&gt; for &lt;plugin&gt;"
+    /// announcement, which also gets one always-on log line so it's on record even if the player never
+    /// notices the tile.</summary>
+    private static void ReportReviewText(LaunchSession s, ClientProfile c, string? text)
+    {
+        if (text is { } t && t.StartsWith("Added ", StringComparison.Ordinal))
+        {
+            s.SetDependencyNotice(t);
+            DependencyLog.Notice(c.Name, t);
+        }
+        else s.SetReviewText(text);
     }
 
     public void Stop(ClientProfile c) => For(c).Stop();

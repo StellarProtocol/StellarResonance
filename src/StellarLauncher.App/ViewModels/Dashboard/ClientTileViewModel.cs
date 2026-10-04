@@ -63,6 +63,9 @@ public sealed partial class ClientTileViewModel : ObservableObject
 
     public string StateLine => SessionPresenter.StateLine(Session, _inv, Client.Modded);
     public IBrush StateBrush => SessionPresenter.StateBrush(Session, _inv);
+    /// <summary>R-2: true while the sticky "Added &lt;dependency&gt; for &lt;plugin&gt;" notice is showing on
+    /// <see cref="StateLine"/> — shows a small dismiss link next to it.</summary>
+    public bool HasDependencyNotice => !Session.IsBusy && Session.DependencyNotice is { Length: > 0 };
 
     public bool ShowProgress => Session.State is SessionState.Launching or SessionState.Preparing;
     public double Progress => (Session.Progress ?? 0) * 100;
@@ -80,7 +83,7 @@ public sealed partial class ClientTileViewModel : ObservableObject
     public void Refresh()
     {
         foreach (var p in new[] { nameof(FrameworkLine), nameof(FrameworkNeedsAttention), nameof(ShowInstallFramework), nameof(PluginsLine),
-                     nameof(StateLine), nameof(StateBrush), nameof(ShowProgress), nameof(Progress), nameof(ProgressIndeterminate),
+                     nameof(StateLine), nameof(StateBrush), nameof(HasDependencyNotice), nameof(ShowProgress), nameof(Progress), nameof(ProgressIndeterminate),
                      nameof(IsLaunchVisible), nameof(IsRunningVisible), nameof(IsPrepVisible), nameof(CanStop),
                      nameof(RegionTag), nameof(EditionTag), nameof(HasRegion), nameof(HasEdition) })
             OnPropertyChanged(p);
@@ -89,4 +92,7 @@ public sealed partial class ClientTileViewModel : ObservableObject
     [RelayCommand] private Task Launch() => _launch(Client);
     [RelayCommand] private void Stop() => _stop(Client);
     [RelayCommand] private void Open() => _open(Client);
+    /// <summary>R-2: "until it's dismissed" — the player can clear the sticky notice early. Raises
+    /// Session.Changed, which the dashboard already relays into every tile's own Refresh().</summary>
+    [RelayCommand] private void DismissDependencyNotice() => Session.ClearDependencyNotice();
 }

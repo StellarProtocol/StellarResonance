@@ -20,6 +20,14 @@ public sealed class LaunchSession
     /// <see cref="StatusText"/> so a previous run's failure message survives a cancelled review.</summary>
     public string? ReviewText { get; private set; }
 
+    /// <summary>R-2: the last "Added &lt;dependency&gt; for &lt;plugin&gt;" notice from a pre-launch review.
+    /// Unlike <see cref="ReviewText"/> (live, in-progress feedback that <see cref="Begin"/> always clears,
+    /// along with the caller's own <c>finally</c> once the review ends), this is STICKY — it survives
+    /// <see cref="Begin"/> and the whole launch (through Running and exit), so the player actually gets to
+    /// see it, until the caller clears it at the start of the NEXT launch attempt or it is explicitly
+    /// dismissed via <see cref="ClearDependencyNotice"/>.</summary>
+    public string? DependencyNotice { get; private set; }
+
     public event Action<LaunchSession>? Changed;
 
     public LaunchSession(string clientId) => ClientId = clientId;
@@ -61,6 +69,25 @@ public sealed class LaunchSession
     {
         if (IsBusy || ReviewText == text) return;
         ReviewText = text;
+        Raise();
+    }
+
+    /// <summary>R-2: sets the sticky dependency notice (never ignored while busy — unlike
+    /// <see cref="SetReviewText"/>, the caller RAISES this one specifically so it survives the launch that's
+    /// about to start).</summary>
+    public void SetDependencyNotice(string text)
+    {
+        if (DependencyNotice == text) return;
+        DependencyNotice = text;
+        Raise();
+    }
+
+    /// <summary>R-2: clears the sticky dependency notice — called by the caller at the start of the next
+    /// launch attempt ("until the next launch"), or by an explicit player dismissal ("until dismissed").</summary>
+    public void ClearDependencyNotice()
+    {
+        if (DependencyNotice is null) return;
+        DependencyNotice = null;
         Raise();
     }
 

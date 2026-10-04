@@ -55,6 +55,10 @@
                     <StackPanel Orientation="Horizontal" Spacing="6">
                       <Ellipse Width="7" Height="7" Fill="{Binding StateBrush}" VerticalAlignment="Center"/>
                       <TextBlock Text="{Binding StateLine}" Foreground="{Binding StateBrush}" FontSize="11.5" TextWrapping="Wrap"/>
+                      <!-- R-2: "until it's dismissed" — a small link next to the sticky dependency notice, same
+                           Classes="link" style already used elsewhere on this tile (no new widget). -->
+                      <Button Classes="link" Content="dismiss" FontSize="10.5" Padding="0" Command="{Binding DismissDependencyNoticeCommand}"
+                              IsVisible="{Binding HasDependencyNotice}"/>
                     </StackPanel>
                     <ProgressBar IsVisible="{Binding ShowProgress}" Value="{Binding Progress}" IsIndeterminate="{Binding ProgressIndeterminate}"
                                  Minimum="0" Maximum="100" Height="4" Foreground="{Binding AccentBrush}" Background="#1c2740"/>

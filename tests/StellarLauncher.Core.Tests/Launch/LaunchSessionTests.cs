@@ -126,4 +126,32 @@ public class LaunchSessionTests
         s.SetReviewText("ignored while busy");
         Assert.Null(s.ReviewText);
     }
+
+    // R-2: "Added <dep> for <plugin>" must be STICKY — unlike ReviewText, Begin() never clears it, so it
+    // survives the whole launch (Begin → Running → exit) instead of vanishing within milliseconds. Cleared
+    // only by an explicit dismiss, or by the caller (ClientSessions) at the START of the next launch attempt.
+    [Fact]
+    public void DependencyNotice_survives_Begin_and_clears_only_on_dismiss()
+    {
+        var s = new LaunchSession("c1");
+        var changes = 0; s.Changed += _ => changes++;
+
+        s.SetDependencyNotice("Added ReShade for Photo Studio");
+        Assert.Equal("Added ReShade for Photo Studio", s.DependencyNotice);
+        Assert.Equal(1, changes);
+
+        s.Begin(T0);
+        Assert.Equal("Added ReShade for Photo Studio", s.DependencyNotice);   // NOT cleared by Begin, unlike ReviewText
+        Assert.Null(s.ReviewText);
+
+        s.Apply(new StartedEvent(new FakeProcess()));
+        s.Apply(new RunningEvent());
+        Assert.Equal("Added ReShade for Photo Studio", s.DependencyNotice);   // still there while running
+
+        s.Apply(new ExitedEvent(0));
+        Assert.Equal("Added ReShade for Photo Studio", s.DependencyNotice);   // still there after exit
+
+        s.ClearDependencyNotice();
+        Assert.Null(s.DependencyNotice);
+    }
 }
