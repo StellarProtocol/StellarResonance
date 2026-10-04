@@ -12,13 +12,14 @@ namespace StellarLauncher.App.Services;
 public static class PluginDownloads
 {
     /// <summary>Download one plugin version and install it under its canonical DLL name into one client.
-    /// When the version declares dependencies: a Modded client unparks (a dependency may still be parked
-    /// from a prior vanilla launch) before ensuring them immediately, honouring whatever this plugin's
-    /// dependencies the player already opted out of (<see cref="ClientProfile.SkippedDependencies"/> —
-    /// fix round 1, Important 2); a Vanilla client defers entirely — EnsureAsync must never run while
-    /// files are parked, so the next Modded launch installs them.</summary>
+    /// v3: adopts kept dependencies; <paramref name="reinstallDependencies"/> requests a fresh download and
+    /// verify (Modded: now; Vanilla: at the next Modded launch). When the version declares dependencies: a
+    /// Modded client unparks (a dependency may still be parked from a prior vanilla launch) before ensuring
+    /// them immediately, honouring whatever this plugin's dependencies the player already opted out of
+    /// (<see cref="ClientProfile.SkippedDependencies"/> — fix round 1, Important 2); a Vanilla client defers
+    /// entirely — EnsureAsync must never run while files are parked, so the next Modded launch installs them.</summary>
     public static async Task InstallAsync(PluginInstallDeps deps, ClientProfile client, PluginEntry entry, PluginVersion v,
-        Action<string>? status)
+        Action<string>? status, bool reinstallDependencies = false)
     {
         var gameMini = client.GameMiniDir;
         using var buffer = new MemoryStream();
@@ -35,7 +36,19 @@ public static class PluginDownloads
         status?.Invoke($"installed v{v.Version}");
 
         if (v.Dependencies is not { Count: > 0 } pluginDeps) return;
-        if (!client.Modded) { status?.Invoke("will be installed at next modded launch"); return; }
+        // v3 V3: the plugin is installed again, so dependencies kept when it was removed are its own again — on a Vanilla
+        // client too (a flag write only: no file moves, safe while files are parked). v3 V2: "Also reinstall dependencies"
+        // asks the next ensure to download + verify them afresh.
+        await TryFlagAsync(gameMini, entry.Id, "adopting kept dependencies",
+            () => deps.Dependencies.SetKeptAsync(gameMini, entry.Id, false));
+        if (reinstallDependencies)
+            await TryFlagAsync(gameMini, entry.Id, "requesting a dependency reinstall",
+                () => deps.Dependencies.RequestReinstallAsync(gameMini, entry.Id));
+        if (!client.Modded)
+        {
+            status?.Invoke(reinstallDependencies ? "dependencies will be reinstalled at next modded launch" : "will be installed at next modded launch");
+            return;
+        }
 
         // No EnsureAsync may run while files are parked — restore first, every time (idempotent, fail-open:
         // the plugin IS installed at this point, so a restore error must not surface as a failed install).
@@ -46,5 +59,13 @@ public static class PluginDownloads
         foreach (var s in await DependencyRunner.EnsurePluginAsync(deps, gameMini, entry.Id, pluginDeps, skipped))
             if (s.State != DependencyState.Installed)
                 status?.Invoke(DependencyRunner.Line(entry.Id, s));
+    }
+
+    /// <summary>A ledger flag write after the plugin itself is installed: fail-open (the install succeeded), one
+    /// always-on log line on failure (final review M-f).</summary>
+    private static async Task TryFlagAsync(string gameMini, string pluginId, string what, Func<Task> write)
+    {
+        try { await write(); }
+        catch (Exception ex) { DependencyLog.Failure(gameMini, $"{pluginId}: {what} failed — {ex.Message}"); }
     }
 }

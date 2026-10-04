@@ -82,4 +82,12 @@ public sealed class RecordingDependencyService : IDependencyService, IDependency
     public bool IsKept(string gameMini, string pluginId) => _inner.IsKept(gameMini, pluginId);
     public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default) =>
         _inner.RequestReinstallAsync(gameMini, pluginId, ct);
+
+    public async Task<bool> RemoveAllUnlessKeptAsync(string gameMini, string pluginId, CancellationToken ct = default)
+    {
+        var removed = await _inner.RemoveAllUnlessKeptAsync(gameMini, pluginId, ct);
+        lock (_gate)
+            foreach (var k in _problems.Keys.Where(k => k.GameMini == gameMini && k.PluginId == pluginId).ToList()) _problems.Remove(k);
+        return removed;
+    }
 }

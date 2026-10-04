@@ -23,6 +23,9 @@ public class RecordingDependencyServiceTests
         public Task SetKeptAsync(string g, string p, bool kept, CancellationToken ct = default) { KeptCalls++; return Task.CompletedTask; }
         public bool IsKept(string g, string p) => KeptAnswer;
         public Task RequestReinstallAsync(string g, string p, CancellationToken ct = default) { ReinstallCalls++; return Task.CompletedTask; }
+        public int RemoveAllUnlessKeptCalls;
+        public bool RemoveAllUnlessKeptAnswer = true;
+        public Task<bool> RemoveAllUnlessKeptAsync(string g, string p, CancellationToken ct = default) { RemoveAllUnlessKeptCalls++; return Task.FromResult(RemoveAllUnlessKeptAnswer); }
     }
 
     private static readonly PluginDependency Fx = new("fx", "Fx", "1.0", "https://cdn/fx", new string('a', 64), 1, "file",

@@ -108,7 +108,9 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
     /// or its own cleanup failed) has its files removed. A plugin counts as present when the registry
     /// inventory sees it (installed or disabled) OR its folder still holds a version marker / sits under
     /// plugins-disabled — so a plugin missing from the registry never loses its dependencies. Each ledger
-    /// is fail-open on its own.</summary>
+    /// is fail-open on its own. A ledger marked kept (v3 V3) is never swept — the check runs GATED (review
+    /// carry-over a): a present-but-unreadable ledger throws from <see cref="IDependencyService.RemoveAllUnlessKeptAsync"/>
+    /// and is caught below like any other failure, so a transient read error is never fail-opened into a removal.</summary>
     private async Task SweepOrphansAsync(ClientProfile client, IEnumerable<string> presentIds, CancellationToken ct)
     {
         // Id case: ledger stems are the registry id EnsureAsync was given, so ordinal matches; only a registry id
@@ -120,7 +122,8 @@ public sealed class PreLaunchReviewService : IPreLaunchReview
             {
                 if (present.Contains(id) || _deps.Plugins.IsInstalled(client.GameMiniDir, id)
                     || _deps.Plugins.IsDisabled(client.GameMiniDir, id)) continue;
-                await _deps.Dependencies.RemoveAllAsync(client.GameMiniDir, id, ct);
+                if (!await _deps.Dependencies.RemoveAllUnlessKeptAsync(client.GameMiniDir, id, ct))
+                { Log(client, $"{id}: kept dependencies left in place"); continue; }
                 Log(client, $"{id}: plugin no longer installed — its dependencies were removed");
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }

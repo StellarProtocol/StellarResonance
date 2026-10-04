@@ -200,6 +200,13 @@ public sealed partial class DependencyService : IDependencyService
         if (!DependencyPaths.IsValidPluginId(pluginId)) return; // controller round: see Remove above
         if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
             throw new InvalidOperationException("dependency record could not be read");
+        RemoveAllFiles(gameMini, pluginId, ledger);
+    }
+
+    /// <summary>Shared by <see cref="RemoveAllCore"/> and <see cref="RemoveAllUnlessKeptCore"/> once each has its
+    /// own already-read, already-validated ledger in hand — never re-reads.</summary>
+    private void RemoveAllFiles(string gameMini, string pluginId, DependencyLedger ledger)
+    {
         foreach (var entry in ledger.Entries.Concat(ledger.Pending ?? Array.Empty<LedgerEntry>()))
             DeleteEntryFiles(gameMini, pluginId, entry);
         _store.Write(gameMini, ledger with { Entries = Array.Empty<LedgerEntry>(), Pending = null });
@@ -227,6 +234,16 @@ public sealed partial class DependencyService : IDependencyService
         var gate = Gate(gameMini);
         await gate.WaitAsync(ct).ConfigureAwait(false);
         try { await Task.Run(action).ConfigureAwait(false); }   // never on the caller's (UI) thread, even with a free gate
+        finally { gate.Release(); }
+    }
+
+    /// <summary>Same contract as <see cref="LockedAsync(string,Action,CancellationToken)"/>, for the one mutating
+    /// member (<see cref="RemoveAllUnlessKeptAsync"/>) that needs to report back whether it actually removed anything.</summary>
+    private async Task<T> LockedAsync<T>(string gameMini, Func<T> func, CancellationToken ct)
+    {
+        var gate = Gate(gameMini);
+        await gate.WaitAsync(ct).ConfigureAwait(false);
+        try { return await Task.Run(func).ConfigureAwait(false); }
         finally { gate.Release(); }
     }
 

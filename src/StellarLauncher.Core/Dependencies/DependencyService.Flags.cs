@@ -35,8 +35,11 @@ public sealed partial class DependencyService
     /// was requested, each declared, non-skipped dependency's files are removed first — hash-checked, so a file the
     /// player changed stays and the loop then reports it Blocked — and the loop downloads + verifies them afresh.
     /// Works from <paramref name="seen"/> (the ledger RemoveUndeclared already read) and reads NOTHING more unless a flag
-    /// is set: the fault-injection tests pin the exact number of ledger reads an ensure makes. Best effort: a failure
-    /// leaves the flag for the next ensure. Returns whether a reinstall is in progress.</summary>
+    /// is set: the fault-injection tests pin the exact number of ledger reads an ensure makes. The Kept clear is
+    /// independent best effort (a failure there just leaves it for the next ensure to adopt). Review carry-over (b):
+    /// returns whether the REINSTALL flag should now be cleared — false when it was never set, or when any
+    /// dependency's remove failed, so the flag stays and the next ensure retries just the ones still wrong (clearing
+    /// it unconditionally would silently drop a dependency that was never actually re-downloaded).</summary>
     private bool Adopt(string gameMini, string pluginId, DependencyLedger seen,
         IReadOnlyList<PluginDependency> deps, ISet<string> skippedIds)
     {
@@ -46,20 +49,41 @@ public sealed partial class DependencyService
             catch (Exception) { /* best effort: the next ensure adopts it */ }
         }
         if (!seen.ReinstallRequested) return false;
+        var allRemoved = true;
         foreach (var d in deps)
         {
             if (skippedIds.Contains(d.Id) || DependencyDeclaration.Problem(d) is not null) continue;
             try { RemoveCore(gameMini, pluginId, d.Id); }
-            catch (Exception) { /* the ensure below reports whatever is still wrong */ }
+            catch (Exception) { allRemoved = false; /* the ensure below reports whatever is still wrong; flag stays for a retry */ }
         }
-        return true;
+        return allRemoved;
     }
 
-    /// <summary>V2: the request is consumed once the ensure has run (an ensure that removed every entry also removed the
-    /// ledger, and with it the flag). Best effort — a failure means one harmless extra re-download next time.</summary>
+    /// <summary>V2: the request is consumed once every declared, non-skipped dependency's remove ran clean (an ensure
+    /// that removed every entry also removed the ledger, and with it the flag). Best effort — a failure to WRITE the
+    /// clear itself means one harmless extra re-download next time (the dependency was already removed/replaced).</summary>
     private void ClearReinstallRequest(string gameMini, string pluginId)
     {
         try { WriteFlags(gameMini, pluginId, l => l with { ReinstallRequested = false }); }
         catch (Exception) { /* best effort */ }
+    }
+
+    /// <summary>Review carry-over (a): GATED — never a bare fail-open <see cref="IsKept"/> read raced against a
+    /// separate <see cref="DependencyService.RemoveAllAsync"/>. Runs under the same per-folder lock as every other
+    /// mutating member.</summary>
+    public Task<bool> RemoveAllUnlessKeptAsync(string gameMini, string pluginId, CancellationToken ct = default) =>
+        LockedAsync(gameMini, () => RemoveAllUnlessKeptCore(gameMini, pluginId), ct);
+
+    /// <summary>Round 6 rule applies here too: a present-but-unreadable ledger is never treated as "safe to sweep" —
+    /// it throws, exactly like <see cref="RemoveAllCore"/>, so the caller's existing failure handling (never a silent
+    /// removal) covers it. Only a successfully read, NOT-kept ledger is actually removed.</summary>
+    private bool RemoveAllUnlessKeptCore(string gameMini, string pluginId)
+    {
+        if (!DependencyPaths.IsValidPluginId(pluginId)) return false;
+        if (!_store.TryReadForWrite(gameMini, pluginId, out var ledger))
+            throw new InvalidOperationException("dependency record could not be read");
+        if (ledger.Kept) return false;
+        RemoveAllFiles(gameMini, pluginId, ledger);
+        return true;
     }
 }

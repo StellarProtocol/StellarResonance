@@ -176,4 +176,108 @@ public sealed partial class DependencyServiceTests
         Assert.Equal(DependencyReason.PlayerFile, st[1].Reason);
         Assert.Equal(new byte[] { 7 }, _fs.File.ReadAllBytes("/game_mini/b.dll"));
     }
+
+    // Review carry-over (c): the request itself throws like SetKeptAsync on a present-but-unreadable ledger — a
+    // flag write is never blind — and touches nothing.
+    [Fact]
+    public async Task RequestReinstall_on_a_transiently_unreadable_ledger_throws_and_writes_nothing()
+    {
+        var d = File("fx", new byte[] { 1 }, "dxgi.dll");
+        await Make().EnsureAsync(G, "p", new[] { d }, None, default);
+        var before = _fs.File.ReadAllText(LedgerPath);
+        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, once: false, "ReadAllText");
+        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => s2.RequestReinstallAsync(G, "p"));
+
+        Assert.Equal("dependency record could not be read", ex.Message);
+        Assert.Equal(before, _fs.File.ReadAllText(LedgerPath));
+    }
+
+    // Review carry-over (c): a ledger that is BOTH kept and reinstall-requested adopts (clears Kept) AND
+    // reinstalls (re-downloads, clears ReinstallRequested) in the same ensure.
+    [Fact]
+    public async Task A_ledger_that_is_both_kept_and_reinstall_requested_adopts_and_reinstalls_in_one_ensure()
+    {
+        var a = File("a", new byte[] { 1 }, "a.dll");
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { a }, None, default);
+        await s.SetKeptAsync(G, "p", true);
+        await s.RequestReinstallAsync(G, "p");
+        Assert.True(LedgerOf().Kept);
+        Assert.True(LedgerOf().ReinstallRequested);
+        _downloads = 0;
+
+        var st = await s.EnsureAsync(G, "p", new[] { a }, None, default);
+
+        Assert.Equal(DependencyState.Installed, Assert.Single(st).State);
+        Assert.False(s.IsKept(G, "p"));
+        Assert.False(LedgerOf().ReinstallRequested);
+        Assert.Equal(1, _downloads);   // re-downloaded even though adopted, not merely left alone
+    }
+
+    // Review carry-over (b): a remove that fails during a requested reinstall must NOT clear the flag — otherwise
+    // the still-wrong dependency is never retried.
+    [Fact]
+    public async Task A_failed_remove_during_a_requested_reinstall_leaves_the_flag_set_for_a_retry()
+    {
+        var a = File("a", new byte[] { 1 }, "a.dll");
+        var b = File("b", new byte[] { 2 }, "b.dll");
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { a, b }, None, default);
+        await s.RequestReinstallAsync(G, "p");
+
+        // Let RemoveUndeclared's own read (call 1) and "a"'s RemoveCore read (call 2) through; fail "b"'s.
+        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, once: true, afterCalls: 2, "ReadAllText");
+        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+
+        await s2.EnsureAsync(G, "p", new[] { a, b }, None, default);
+
+        Assert.True(LedgerOf().ReinstallRequested);   // "b" never got re-downloaded — the next ensure must retry it
+    }
+
+    // Review carry-over (a): the gated check used by the orphan sweep — a present-but-unreadable ledger is
+    // treated as KEPT (never removed), not silently swept on a transient read failure.
+    [Fact]
+    public async Task RemoveAllUnlessKept_on_a_transiently_unreadable_ledger_removes_nothing()
+    {
+        var d = File("fx", new byte[] { 1 }, "dxgi.dll");
+        await Make().EnsureAsync(G, "p", new[] { d }, None, default);
+        var before = _fs.File.ReadAllText(LedgerPath);
+        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, once: false, "ReadAllText");
+        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => s2.RemoveAllUnlessKeptAsync(G, "p"));
+
+        Assert.Equal("dependency record could not be read", ex.Message);
+        Assert.Equal(before, _fs.File.ReadAllText(LedgerPath));
+        Assert.True(_fs.File.Exists("/game_mini/dxgi.dll"));
+    }
+
+    [Fact]
+    public async Task RemoveAllUnlessKept_removes_an_ordinary_ledger_and_returns_true()
+    {
+        var d = File("fx", new byte[] { 1 }, "dxgi.dll");
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { d }, None, default);
+
+        Assert.True(await s.RemoveAllUnlessKeptAsync(G, "p"));
+
+        Assert.False(_fs.File.Exists("/game_mini/dxgi.dll"));
+        Assert.False(_fs.File.Exists(LedgerPath));
+    }
+
+    [Fact]
+    public async Task RemoveAllUnlessKept_leaves_a_kept_ledger_untouched_and_returns_false()
+    {
+        var d = File("fx", new byte[] { 1 }, "dxgi.dll");
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { d }, None, default);
+        await s.SetKeptAsync(G, "p", true);
+
+        Assert.False(await s.RemoveAllUnlessKeptAsync(G, "p"));
+
+        Assert.True(_fs.File.Exists("/game_mini/dxgi.dll"));
+        Assert.True(LedgerOf().Kept);
+    }
 }

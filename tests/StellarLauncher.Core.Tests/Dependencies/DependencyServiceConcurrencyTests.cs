@@ -142,4 +142,24 @@ public sealed class DependencyServiceConcurrencyTests
         await Task.WhenAll(ensure, keep);
         Assert.True(s.IsKept(G, "p"));
     }
+
+    // Review carry-over (c): RequestReinstallAsync is a mutating member too — it waits for the folder's gate
+    // exactly like SetKeptAsync.
+    [Fact]
+    public async Task RequestReinstall_waits_for_an_ensure_in_flight_and_marks_the_ledger_it_wrote()
+    {
+        Hold = TimeSpan.FromSeconds(5);
+        var s = Make();
+        var a = Dep("a", 1);
+        var ensure = s.EnsureAsync(G, "p", new[] { a }, None, default);
+        await Started.Task;
+
+        var reinstall = s.RequestReinstallAsync(G, "p");
+        await Task.Delay(100);
+        Assert.False(reinstall.IsCompleted);
+
+        Release.TrySetResult();
+        await Task.WhenAll(ensure, reinstall);
+        Assert.True(new DependencyLedgerStore(_fs).Read(G, "p").ReinstallRequested);
+    }
 }

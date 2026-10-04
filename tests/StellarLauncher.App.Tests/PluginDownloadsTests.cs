@@ -50,6 +50,7 @@ public class PluginDownloadsTests
         public bool IsKept(string gameMini, string pluginId) => Kept.Contains(pluginId);
         public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default)
         { Flags.Add($"Reinstall:{pluginId}"); return Task.CompletedTask; }
+        public Task<bool> RemoveAllUnlessKeptAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.FromResult(true);
     }
 
     private sealed class DllHandler : HttpMessageHandler
@@ -200,5 +201,49 @@ public class PluginDownloadsTests
 
         Assert.NotNull(fake.LastSkippedIds);
         Assert.Empty(fake.LastSkippedIds!);
+    }
+
+    // v3 V3: installing a version that declares dependencies adopts any kept ones — on a Vanilla client too (a flag
+    // write, never an ensure: the pinned Calls stay empty there).
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Install_with_dependencies_adopts_kept_ones_on_any_client(bool modded)
+    {
+        var (deps, fake) = Build();
+        var entry = EntryWithDependency();
+
+        await PluginDownloads.InstallAsync(deps, Client(modded), entry, entry.Versions[0], null);
+
+        Assert.Equal(new[] { "Kept:p1:False" }, fake.Flags);
+        Assert.Equal(modded ? new[] { "Unpark", "Ensure:p1" } : Array.Empty<string>(), fake.Calls);
+    }
+
+    // v3 V2: "Also reinstall dependencies" on a Modded client: request, then the usual unpark → ensure consumes it.
+    [Fact]
+    public async Task Reinstall_with_dependencies_requests_it_before_the_ensure()
+    {
+        var (deps, fake) = Build();
+        var entry = EntryWithDependency();
+
+        await PluginDownloads.InstallAsync(deps, Client(modded: true), entry, entry.Versions[0], null, reinstallDependencies: true);
+
+        Assert.Equal(new[] { "Kept:p1:False", "Reinstall:p1" }, fake.Flags);
+        Assert.Equal(new[] { "Unpark", "Ensure:p1" }, fake.Calls);
+    }
+
+    // v3 V2: on a Vanilla client the dependency part waits for the next Modded launch, as an install does.
+    [Fact]
+    public async Task Vanilla_reinstall_records_the_request_and_defers_it()
+    {
+        var (deps, fake) = Build();
+        var entry = EntryWithDependency();
+        var messages = new List<string>();
+
+        await PluginDownloads.InstallAsync(deps, Client(modded: false), entry, entry.Versions[0], messages.Add, reinstallDependencies: true);
+
+        Assert.Empty(fake.Calls);   // no unpark, no ensure while files may be parked
+        Assert.Equal(new[] { "Kept:p1:False", "Reinstall:p1" }, fake.Flags);
+        Assert.Contains("dependencies will be reinstalled at next modded launch", messages);
     }
 }

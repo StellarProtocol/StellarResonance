@@ -52,6 +52,7 @@ public sealed class DependencyLedgerStoreTests
         var old = JsonSerializer.Deserialize<PreviousLedger>(fs.File.ReadAllText("/game_mini/stellar/deps/p.json"));
         Assert.Equal("fx", Assert.Single(old!.Entries).DependencyId);
     }
+
     [Fact]
     public void Write_then_read_round_trips_and_missing_reads_empty()
     {

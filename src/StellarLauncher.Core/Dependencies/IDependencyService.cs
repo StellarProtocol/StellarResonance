@@ -80,4 +80,12 @@ public interface IDependencyService
     /// them afresh. A flag write only (safe while parked, so a Vanilla client defers it to the next Modded launch).
     /// No-op without a ledger; throws like <see cref="SetKeptAsync"/>.</summary>
     Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default);
+
+    /// <summary>v3 V3 review carry-over (a): the GATED equivalent of a bare <see cref="IsKept"/> read followed by a
+    /// separate <see cref="RemoveAllAsync"/> — the orphan sweep must never fail-open a transient read error into a
+    /// removal. Removes every dependency's files and the ledger for <paramref name="pluginId"/> UNLESS the ledger is
+    /// marked kept, in which case nothing is touched and this returns false. A present-but-unreadable ledger is
+    /// treated as kept (never swept): it throws <see cref="System.InvalidOperationException"/>, exactly like
+    /// <see cref="RemoveAllAsync"/>, rather than removing anything. Returns true when the removal actually ran.</summary>
+    Task<bool> RemoveAllUnlessKeptAsync(string gameMini, string pluginId, CancellationToken ct = default);
 }

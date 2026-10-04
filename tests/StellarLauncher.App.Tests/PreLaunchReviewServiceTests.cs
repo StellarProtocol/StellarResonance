@@ -1,4 +1,5 @@
 using System.IO.Abstractions.TestingHelpers;
+using System.Security.Cryptography;
 using StellarLauncher.App.Services;
 using StellarLauncher.App.ViewModels;
 using StellarLauncher.Core.Clients;
@@ -67,6 +68,16 @@ public class PreLaunchReviewServiceTests
         public bool IsKept(string gameMini, string pluginId) => Kept.Contains(pluginId);
         public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default)
         { Flags.Add($"Reinstall:{pluginId}"); return Task.CompletedTask; }
+
+        // Review carry-over (a): simulates a present-but-unreadable ledger (the real, gated Core check throws here).
+        public HashSet<string> Unreadable = new();
+        public Task<bool> RemoveAllUnlessKeptAsync(string gameMini, string pluginId, CancellationToken ct = default)
+        {
+            if (Unreadable.Contains(pluginId)) throw new InvalidOperationException("dependency record could not be read");
+            if (Kept.Contains(pluginId)) return Task.FromResult(false);
+            Calls.Add($"RemoveAll:{pluginId}");
+            return Task.FromResult(true);
+        }
     }
 
     // Shared by any test that needs one installed plugin whose installed version declares a dependency.
@@ -380,5 +391,67 @@ public class PreLaunchReviewServiceTests
         public IReadOnlyList<string> Lines => Queue.ToList();
         public override void Write(string? message) { }
         public override void WriteLine(string? message) { if (message is not null) Queue.Enqueue(message); }
+    }
+
+    // v3 V3: a kept ledger is "never swept by the orphan cleanup".
+    [Fact]
+    public async Task Kept_ledgers_are_skipped_by_the_orphan_sweep()
+    {
+        var fs = new MockFileSystem();
+        var entry = OnePluginWithDependency();
+        var fake = new FakeDependencyService { Ledgers = { "p1", "gone", "kept" }, Kept = { "kept" } };
+        var (deps, inventory) = BuildInstalledP1(fs, fake);
+        var sut = new PreLaunchReviewService(new RegistryCache(new OneEntryRegistry(entry), () => new LauncherConfig()),
+            inventory, new Online(), deps, _ => Task.FromResult(PreLaunchResult.Proceed));
+
+        Assert.True(await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g", AutoUpdateBeforeLaunch = true }, CancellationToken.None));
+
+        Assert.Equal(new[] { "Unpark", "RemoveAll:gone", "Ensure:p1" }, fake.Calls);
+    }
+
+    // v3 V3 end-to-end on the real service: kept files survive a Modded launch's sweep, and are parked for Vanilla and
+    // restored for Modded like any other moddedOnly file.
+    [Fact]
+    public async Task Kept_dependencies_survive_launches_and_are_parked_and_restored()
+    {
+        var fs = new MockFileSystem();
+        var bytes = new byte[] { 1 };
+        fs.AddFile("/g/dxgi.dll", new MockFileData(bytes));
+        new DependencyLedgerStore(fs).Write("/g", new DependencyLedger("gone", new[]
+        {
+            new LedgerEntry("fx", "1", new[] { new LedgerFile("dxgi.dll", Convert.ToHexString(SHA256.HashData(bytes)), true) }),
+        }, Kept: true));
+        var noDeps = new PluginEntry("p1", "Plugin One", "d", null, new[]
+            { new PluginVersion("1.0.0", null, "P1.dll", "https://cdn/p1.dll", "sha", "0.1.0", null, null) });
+        var (deps, inventory) = BuildInstalledP1(fs, new DependencyService(fs, new HttpClient()));
+        var sut = new PreLaunchReviewService(new RegistryCache(new OneEntryRegistry(noDeps), () => new LauncherConfig()),
+            inventory, new Online(), deps, _ => Task.FromResult(PreLaunchResult.Proceed));
+
+        Assert.True(await sut.ReviewAsync(new ClientProfile { Modded = false, GameMiniDir = "/g" }, CancellationToken.None));
+        Assert.False(fs.File.Exists("/g/dxgi.dll"));
+        Assert.True(fs.File.Exists("/g/stellar/deps-parked/gone/dxgi.dll"));
+
+        Assert.True(await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g", AutoUpdateBeforeLaunch = true }, CancellationToken.None));
+        Assert.True(fs.File.Exists("/g/dxgi.dll"));
+        Assert.True(fs.File.Exists("/g/stellar/deps/gone.json"));
+    }
+
+    // Review carry-over (a): the sweep's RemoveAllUnlessKeptAsync call is wrapped by the same fail-open catch as any
+    // other ledger failure — an unreadable ledger (the gated Core check treats it as kept; see
+    // DependencyServiceKeptTests.RemoveAllUnlessKept_on_a_transiently_unreadable_ledger_removes_nothing for the
+    // filesystem-level guarantee) removes nothing here either, and never fails the review.
+    [Fact]
+    public async Task An_unreadable_ledger_is_never_swept_and_does_not_fail_the_review()
+    {
+        var fs = new MockFileSystem();
+        var entry = OnePluginWithDependency();
+        var fake = new FakeDependencyService { Ledgers = { "p1", "unreadable" }, Unreadable = { "unreadable" } };
+        var (deps, inventory) = BuildInstalledP1(fs, fake);
+        var sut = new PreLaunchReviewService(new RegistryCache(new OneEntryRegistry(entry), () => new LauncherConfig()),
+            inventory, new Online(), deps, _ => Task.FromResult(PreLaunchResult.Proceed));
+
+        Assert.True(await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g", AutoUpdateBeforeLaunch = true }, CancellationToken.None));
+
+        Assert.DoesNotContain("RemoveAll:unreadable", fake.Calls);
     }
 }

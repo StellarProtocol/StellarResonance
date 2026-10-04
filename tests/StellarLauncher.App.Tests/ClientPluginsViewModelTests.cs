@@ -152,6 +152,7 @@ public partial class ClientPluginsViewModelTests
         public Task SetKeptAsync(string gameMini, string pluginId, bool kept, CancellationToken ct = default) => Task.CompletedTask;
         public bool IsKept(string gameMini, string pluginId) => false;
         public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<bool> RemoveAllUnlessKeptAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.FromResult(true);
     }
 
     [Fact]
@@ -477,6 +478,7 @@ public partial class ClientPluginsViewModelTests
         public Task SetKeptAsync(string g, string p, bool kept, CancellationToken ct = default) => inner.SetKeptAsync(g, p, kept, ct);
         public bool IsKept(string g, string p) => inner.IsKept(g, p);
         public Task RequestReinstallAsync(string g, string p, CancellationToken ct = default) => inner.RequestReinstallAsync(g, p, ct);
+        public Task<bool> RemoveAllUnlessKeptAsync(string g, string p, CancellationToken ct = default) => inner.RemoveAllUnlessKeptAsync(g, p, ct);
     }
 
     [Fact]
