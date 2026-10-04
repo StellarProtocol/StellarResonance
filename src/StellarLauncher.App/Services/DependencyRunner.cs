@@ -75,7 +75,12 @@ public static class DependencyRunner
 
     /// <summary>Ensures every installed plugin's dependencies. Before a plugin whose dependencies still need
     /// downloading, reports "Preparing &lt;plugin&gt;: &lt;dependency names&gt;…" through
-    /// <paramref name="progress"/>. Returns one status line per dependency.</summary>
+    /// <paramref name="progress"/>. Owner decision ("install it ticked, tell me"): a version bump (or the
+    /// copy-set path) that declares an optional dependency not yet in this plugin's ledger — one the player
+    /// was never asked about, because no step dialog runs here — installs it the same as a fresh install's
+    /// ticked default, and this reports "Added &lt;dependency&gt; for &lt;plugin&gt;" once it actually lands
+    /// (a player who already opted out via <see cref="ClientProfile.SkippedDependencies"/> never sees either
+    /// the download or the message). Returns one status line per dependency.</summary>
     public static async Task<IReadOnlyList<DependencyLine>> EnsureForClientAsync(IDependencyService svc, ClientProfile c,
         IReadOnlyList<(PluginEntry Entry, string Version)> installed, CancellationToken ct, Action<string>? progress = null)
     {
@@ -90,12 +95,32 @@ public static class DependencyRunner
             // an empty declaration is what removes everything an earlier version placed.
             if (deps.Count == 0 && !ledgers.Contains(entry.Id)) continue;
             var skipped = Skipped(c, entry.Id, deps);
-            if (progress is not null && PendingNames(svc, c.GameMiniDir, entry.Id, deps, skipped) is { Length: > 0 } names)
-                progress($"Preparing {entry.Name}: {names}…");
-            foreach (var s in await svc.EnsureAsync(c.GameMiniDir, entry.Id, deps, skipped, ct))
-                lines.Add(new DependencyLine(Line(entry.Id, s), IsProblem(s)));
+            ISet<string>? before = null;
+            if (progress is not null)
+            {
+                if (PendingNames(svc, c.GameMiniDir, entry.Id, deps, skipped) is { Length: > 0 } names)
+                    progress($"Preparing {entry.Name}: {names}…");
+                before = ExistingDependencyIds(svc, c.GameMiniDir, entry.Id);   // snapshot BEFORE the ensure
+            }
+            var results = await svc.EnsureAsync(c.GameMiniDir, entry.Id, deps, skipped, ct);
+            foreach (var s in results) lines.Add(new DependencyLine(Line(entry.Id, s), IsProblem(s)));
+            if (before is not null)
+                foreach (var s in results)
+                    if (s.State == DependencyState.Installed && !before.Contains(s.DependencyId)
+                        && deps.FirstOrDefault(d => d.Id == s.DependencyId) is { Optional: true } d)
+                        progress!($"Added {d.Name} for {entry.Name}");
         }
         return lines;
+    }
+
+    /// <summary>The dependency ids this plugin's ledger already records, right now — used to tell a
+    /// genuinely NEW optional dependency (never ledgered before this ensure) from one merely finishing an
+    /// earlier attempt. Best-effort: a read failure is treated as "nothing recorded" (never crashes the
+    /// ensure, and at worst over-reports once).</summary>
+    private static ISet<string> ExistingDependencyIds(IDependencyService svc, string gameMini, string pluginId)
+    {
+        try { return svc.LedgerEntries(gameMini, pluginId).Select(e => e.DependencyId).ToHashSet(StringComparer.Ordinal); }
+        catch (Exception) { return new HashSet<string>(); }
     }
 
     private static bool IsProblem(DependencyStatus s) => s.State is DependencyState.Failed or DependencyState.Blocked;
