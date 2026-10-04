@@ -66,16 +66,54 @@ public partial class PluginItemViewModel
     private async Task RefreshCoreAsync()
     {
         var generation = ++_refreshGeneration;
-        var deps = ShownDependencies;
-        IReadOnlyList<DependencyStatus> statuses;
+        var shownDeps = ShownDependencies;
+        // Fix round M1 still holds: CALL (not yet await) DependencyStatusAsync first, exactly as before — its
+        // implementation must snapshot UI-thread state (e.g. SkippedDependencies) synchronously, before this method's
+        // own first await lets the UI thread run further. Awaiting DependenciesKeptAsync FIRST would delay that call
+        // past the point the UI could have already mutated that state.
+        var statusTask = shownDeps.Count == 0 ? Task.FromResult<IReadOnlyList<DependencyStatus>>(Array.Empty<DependencyStatus>()) : _parent.DependencyStatusAsync(this);
+        var keptTask = _parent.DependenciesKeptAsync(this);
+
         bool kept;
-        try { statuses = deps.Count == 0 ? Array.Empty<DependencyStatus>() : await _parent.DependencyStatusAsync(this); }
-        catch (Exception) { return; }
-        try { kept = await _parent.DependenciesKeptAsync(this); }
+        try { kept = await keptTask; }
         catch (Exception) { kept = false; }
+
+        IReadOnlyList<PluginDependency> deps;
+        IReadOnlyList<DependencyStatus> statuses;
+        if (kept)
+        {
+            // Review fix round 3 (4): the kept section shows what the LEDGER actually holds, not what the
+            // currently shown version happens to declare (which may have changed, or dropped it entirely).
+            // statusTask (started above) is irrelevant here and deliberately left unobserved.
+            IReadOnlyList<LedgerEntry> entries;
+            try { entries = await _parent.KeptLedgerEntriesAsync(this); }
+            catch (Exception) { entries = Array.Empty<LedgerEntry>(); }
+            deps = entries.Select(ResolveKeptDependency).ToList();
+            statuses = deps.Select(d => new DependencyStatus(d.Id, DependencyState.Installed, null)).ToList();
+        }
+        else
+        {
+            deps = shownDeps;
+            try { statuses = await statusTask; }
+            catch (Exception) { return; }
+        }
+
         if (generation != _refreshGeneration) return;   // a newer refresh started meanwhile; it owns the rows
         ApplyDependencyRows(deps, statuses);
         DependenciesKept = kept;
+    }
+
+    /// <summary>Review fix round 3 (4): resolves one kept ledger entry to a displayable dependency — the manifest
+    /// name/metadata when SOME version of this plugin still declares the id, else a minimal synthetic dependency
+    /// naming just the bare id, with ModdedOnly read from the ledger entry's OWN recorded files (never from a
+    /// manifest that no longer names it).</summary>
+    private PluginDependency ResolveKeptDependency(LedgerEntry entry)
+    {
+        var known = Entry.Versions.SelectMany(v => v.Dependencies ?? Array.Empty<PluginDependency>())
+            .FirstOrDefault(d => d.Id == entry.DependencyId);
+        if (known is not null) return known;
+        return new PluginDependency(entry.DependencyId, entry.DependencyId, entry.Version, "", "", 0, "file",
+            Array.Empty<PluginDependencyFile>(), "game", ModdedOnly: entry.Files.Any(f => f.ModdedOnly), License: "");
     }
 
     private void ApplyDependencyRows(IReadOnlyList<PluginDependency> deps, IReadOnlyList<DependencyStatus> statuses)

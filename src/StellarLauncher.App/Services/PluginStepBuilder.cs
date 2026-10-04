@@ -75,11 +75,11 @@ public static class PluginStepBuilder
         return used.Count == 0 ? null : new ReinstallStep(entry.Name, target.Version, used);
     }
 
-    /// <summary>V3: the names the remove step shows — the declared, non-skipped dependencies ("the dependencies" when the
-    /// ledger holds only ones this version no longer names). Used by Task 6. Review fix round 1 (c): this always returns
-    /// a step when <paramref name="declared"/> is non-empty (even if every one is currently skipped — the player may
+    /// <summary>V3: the names the remove step shows — the declared, non-skipped dependencies ("the dependencies" when
+    /// every declared dependency is currently skipped). Used by Task 6. Review fix round 1 (c): this always returns
+    /// a step when <paramref name="declared"/> is non-empty, even when every one is currently skipped (the player may
     /// still want to remove what the ledger kept); its CALLER must be the one to skip the step entirely when the plugin
-    /// never declared any dependency at all (<paramref name="declared"/> empty) — there is nothing to ask about then.</summary>
+    /// declares no dependency at all right now (<paramref name="declared"/> empty) — there is nothing to ask about then.</summary>
     public static RemoveStep Remove(ClientProfile client, PluginEntry entry, IReadOnlyList<PluginDependency> declared)
     {
         var skipped = DependencyRunner.Skipped(client, entry.Id, declared);

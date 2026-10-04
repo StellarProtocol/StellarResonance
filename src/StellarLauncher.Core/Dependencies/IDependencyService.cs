@@ -90,4 +90,10 @@ public interface IDependencyService
     /// treated as kept (never swept): it throws <see cref="System.InvalidOperationException"/>, exactly like
     /// <see cref="RemoveAllAsync"/>, rather than removing anything. Returns true when the removal actually ran.</summary>
     Task<bool> RemoveAllUnlessKeptAsync(string gameMini, string pluginId, CancellationToken ct = default);
+
+    /// <summary>v3 V3 review fix round 3 (4): this plugin's ledger entries exactly as recorded — used by the kept
+    /// dependencies page section, which must show what the LEDGER actually holds, not what the currently shown
+    /// plugin version happens to declare. Read-only (no gate, never quarantines); empty for no/unreadable ledger
+    /// or an invalid id.</summary>
+    IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId);
 }

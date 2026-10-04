@@ -29,4 +29,9 @@ public interface IPluginActions
 
     /// <summary>v3 V3: the page's "Remove kept dependencies".</summary>
     Task RemoveKeptDependenciesAsync(PluginItemViewModel item);
+
+    /// <summary>v3 V3 review fix round 3 (4): this plugin's ledger entries exactly as kept (read off the UI thread) —
+    /// the kept section's rows and Vanilla clause must reflect what's REALLY on disk, not what the shown version
+    /// happens to declare.</summary>
+    Task<IReadOnlyList<LedgerEntry>> KeptLedgerEntriesAsync(PluginItemViewModel item);
 }

@@ -53,6 +53,7 @@ public class PreLaunchReviewServiceTests
             return Task.CompletedTask;
         }
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Ledgers;
+        public IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) => Array.Empty<LedgerEntry>();
         public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) { Calls.Add("Park"); return Task.CompletedTask; }
         public Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default)
         {

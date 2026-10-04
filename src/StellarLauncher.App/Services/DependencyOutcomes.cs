@@ -93,4 +93,6 @@ public sealed class RecordingDependencyService : IDependencyService, IDependency
                 foreach (var k in _problems.Keys.Where(k => k.GameMini == gameMini && k.PluginId == pluginId).ToList()) _problems.Remove(k);
         return removed;
     }
+
+    public IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) => _inner.LedgerEntries(gameMini, pluginId);
 }

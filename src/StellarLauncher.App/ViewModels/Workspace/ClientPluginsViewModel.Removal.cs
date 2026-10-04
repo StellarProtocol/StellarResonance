@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using StellarLauncher.App.Services;
+using StellarLauncher.Core.Dependencies;
 
 namespace StellarLauncher.App.ViewModels.Workspace;
 
@@ -12,7 +14,11 @@ public sealed partial class ClientPluginsViewModel
     /// Cancel removes nothing). Without a ledger there is nothing to choose: removed at once, as before. Fix round 1,
     /// Minor 2 still holds: dependency cleanup runs BEFORE the plugin DLL goes, a failed cleanup still removes the plugin
     /// but keeps its skip entries. "Plugin only" marks the ledger kept first — if that fails nothing is removed, or the
-    /// next launch's orphan sweep would delete what the player chose to keep.</summary>
+    /// next launch's orphan sweep would delete what the player chose to keep. Fix round 3 (1): if the plugin itself then
+    /// fails to remove, the kept mark is best-effort reverted — the plugin is still installed, so its dependencies must
+    /// not be left recorded as kept for a removal that never happened. Fix round 3 (2) — controller decision: "plugin
+    /// only" KEEPS the plugin's SkippedDependencies (a reinstall pre-fills the earlier opt-out via
+    /// <see cref="PluginStepBuilder.Install"/>'s client parameter); only "plugin and dependencies" clears them.</summary>
     public async Task RemoveAsync(PluginItemViewModel item)
     {
         var choice = RemoveChoice.PluginAndDependencies;
@@ -32,11 +38,21 @@ public sealed partial class ClientPluginsViewModel
                     return;
                 }
                 depFailure = null;
+                try { _ws.Services.Core.Install.Plugins.Remove(_ws.Client.GameMiniDir, item.Entry.Id, item.CanonicalDll); }
+                catch
+                {
+                    // The plugin is STILL installed — don't leave its ledger marked kept for a removal that never happened.
+                    await TryDependencyWorkAsync(svc => svc.SetKeptAsync(_ws.Client.GameMiniDir, item.Entry.Id, false));
+                    throw;
+                }
             }
-            else depFailure = await TryDependencyWorkAsync(svc => svc.RemoveAllAsync(_ws.Client.GameMiniDir, item.Entry.Id));
+            else
+            {
+                depFailure = await TryDependencyWorkAsync(svc => svc.RemoveAllAsync(_ws.Client.GameMiniDir, item.Entry.Id));
+                _ws.Services.Core.Install.Plugins.Remove(_ws.Client.GameMiniDir, item.Entry.Id, item.CanonicalDll);
+            }
 
-            _ws.Services.Core.Install.Plugins.Remove(_ws.Client.GameMiniDir, item.Entry.Id, item.CanonicalDll);
-            if (depFailure is null)
+            if (choice != RemoveChoice.PluginOnly && depFailure is null)
             {
                 _ws.Client.SkippedDependencies.RemoveAll(s => s.StartsWith(item.Entry.Id + "/", StringComparison.Ordinal));
                 _ws.SaveProfile();
@@ -75,6 +91,12 @@ public sealed partial class ClientPluginsViewModel
     {
         var (svc, gameMini, id) = (_ws.Services.Core.Install.Dependencies, _ws.Client.GameMiniDir, item.Entry.Id);
         return Task.Run(() => svc.IsKept(gameMini, id));
+    }
+
+    public Task<IReadOnlyList<LedgerEntry>> KeptLedgerEntriesAsync(PluginItemViewModel item)
+    {
+        var (svc, gameMini, id) = (_ws.Services.Core.Install.Dependencies, _ws.Client.GameMiniDir, item.Entry.Id);
+        return Task.Run(() => svc.LedgerEntries(gameMini, id));
     }
 
     public async Task RemoveKeptDependenciesAsync(PluginItemViewModel item)

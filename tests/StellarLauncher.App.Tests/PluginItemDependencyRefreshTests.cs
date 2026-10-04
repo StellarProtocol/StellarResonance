@@ -26,6 +26,7 @@ public class PluginItemDependencyRefreshTests
         public bool HasInstallStep(PluginItemViewModel item) => false;
         public Task<bool> DependenciesKeptAsync(PluginItemViewModel item) => Task.FromResult(false);
         public Task RemoveKeptDependenciesAsync(PluginItemViewModel item) => Task.CompletedTask;
+        public Task<IReadOnlyList<LedgerEntry>> KeptLedgerEntriesAsync(PluginItemViewModel item) => Task.FromResult<IReadOnlyList<LedgerEntry>>(Array.Empty<LedgerEntry>());
     }
 
     private static PluginItemViewModel Item(IPluginActions actions)

@@ -32,6 +32,9 @@ public sealed class WorkspaceFixture
     /// <summary>Override the dependency service built in <see cref="Start"/> (e.g. to record/fault-inject
     /// calls); null (default) uses a real <see cref="DependencyService"/> over <see cref="Fs"/>.</summary>
     public IDependencyService? Dependencies { get; set; }
+    /// <summary>Override the plugin installer built in <see cref="Start"/> (e.g. to fault-inject
+    /// <see cref="IPluginInstaller.Remove"/>); null (default) uses a real <see cref="PluginInstaller"/> over <see cref="Fs"/>.</summary>
+    public IPluginInstaller? Plugins { get; set; }
 
     private sealed class Platform : IPlatformInfo { public bool IsWindows => false; public string AppDataDir => "/cfg"; }
     private sealed class Reg(List<PluginEntry> entries) : IPluginRegistryService
@@ -121,7 +124,7 @@ public sealed class WorkspaceFixture
         var http = new HttpClient(new DllHandler(this));
         IDependencyService dependencies = Dependencies ?? new RecordingDependencyService(new DependencyService(Fs, http));   // as App wires it
         if (WrapDependencies is not null) dependencies = WrapDependencies(dependencies);
-        var deps = new PluginInstallDeps(new Installer(Fs), new PluginInstaller(Fs), http, dependencies);
+        var deps = new PluginInstallDeps(new Installer(Fs), Plugins ?? new PluginInstaller(Fs), http, dependencies);
         var core = new DashboardServices(new ClientInventory(Fs, deps.Installer, deps.Plugins, new DoorstopToggle(Fs)),
             new RegistryCache(new Reg(Registry), () => Store.Load()), new FrameworkManifests(Manifests), new Review(), deps,
             new ClientCandidates(GameDetector, new Platform()), Steps);

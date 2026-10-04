@@ -42,6 +42,7 @@ public class PluginDownloadsTests
             return Task.CompletedTask;
         }
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
+        public IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) => Array.Empty<LedgerEntry>();
 
         public readonly List<string> Flags = new();
         public HashSet<string> Kept = new();

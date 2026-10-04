@@ -129,9 +129,19 @@ public class DependencyDeadlockTests
         var again = ui.Run(() => deps.Dependencies.RequestReinstallAsync("/g", "p1"));
         await Task.Delay(200);
         hold.TrySetResult();
-        steps.AnswerInstall(new InstallStepResult(new HashSet<string>()));   // the "player" answers while the ensure is still unblocking
 
-        var all = Task.WhenAll(ensure, install, keep, again);
+        // Review fix round 3 (6): the two flag writes (which DO need the folder's gate the ensure just released)
+        // finish on their own — proving the UI context isn't somehow stuck behind the install's still-open step —
+        // while install is asserted to still be waiting for its answer. Only THEN does the "player" answer it.
+        var flagWrites = Task.WhenAll(keep, again);
+        var flagsFinished = await Task.WhenAny(flagWrites, Task.Delay(Limit));
+        Assert.True(flagsFinished == flagWrites, "deadlock: the UI context was blocked waiting for the dependency gate");
+        await flagWrites;
+        Assert.False(install.IsCompleted, "the install should still be awaiting the step's answer");
+
+        steps.AnswerInstall(new InstallStepResult(new HashSet<string>()));
+
+        var all = Task.WhenAll(ensure, install);
         var finished = await Task.WhenAny(all, Task.Delay(Limit));
         Assert.True(finished == all, "deadlock: the UI context was blocked waiting for the dependency gate");
         await all;

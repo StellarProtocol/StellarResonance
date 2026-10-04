@@ -153,6 +153,7 @@ public partial class ClientPluginsViewModelTests
         public bool IsKept(string gameMini, string pluginId) => false;
         public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.CompletedTask;
         public Task<bool> RemoveAllUnlessKeptAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.FromResult(true);
+        public IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) => Array.Empty<LedgerEntry>();
     }
 
     [Fact]
@@ -479,6 +480,7 @@ public partial class ClientPluginsViewModelTests
         public bool IsKept(string g, string p) => inner.IsKept(g, p);
         public Task RequestReinstallAsync(string g, string p, CancellationToken ct = default) => inner.RequestReinstallAsync(g, p, ct);
         public Task<bool> RemoveAllUnlessKeptAsync(string g, string p, CancellationToken ct = default) => inner.RemoveAllUnlessKeptAsync(g, p, ct);
+        public IReadOnlyList<LedgerEntry> LedgerEntries(string g, string p) => inner.LedgerEntries(g, p);
     }
 
     [Fact]

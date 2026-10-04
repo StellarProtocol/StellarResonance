@@ -3,6 +3,7 @@ using StellarLauncher.App.ViewModels;
 using StellarLauncher.App.ViewModels.Workspace;
 using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Model;
+using StellarLauncher.Core.Services;
 using Xunit;
 
 /// <summary>v3 V3 (spec § 12): removing a plugin with dependencies asks — remove them too (default) or keep them under
@@ -95,6 +96,8 @@ public class RemoveStepTests
         Assert.True(f.Fs.File.Exists($"{G}/stellar/deps/photo.json"));
     }
 
+    // Fix round 3 (2) — controller decision: "plugin only" KEEPS SkippedDependencies (a reinstall pre-fills the
+    // earlier opt-out via PluginStepBuilder.Install's client parameter); only "plugin and dependencies" clears them.
     [Fact]
     public async Task Plugin_only_keeps_the_dependencies_under_launcher_management()
     {
@@ -109,8 +112,49 @@ public class RemoveStepTests
         Assert.True(f.Fs.File.Exists($"{G}/fx.bin"));
         Assert.True(f.Fs.File.Exists($"{G}/bridge.bin"));
         Assert.True(f.Services.Core.Install.Dependencies.IsKept(G, "photo"));
-        Assert.Empty(f.Store.Load().Clients.Single().SkippedDependencies);
+        Assert.Equal(new[] { "photo/x" }, f.Store.Load().Clients.Single().SkippedDependencies);
         Assert.Contains("kept", vm.Status);
+    }
+
+    /// <summary>Forwards every call to a real <see cref="PluginInstaller"/> except <see cref="Remove"/>, which throws.</summary>
+    private sealed class ThrowingRemovePluginInstaller(PluginInstaller inner) : IPluginInstaller
+    {
+        public Task InstallAsync(Stream dll, string expectedSha256, string gameMiniDir, string pluginId, string dllFileName,
+            string version, CancellationToken ct = default) => inner.InstallAsync(dll, expectedSha256, gameMiniDir, pluginId, dllFileName, version, ct);
+        public void Remove(string gameMiniDir, string pluginId, string? dllFileName = null) => throw new IOException("plugin folder locked");
+        public bool IsInstalled(string gameMiniDir, string pluginId) => inner.IsInstalled(gameMiniDir, pluginId);
+        public string? InstalledVersion(string gameMiniDir, string pluginId) => inner.InstalledVersion(gameMiniDir, pluginId);
+        public string? FindInstalledDll(string gameMiniDir, string dllFileName) => inner.FindInstalledDll(gameMiniDir, dllFileName);
+        public void Disable(string gameMiniDir, string pluginId) => inner.Disable(gameMiniDir, pluginId);
+        public void Enable(string gameMiniDir, string pluginId) => inner.Enable(gameMiniDir, pluginId);
+        public bool IsDisabled(string gameMiniDir, string pluginId) => inner.IsDisabled(gameMiniDir, pluginId);
+    }
+
+    // Fix round 3 (1): if the plugin itself fails to remove AFTER the ledger was already marked kept, the
+    // kept mark is reverted (best effort) — the plugin is still installed, so its dependencies must not be
+    // left recorded as kept for a removal that never happened.
+    [Fact]
+    public async Task If_removing_the_plugin_fails_after_marking_it_kept_the_kept_mark_is_reverted()
+    {
+        var f = new WorkspaceFixture();
+        f.Plugins = new ThrowingRemovePluginInstaller(new PluginInstaller(f.Fs));
+        f.Registry.Add(Photo(V("1.0.0", Fx, Bridge)));
+        f.AddClient("c1", "Main", G, framework: "2.8.0");
+        f.InstallPlugin(G, "photo", "Stellar.Photo.dll", "1.0.0");
+        f.Tabs = f.Tabs with { Plugins = w => new ClientPluginsViewModel(w) };
+        f.Start();
+        await f.Services.Core.Install.Dependencies.EnsureAsync(G, "photo", new[] { Fx, Bridge }, new HashSet<string>(), CancellationToken.None);
+        var ws = await f.OpenAsync("c1");
+        ws.ShowPluginsCommand.Execute(null);
+        var vm = (ClientPluginsViewModel)ws.TabContent!;
+        await vm.ReloadAsync();
+        f.Steps.Remove = _ => RemoveChoice.PluginOnly;
+
+        await Item(vm).RemoveCommand.ExecuteAsync(null);
+
+        Assert.True(f.Fs.File.Exists(Dll));   // the plugin is still there — Plugins.Remove threw
+        Assert.False(f.Services.Core.Install.Dependencies.IsKept(G, "photo"));   // reverted, not left kept
+        Assert.Contains("failed", vm.Status, StringComparison.OrdinalIgnoreCase);
     }
 
     private sealed class KeepFails(IDependencyService inner) : ForwardingDependencyService(inner)
@@ -155,6 +199,48 @@ public class RemoveStepTests
         Assert.False(f.Fs.File.Exists($"{G}/fx.bin"));
         Assert.False(f.Fs.File.Exists($"{G}/stellar/deps/photo.json"));
         Assert.False(item.DependenciesKept);
+    }
+
+    // Review fix round 3 (4): the kept section's rows and its Vanilla clause come from the KEPT LEDGER's own
+    // entries, not from whatever the currently shown version declares — here the shown version (newest, since
+    // nothing is installed) declares a completely different, unrelated dependency.
+    [Fact]
+    public async Task The_kept_section_shows_the_ledgers_own_entries_even_when_the_shown_version_declares_something_else()
+    {
+        var lut = Dep("lut", "Colour tables", optional: true);
+        var (f, vm) = await Open(Photo(V("2.0.0", lut), V("1.0.0", Fx, Bridge)));   // "1.0.0" installed + ensured
+        f.Steps.Remove = _ => RemoveChoice.PluginOnly;
+        await Item(vm).RemoveCommand.ExecuteAsync(null);
+        await vm.ReloadAsync();
+        var item = Item(vm);
+
+        vm.OpenPluginCommand.Execute(item);
+        await item.DependencyRefresh;
+
+        // The shown version is "2.0.0" (newest, since nothing is installed) and declares only "lut" — but the
+        // ledger still holds Fx + Bridge, kept from when "1.0.0" was removed.
+        Assert.Equal(new[] { "Effects runtime", "Effects bridge" }, item.Dependencies.Select(d => d.Name));
+        Assert.All(item.Dependencies, d => Assert.Equal("Installed", d.StateText));
+        Assert.True(item.ShowDependencySection);
+        Assert.Contains("Still moved aside for Vanilla launches", item.KeptNote);
+    }
+
+    // Review fix round 3 (5): the kept note shows even while the plugin is STILL installed (the post-crash
+    // case the original Task 6 brief called for: "whether the plugin is installed or not").
+    [Fact]
+    public async Task The_kept_note_shows_even_while_the_plugin_is_still_installed()
+    {
+        var (f, vm) = await Open(Photo(V("1.0.0", Fx, Bridge)));
+        await f.Services.Core.Install.Dependencies.SetKeptAsync(G, "photo", true);
+        var item = Item(vm);
+
+        vm.OpenPluginCommand.Execute(item);
+        await item.DependencyRefresh;
+
+        Assert.True(item.Installed);
+        Assert.True(item.DependenciesKept);
+        Assert.True(item.ShowDependencySection);
+        Assert.Equal("Kept after Photo Thing was removed. Still moved aside for Vanilla launches; reinstalling Photo Thing uses it again.", item.KeptNote);
     }
 
     [Fact]

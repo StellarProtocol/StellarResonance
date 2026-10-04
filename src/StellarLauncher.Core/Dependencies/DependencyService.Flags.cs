@@ -19,6 +19,9 @@ public sealed partial class DependencyService
     public bool IsKept(string gameMini, string pluginId) =>
         DependencyPaths.IsValidPluginId(pluginId) && _store.Read(gameMini, pluginId, quarantine: false).Kept;
 
+    public IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) =>
+        DependencyPaths.IsValidPluginId(pluginId) ? _store.Read(gameMini, pluginId, quarantine: false).Entries : Array.Empty<LedgerEntry>();
+
     /// <summary>Read-for-write (round 6: a present-but-unreadable ledger is never written blind), change, write back
     /// only when something changed. No ledger → nothing to mark (an empty ledger is never written into existence).</summary>
     private void WriteFlags(string gameMini, string pluginId, Func<DependencyLedger, DependencyLedger> change)
