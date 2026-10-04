@@ -102,6 +102,26 @@ public class DependencyItemViewModelTests
         Assert.Equal("Skipped", vm.StateText);
     }
 
+    // R-5: being moved aside is the NORMAL state after a Vanilla launch, not a problem — the neutral "off"
+    // pill (the same outline NotInstalled/Skipped use), not the amber "warn" used for an actual Blocked
+    // dependency row elsewhere on this page.
+    [Theory]
+    [InlineData(KeptDependencyDiskState.Kept, "Kept", "ok")]
+    [InlineData(KeptDependencyDiskState.Parked, "Kept · moved aside", "off")]
+    [InlineData(KeptDependencyDiskState.Missing, "Missing", "bad")]
+    public void Kept_disk_state_sets_the_pill_text_and_class(KeptDependencyDiskState state, string text, string cls)
+    {
+        var vm = Vm(Dep());
+        vm.ApplyKeptDiskState(state);
+
+        Assert.Equal(text, vm.StateText);
+        Assert.Equal(cls, vm.StateClass);
+        Assert.Equal(cls == "ok", vm.IsOk);
+        Assert.Equal(cls == "off", vm.IsOff);
+        Assert.Equal(cls == "warn", vm.IsWarn);
+        Assert.Equal(cls == "bad", vm.IsBad);
+    }
+
     // Final review M-d: the row says WHO is in the way, and that a dependent of a blocked prerequisite waits.
     [Fact]
     public void Another_plugins_file_and_a_waiting_dependent_have_their_own_row_text()

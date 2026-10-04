@@ -120,7 +120,9 @@ public sealed partial class DependencyItemViewModel : ObservableObject
         StateClass = state switch
         {
             KeptDependencyDiskState.Kept => "ok",
-            KeptDependencyDiskState.Parked => "warn",
+            // R-5: moved aside is the NORMAL state after a Vanilla launch, not a problem — the neutral "off"
+            // outline, not the amber warning used for an actual Blocked outcome elsewhere on this page.
+            KeptDependencyDiskState.Parked => "off",
             _ => "bad",
         };
     }
