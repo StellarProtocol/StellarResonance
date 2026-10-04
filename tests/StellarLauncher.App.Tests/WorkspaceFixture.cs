@@ -60,6 +60,20 @@ public sealed class WorkspaceFixture
     }
     public sealed class AutoConfirm : IConfirm { public int Asked; public Task<bool> AskAsync(string t, string b, string ok) { Asked++; return Task.FromResult(true); } }
 
+    /// <summary>v3: answers every plugin step with its default (all ticked / don't reinstall dependencies / remove them
+    /// too) unless a test sets the answer; records each step it was asked.</summary>
+    public sealed class ScriptedSteps : IPluginSteps
+    {
+        public readonly List<object> Asked = new();
+        public Func<InstallStep, InstallStepResult?> Install = _ => new InstallStepResult(new HashSet<string>());
+        public Func<ReinstallStep, bool?> Reinstall = _ => false;
+        public Func<RemoveStep, RemoveChoice?> Remove = _ => RemoveChoice.PluginAndDependencies;
+        public Task<InstallStepResult?> AskInstallAsync(InstallStep s) { Asked.Add(s); return Task.FromResult(Install(s)); }
+        public Task<bool?> AskReinstallAsync(ReinstallStep s) { Asked.Add(s); return Task.FromResult(Reinstall(s)); }
+        public Task<RemoveChoice?> AskRemoveAsync(RemoveStep s) { Asked.Add(s); return Task.FromResult(Remove(s)); }
+    }
+    public ScriptedSteps Steps { get; } = new();
+
     public Detector GameDetector { get; } = new();
     public AutoConfirm Confirm { get; } = new();
     public WorkspaceServices Services { get; private set; } = null!;
@@ -102,7 +116,7 @@ public sealed class WorkspaceFixture
         var deps = new PluginInstallDeps(new Installer(Fs), new PluginInstaller(Fs), http, dependencies);
         var core = new DashboardServices(new ClientInventory(Fs, deps.Installer, deps.Plugins, new DoorstopToggle(Fs)),
             new RegistryCache(new Reg(Registry), () => Store.Load()), new FrameworkManifests(Manifests), new Review(), deps,
-            new ClientCandidates(GameDetector, new Platform()));
+            new ClientCandidates(GameDetector, new Platform()), Steps);
         Services = new WorkspaceServices(core, new DoorstopToggle(Fs), Fs, new Platform(), GameDetector, new GameLocator(Fs), Confirm,
             Timer: (_, tick) => { Ticks.Add(tick); return new Disposer(() => Ticks.Remove(tick)); });
         Shell = new ShellViewModel(Store, sessions, new ShellPages(s => new DashboardViewModel(s, core), (s, cl) => new ClientWorkspaceViewModel(s, cl, Services, Tabs), s => new object(), s => new object()));

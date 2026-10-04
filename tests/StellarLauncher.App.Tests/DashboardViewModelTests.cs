@@ -63,7 +63,7 @@ public class DashboardViewModelTests
         var svc = new DashboardServices(
             new StellarLauncher.Core.Inventory.ClientInventory(fs, deps.Installer, deps.Plugins, new DoorstopToggle(fs)),
             new RegistryCache(new Registry(), () => store.Load()), new FrameworkManifests(new Versions()),
-            new Review(), deps, new ClientCandidates(new Detector(), new Platform()));
+            new Review(), deps, new ClientCandidates(new Detector(), new Platform()), new WorkspaceFixture.ScriptedSteps());
         ShellViewModel shell = null!;
         shell = new ShellViewModel(store, sessions, new ShellPages(s => new DashboardViewModel(s, svc), (s, c) => new object(), s => new object(), s => new object()));
         shell.Start();
@@ -167,7 +167,7 @@ public class DashboardViewModelTests
         var svc = new DashboardServices(
             new StellarLauncher.Core.Inventory.ClientInventory(fs, deps.Installer, deps.Plugins, new DoorstopToggle(fs)),
             new RegistryCache(new Registry(), () => store.Load()), new FrameworkManifests(failingVersions),
-            new Review(), deps, new ClientCandidates(new Detector(), new Platform()));
+            new Review(), deps, new ClientCandidates(new Detector(), new Platform()), new WorkspaceFixture.ScriptedSteps());
 
         ShellViewModel shell = null!;
         shell = new ShellViewModel(store, sessions, new ShellPages(s => new DashboardViewModel(s, svc), (s, c) => new object(), s => new object(), s => new object()));

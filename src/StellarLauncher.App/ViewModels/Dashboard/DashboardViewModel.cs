@@ -17,7 +17,7 @@ using StellarLauncher.Core.Model;
 namespace StellarLauncher.App.ViewModels.Dashboard;
 
 public sealed record DashboardServices(ClientInventory Inventory, RegistryCache Registry, FrameworkManifests Manifests,
-    IPreLaunchReview Review, PluginInstallDeps Install, ClientCandidates Candidates);
+    IPreLaunchReview Review, PluginInstallDeps Install, ClientCandidates Candidates, IPluginSteps Steps);
 
 /// <summary>All clients at once: launch tiles + the plugin matrix (mockup #dashboard).</summary>
 public sealed partial class DashboardViewModel : ObservableObject, IDisposable

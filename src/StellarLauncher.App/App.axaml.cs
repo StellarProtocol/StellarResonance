@@ -61,6 +61,7 @@ public partial class App : Application
         var versions = new VersionService(http);
         var manifests = new FrameworkManifests(versions);
         var confirm = new ConfirmDialog(() => mainWindow);
+        var steps = new PluginStepDialog(() => mainWindow);
         var review = new PreLaunchReviewService(registry, inventory, versions, deps, vm => PreLaunchReviewDialog.ShowFor(vm, mainWindow!));
 
         var env = new LaunchEnvironment(fs, platform, detector);
@@ -70,7 +71,7 @@ public partial class App : Application
         var sessions = new ClientSessions(store, orchestrator, scanner, new SystemProcessFactory(),
             () => DateTimeOffset.UtcNow, a => Dispatcher.UIThread.Post(a));
 
-        var core = new DashboardServices(inventory, registry, manifests, review, deps, new ClientCandidates(detector, platform));
+        var core = new DashboardServices(inventory, registry, manifests, review, deps, new ClientCandidates(detector, platform), steps);
         var wsServices = new WorkspaceServices(core, doorstop, fs, platform, detector, locator, confirm, UiTimer);
         var tabs = new WorkspaceTabFactories(w => new OverviewViewModel(w), w => new ClientPluginsViewModel(w),
             w => new ClientSettingsViewModel(w), w => new LogsViewModel(w));
