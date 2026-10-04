@@ -8,6 +8,7 @@ using StellarLauncher.App.ViewModels.Dashboard;
 using StellarLauncher.App.ViewModels.Shell;
 using StellarLauncher.App.ViewModels.Workspace;
 using StellarLauncher.Core.Clients;
+using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Inventory;
 using StellarLauncher.Core.Launch;
 using StellarLauncher.Core.Model;
@@ -28,6 +29,12 @@ public sealed class WorkspaceFixture
     public WorkspaceTabFactories Tabs { get; set; }
     /// <summary>Framework manifest source; swap for <c>new ManifestVersions("99.0.0")</c> to simulate a too-old launcher.</summary>
     public IVersionService Manifests { get; set; } = new ManifestVersions();
+    /// <summary>Override the dependency service built in <see cref="Start"/> (e.g. to record/fault-inject
+    /// calls); null (default) uses a real <see cref="DependencyService"/> over <see cref="Fs"/>.</summary>
+    public IDependencyService? Dependencies { get; set; }
+    /// <summary>Override the plugin installer built in <see cref="Start"/> (e.g. to fault-inject
+    /// <see cref="IPluginInstaller.Remove"/>); null (default) uses a real <see cref="PluginInstaller"/> over <see cref="Fs"/>.</summary>
+    public IPluginInstaller? Plugins { get; set; }
 
     private sealed class Platform : IPlatformInfo { public bool IsWindows => false; public string AppDataDir => "/cfg"; }
     private sealed class Reg(List<PluginEntry> entries) : IPluginRegistryService
@@ -46,12 +53,36 @@ public sealed class WorkspaceFixture
     private sealed class Orch : ILaunchOrchestrator { public Task<LaunchOutcome> LaunchAsync(ClientProfile c, IProgress<LaunchEvent> e, CancellationToken ct) { e.Report(new RunningEvent()); return Task.FromResult(new LaunchOutcome(LaunchOutcomeKind.Started, null)); } }
     private sealed class NoScan : IRunningProcessScanner { public IReadOnlyList<RunningProcess> Snapshot() => Array.Empty<RunningProcess>(); }
     private sealed class NoProc : IProcessFactory { public IGameProcess? Start(ProcessStartInfo p) => null; public IGameProcess? Attach(int pid) => null; }
-    private sealed class DllHandler : HttpMessageHandler
+    /// <summary>URL → bytes overrides; every other URL serves <see cref="DllBytes"/>.</summary>
+    public Dictionary<string, byte[]> Downloads { get; } = new();
+    /// <summary>Every URL the fake web served, in order.</summary>
+    public List<string> Requested { get; } = new();
+    /// <summary>Wraps the dependency service <see cref="Start"/> builds — a spy over the real one.</summary>
+    public Func<IDependencyService, IDependencyService>? WrapDependencies { get; set; }
+    private sealed class DllHandler(WorkspaceFixture f) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)
-            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(DllBytes) });
+        {
+            lock (f.Requested) f.Requested.Add(r.RequestUri!.ToString());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            { Content = new ByteArrayContent(f.Downloads.TryGetValue(r.RequestUri!.ToString(), out var b) ? b : DllBytes) });
+        }
     }
     public sealed class AutoConfirm : IConfirm { public int Asked; public Task<bool> AskAsync(string t, string b, string ok) { Asked++; return Task.FromResult(true); } }
+
+    /// <summary>v3: answers every plugin step with its default (all ticked / don't reinstall dependencies / remove them
+    /// too) unless a test sets the answer; records each step it was asked.</summary>
+    public sealed class ScriptedSteps : IPluginSteps
+    {
+        public readonly List<object> Asked = new();
+        public Func<InstallStep, InstallStepResult?> Install = _ => new InstallStepResult(new HashSet<string>());
+        public Func<ReinstallStep, bool?> Reinstall = _ => false;
+        public Func<RemoveStep, RemoveChoice?> Remove = _ => RemoveChoice.PluginAndDependencies;
+        public Task<InstallStepResult?> AskInstallAsync(InstallStep s) { Asked.Add(s); return Task.FromResult(Install(s)); }
+        public Task<bool?> AskReinstallAsync(ReinstallStep s) { Asked.Add(s); return Task.FromResult(Reinstall(s)); }
+        public Task<RemoveChoice?> AskRemoveAsync(RemoveStep s) { Asked.Add(s); return Task.FromResult(Remove(s)); }
+    }
+    public ScriptedSteps Steps { get; } = new();
 
     public Detector GameDetector { get; } = new();
     public AutoConfirm Confirm { get; } = new();
@@ -90,10 +121,13 @@ public sealed class WorkspaceFixture
     public ShellViewModel Start()
     {
         var sessions = new ClientSessions(Store, new Orch(), new NoScan(), new NoProc(), () => DateTimeOffset.UnixEpoch, a => a());
-        var deps = new PluginInstallDeps(new Installer(Fs), new PluginInstaller(Fs), new HttpClient(new DllHandler()));
+        var http = new HttpClient(new DllHandler(this));
+        IDependencyService dependencies = Dependencies ?? new RecordingDependencyService(new DependencyService(Fs, http));   // as App wires it
+        if (WrapDependencies is not null) dependencies = WrapDependencies(dependencies);
+        var deps = new PluginInstallDeps(new Installer(Fs), Plugins ?? new PluginInstaller(Fs), http, dependencies);
         var core = new DashboardServices(new ClientInventory(Fs, deps.Installer, deps.Plugins, new DoorstopToggle(Fs)),
             new RegistryCache(new Reg(Registry), () => Store.Load()), new FrameworkManifests(Manifests), new Review(), deps,
-            new ClientCandidates(GameDetector, new Platform()));
+            new ClientCandidates(GameDetector, new Platform()), Steps);
         Services = new WorkspaceServices(core, new DoorstopToggle(Fs), Fs, new Platform(), GameDetector, new GameLocator(Fs), Confirm,
             Timer: (_, tick) => { Ticks.Add(tick); return new Disposer(() => Ticks.Remove(tick)); });
         Shell = new ShellViewModel(Store, sessions, new ShellPages(s => new DashboardViewModel(s, core), (s, cl) => new ClientWorkspaceViewModel(s, cl, Services, Tabs), s => new object(), s => new object()));

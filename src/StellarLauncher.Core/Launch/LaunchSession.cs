@@ -15,6 +15,18 @@ public sealed class LaunchSession
     public IGameProcess? Process { get; private set; }
     public DateTimeOffset? StartedAt { get; private set; }
     public int? ExitCode { get; private set; }
+    /// <summary>What the pre-launch review is doing right now (e.g. "Preparing &lt;plugin&gt;: …"), shown on
+    /// the state line before <see cref="Begin"/>; null when no review is running. Kept apart from
+    /// <see cref="StatusText"/> so a previous run's failure message survives a cancelled review.</summary>
+    public string? ReviewText { get; private set; }
+
+    /// <summary>R-2: the last "Added &lt;dependency&gt; for &lt;plugin&gt;" notice from a pre-launch review.
+    /// Unlike <see cref="ReviewText"/> (live, in-progress feedback that <see cref="Begin"/> always clears,
+    /// along with the caller's own <c>finally</c> once the review ends), this is STICKY — it survives
+    /// <see cref="Begin"/> and the whole launch (through Running and exit), so the player actually gets to
+    /// see it, until the caller clears it at the start of the NEXT launch attempt or it is explicitly
+    /// dismissed via <see cref="ClearDependencyNotice"/>.</summary>
+    public string? DependencyNotice { get; private set; }
 
     public event Action<LaunchSession>? Changed;
 
@@ -28,7 +40,7 @@ public sealed class LaunchSession
     {
         if (!CanLaunch) throw new InvalidOperationException($"cannot launch while {State}");
         State = SessionState.Launching; StartedAt = now; ExitCode = null; Process = null;
-        Progress = null; ProgressIndeterminate = false; StatusText = "launching…";
+        Progress = null; ProgressIndeterminate = false; StatusText = "launching…"; ReviewText = null;
         Raise();
     }
 
@@ -48,6 +60,34 @@ public sealed class LaunchSession
             case FailedEvent f:
                 State = SessionState.Failed; StatusText = f.Message; Progress = null; ProgressIndeterminate = false; break;
         }
+        Raise();
+    }
+
+    /// <summary>Sets (or, with null, clears) <see cref="ReviewText"/>. Ignored while the session is busy —
+    /// a running game's state line is never overwritten by a review.</summary>
+    public void SetReviewText(string? text)
+    {
+        if (IsBusy || ReviewText == text) return;
+        ReviewText = text;
+        Raise();
+    }
+
+    /// <summary>R-2: sets the sticky dependency notice (never ignored while busy — unlike
+    /// <see cref="SetReviewText"/>, the caller RAISES this one specifically so it survives the launch that's
+    /// about to start).</summary>
+    public void SetDependencyNotice(string text)
+    {
+        if (DependencyNotice == text) return;
+        DependencyNotice = text;
+        Raise();
+    }
+
+    /// <summary>R-2: clears the sticky dependency notice — called by the caller at the start of the next
+    /// launch attempt ("until the next launch"), or by an explicit player dismissal ("until dismissed").</summary>
+    public void ClearDependencyNotice()
+    {
+        if (DependencyNotice is null) return;
+        DependencyNotice = null;
         Raise();
     }
 

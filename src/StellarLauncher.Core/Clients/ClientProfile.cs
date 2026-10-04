@@ -47,4 +47,7 @@ public sealed class ClientProfile
     public LinuxRuntime? Linux { get; set; }
     public AdvancedOptions Advanced { get; set; } = new();
     public int LastInteropCount { get; set; }
+    /// <summary>Dependencies the player opted out of, as <c>"&lt;pluginId&gt;/&lt;depId&gt;"</c> entries
+    /// (see <c>DependencyRunner.Skipped</c>). Only ever holds <c>optional</c> dependency ids.</summary>
+    public List<string> SkippedDependencies { get; set; } = new();
 }

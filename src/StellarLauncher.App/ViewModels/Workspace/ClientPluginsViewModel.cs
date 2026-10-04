@@ -16,7 +16,7 @@ namespace StellarLauncher.App.ViewModels.Workspace;
 public enum PluginFilter { All, Installed, Updates, Disabled }
 
 /// <summary>This client's plugins (its folder is the target), every other client in view (mockup #plugins).</summary>
-public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginActions
+public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginActions, IDisposable
 {
     private readonly ClientWorkspaceViewModel _ws;
     private readonly List<PluginRowViewModel> _all = new();
@@ -46,6 +46,8 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         _ws = ws;
         _gridView = ws.Shell.Config.Launcher.PluginsGridView;
         _ws.Refreshed += () => _ = ReloadAsync();   // released by the workspace's Dispose (Refreshed = null)
+        _onSession = _ => { if (SelectedPlugin is { } p) p.DependenciesLocked = _ws.Session.IsBusy; };
+        _ws.Session.Changed += _onSession;          // released by Dispose (the workspace disposes its tab VMs)
         _ = ReloadAsync();
     }
 
@@ -129,10 +131,19 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     {
         var v = row.Item.Entry.Versions.FirstOrDefault(x => x.Version == version) ?? row.Item.SelectedVersion;
         if (v is null) return;
-        try { await PluginDownloads.InstallAsync(_ws.Services.Core.Install, _ws.Client.GameMiniDir, row.Item.Entry, v, s => Status = $"{row.Name}: {s}"); }
+        var request = new PluginInstallRequest(_ws.Client, row.Item.Entry, v, row.Item.Installed, row.Item.InstalledVersion);
+        try
+        {
+            // v3: Cancel in the step changes nothing — no refresh either.
+            if (!await PluginInstallFlow.RunAsync(_ws.Services.Core.Install, _ws.Services.Core.Steps, request, _ws.SaveProfile,
+                    s => Status = $"{row.Name}: {s}")) return;
+        }
         catch (Exception ex) { Status = $"{row.Name} failed: {ex.Message}"; }
         await _ws.RefreshAsync();
     }
+
+    public bool HasInstallStep(PluginItemViewModel item) => item.SelectedVersion is { } v
+        && PluginInstallFlow.NeedsStep(new PluginInstallRequest(_ws.Client, item.Entry, v, item.Installed, item.InstalledVersion));
 
     public async Task SetEnabledAsync(PluginRowViewModel row, bool enabled)
     {
@@ -147,16 +158,6 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     }
 
     public Task InstallAsync(PluginItemViewModel item) => InstallVersionAsync(RowOf(item), item.SelectedVersion?.Version);
-    public async Task RemoveAsync(PluginItemViewModel item)
-    {
-        try
-        {
-            _ws.Services.Core.Install.Plugins.Remove(_ws.Client.GameMiniDir, item.Entry.Id, item.CanonicalDll);
-            item.MarkRemoved(); Status = $"{item.Name}: removed";
-        }
-        catch (Exception ex) { Status = $"{item.Name} failed: {ex.Message}"; }
-        await _ws.RefreshAsync();
-    }
     public Task EnableAsync(PluginItemViewModel item) => SetEnabledAsync(RowOf(item), true);
     private PluginRowViewModel RowOf(PluginItemViewModel item) => _all.First(r => ReferenceEquals(r.Item, item));
 
@@ -174,7 +175,7 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         foreach (var i in installs)
         {
             var v = i.Entry.Versions.First(x => x.Version == i.TargetVersion);
-            try { await PluginDownloads.InstallAsync(_ws.Services.Core.Install, _ws.Client.GameMiniDir, i.Entry, v, null); ok++; }
+            try { await PluginDownloads.InstallAsync(_ws.Services.Core.Install, _ws.Client, i.Entry, v, null); ok++; }
             catch (Exception ex) { Status = $"{i.Entry.Name} failed: {ex.Message}"; }
         }
         Status = $"copied from {source.Name}: {ok} installed, {plan.Count - installs.Count} skipped";
@@ -184,7 +185,14 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     // ---- detail page + lightbox (same member names as the old PluginsViewModel so the XAML moves verbatim) ----
     partial void OnSelectedPluginChanged(PluginItemViewModel? value) => OnPropertyChanged(nameof(IsDetailOpen));
     partial void OnLightboxImageChanged(Bitmap? value) => OnPropertyChanged(nameof(IsLightboxOpen));
-    [RelayCommand] private void OpenPlugin(PluginItemViewModel item) { SelectedPlugin = item; _ = item.EnsureDetailLoadedAsync(_ws.Services.Core.Install.Http, bmp => LightboxImage = bmp); }
+    [RelayCommand]
+    private void OpenPlugin(PluginItemViewModel item)
+    {
+        SelectedPlugin = item;
+        item.DependenciesLocked = _ws.Session.IsBusy;
+        _ = item.RefreshDependenciesAsync();   // re-read every time the page opens: disk may have changed since (a launch, a remove)
+        _ = item.EnsureDetailLoadedAsync(_ws.Services.Core.Install.Http, bmp => LightboxImage = bmp);
+    }
     [RelayCommand] private void CloseDetail() => SelectedPlugin = null;
     [RelayCommand] private void CloseLightbox() { var old = LightboxImage; LightboxImage = null; old?.Dispose(); }
     [RelayCommand] private void OpenLink(string? url) => Services.Browser.Open(url);

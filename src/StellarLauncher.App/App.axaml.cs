@@ -17,6 +17,7 @@ using StellarLauncher.App.ViewModels.Shell;
 using StellarLauncher.App.ViewModels.Workspace;
 using StellarLauncher.App.Views;
 using StellarLauncher.Core.Clients;
+using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Inventory;
 using StellarLauncher.Core.Launch;
 using StellarLauncher.Core.Platform;
@@ -51,12 +52,16 @@ public partial class App : Application
         MainWindow? mainWindow = null;
         ShellViewModel? shell = null;
 
-        var deps = new PluginInstallDeps(installer, pluginInstaller, http);
+        // One recorder wraps the real service so every EnsureAsync (launch, install, page re-tick) leaves its last
+        // failures for the plugin page to show.
+        var dependencies = new RecordingDependencyService(new DependencyService(fs, http));
+        var deps = new PluginInstallDeps(installer, pluginInstaller, http, dependencies);
         var inventory = new ClientInventory(fs, installer, pluginInstaller, doorstop);
         var registry = new RegistryCache(new PluginRegistryService(http), () => shell!.Config);
         var versions = new VersionService(http);
         var manifests = new FrameworkManifests(versions);
         var confirm = new ConfirmDialog(() => mainWindow);
+        var steps = new PluginStepDialog(() => mainWindow);
         var review = new PreLaunchReviewService(registry, inventory, versions, deps, vm => PreLaunchReviewDialog.ShowFor(vm, mainWindow!));
 
         var env = new LaunchEnvironment(fs, platform, detector);
@@ -66,7 +71,7 @@ public partial class App : Application
         var sessions = new ClientSessions(store, orchestrator, scanner, new SystemProcessFactory(),
             () => DateTimeOffset.UtcNow, a => Dispatcher.UIThread.Post(a));
 
-        var core = new DashboardServices(inventory, registry, manifests, review, deps, new ClientCandidates(detector, platform));
+        var core = new DashboardServices(inventory, registry, manifests, review, deps, new ClientCandidates(detector, platform), steps);
         var wsServices = new WorkspaceServices(core, doorstop, fs, platform, detector, locator, confirm, UiTimer);
         var tabs = new WorkspaceTabFactories(w => new OverviewViewModel(w), w => new ClientPluginsViewModel(w),
             w => new ClientSettingsViewModel(w), w => new LogsViewModel(w));

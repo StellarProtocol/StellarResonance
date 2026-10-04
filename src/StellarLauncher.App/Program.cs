@@ -31,6 +31,11 @@ sealed class Program
             TryAddFileListener();
             b = b.LogToTrace(LogEventLevel.Information);
         }
+        else
+        {
+            // Final review M-f: dependency park/unpark/ensure FAILURES only are still written in a silent build.
+            Services.DependencyLog.AlwaysOnFile = LogPath();
+        }
         return b;
     }
 
@@ -47,12 +52,14 @@ sealed class Program
 #endif
     }
 
+    private static string LogPath() =>
+        Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory, "stellar-launcher.log");
+
     private static void TryAddFileListener()
     {
         try
         {
-            var dir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
-            Trace.Listeners.Add(new TextWriterTraceListener(Path.Combine(dir, "stellar-launcher.log")));
+            Trace.Listeners.Add(new TextWriterTraceListener(LogPath()));
             Trace.AutoFlush = true;
         }
         catch { /* logging is best-effort; never block startup */ }

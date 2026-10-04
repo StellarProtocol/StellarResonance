@@ -1,0 +1,80 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:StellarLauncher.App.ViewModels"
+        x:Class="StellarLauncher.App.Views.PluginStepDialog"
+        x:DataType="vm:PluginStepViewModel"
+        Title="{Binding Title}" Width="520" SizeToContent="Height"
+        CanResize="False" WindowStartupLocation="CenterOwner"
+        Background="#080a12" Icon="/Assets/stellar-window.png">
+  <Border Padding="22,20">
+    <StackPanel Spacing="14">
+      <TextBlock Text="{Binding Title}" Foreground="White" FontSize="17" FontWeight="Bold" TextWrapping="Wrap"/>
+      <TextBlock Text="{Binding Body}" Foreground="#8a93b2" FontSize="13" TextWrapping="Wrap" LineHeight="19"/>
+
+      <!-- V1: one checkbox per optional dependency, ticked by default -->
+      <ItemsControl ItemsSource="{Binding Options}" IsVisible="{Binding IsInstall}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:InstallOptionViewModel">
+            <StackPanel Spacing="8" Margin="0,0,0,8">
+              <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1" CornerRadius="10" Padding="12,10">
+                <Grid ColumnDefinitions="Auto,*">
+                  <CheckBox Grid.Column="0" IsChecked="{Binding Use}" VerticalAlignment="Top" MinWidth="0" Padding="0"/>
+                  <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="2">
+                    <TextBlock Text="{Binding Title}" Foreground="#e8ebf5" FontWeight="SemiBold" FontSize="13.5" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Detail}" Foreground="#8a93b2" FontSize="12.5" TextWrapping="Wrap" LineHeight="18"/>
+                  </StackPanel>
+                </Grid>
+              </Border>
+              <Border IsVisible="{Binding HasNotice}" Background="#1Affcf6b" CornerRadius="8" Padding="11,8">
+                <TextBlock Classes="body amber" Text="{Binding NoticeText}" FontSize="12.5" TextWrapping="Wrap" LineHeight="18"/>
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- V2: unticked by default -->
+      <Border IsVisible="{Binding IsReinstall}" Background="#141a2e" BorderBrush="#222a44" BorderThickness="1" CornerRadius="10" Padding="12,10">
+        <Grid ColumnDefinitions="Auto,*">
+          <CheckBox Grid.Column="0" IsChecked="{Binding AlsoReinstallDependencies}" VerticalAlignment="Top" MinWidth="0" Padding="0"/>
+          <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="2">
+            <TextBlock Text="Also reinstall dependencies" Foreground="#e8ebf5" FontWeight="SemiBold" FontSize="13.5"/>
+            <TextBlock Text="{Binding ReinstallDetail}" Foreground="#8a93b2" FontSize="12.5" TextWrapping="Wrap" LineHeight="18"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- V3: two choices, the first is the default -->
+      <StackPanel IsVisible="{Binding IsRemove}" Spacing="8">
+        <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1" CornerRadius="10" Padding="12,10">
+          <Grid ColumnDefinitions="Auto,*">
+            <RadioButton Grid.Column="0" GroupName="removeChoice" IsChecked="{Binding RemoveDependencies}" VerticalAlignment="Top" MinWidth="0" Padding="0"/>
+            <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="2">
+              <TextBlock Text="{Binding RemoveAllTitle}" Foreground="#e8ebf5" FontWeight="SemiBold" FontSize="13.5" TextWrapping="Wrap"/>
+              <TextBlock Text="{Binding RemoveAllDetail}" Foreground="#8a93b2" FontSize="12.5" TextWrapping="Wrap" LineHeight="18"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+        <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1" CornerRadius="10" Padding="12,10">
+          <Grid ColumnDefinitions="Auto,*">
+            <RadioButton Grid.Column="0" GroupName="removeChoice" IsChecked="{Binding KeepDependencies}" VerticalAlignment="Top" MinWidth="0" Padding="0"/>
+            <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="2">
+              <TextBlock Text="{Binding RemoveOnlyTitle}" Foreground="#e8ebf5" FontWeight="SemiBold" FontSize="13.5" TextWrapping="Wrap"/>
+              <TextBlock Text="{Binding RemoveOnlyDetail}" Foreground="#8a93b2" FontSize="12.5" TextWrapping="Wrap" LineHeight="18"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+      </StackPanel>
+
+      <!-- Review fix round 1 (b): IsCancel (Esc) / IsDefault (Enter) — the same keyboard behaviour every other dialog gets for free. -->
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Content="Cancel" Command="{Binding CancelCommand}" IsCancel="True"
+                Foreground="#9aa3bf" Background="Transparent" BorderBrush="#2f3a5a" BorderThickness="1" Padding="14,9" CornerRadius="10"/>
+        <Button Content="{Binding OkLabel}" Command="{Binding OkCommand}" IsVisible="{Binding !IsRemove}" IsDefault="True"
+                Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="16,9" CornerRadius="10"/>
+        <Button Content="{Binding OkLabel}" Command="{Binding OkCommand}" IsVisible="{Binding IsRemove}" IsDefault="True"
+                Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1" Padding="16,9" CornerRadius="10"/>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>

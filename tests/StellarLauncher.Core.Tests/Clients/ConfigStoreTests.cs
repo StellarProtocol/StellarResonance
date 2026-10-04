@@ -63,6 +63,25 @@ public class ConfigStoreTests
         Assert.Equal("c1", back.Launcher.LastSelectedClientId);
     }
 
+    // Fix round 1: SkippedDependencies must round-trip through the real serializer, not just in-memory —
+    // a player's opt-out choice is worthless if a reload silently drops it.
+    [Fact]
+    public void SkippedDependencies_round_trips_through_the_real_serializer()
+    {
+        var fs = new MockFileSystem();
+        var store = new ConfigStore(fs, new Linux());
+        var cfg = new LauncherConfig();
+        cfg.Clients.Add(new ClientProfile { Id = "c1", Name = "Main", GameMiniDir = "/g/game_mini",
+            SkippedDependencies = new List<string> { "combatmeter/shaderpack", "playerhud/optionalfeature" } });
+        store.Save(cfg);
+
+        var text = fs.File.ReadAllText("/cfg/stellar-launcher/settings.json");
+        Assert.Contains("\"skippedDependencies\"", text);
+
+        var back = store.Load();
+        Assert.Equal(new[] { "combatmeter/shaderpack", "playerhud/optionalfeature" }, back.Clients[0].SkippedDependencies);
+    }
+
     [Fact]
     public void V1_file_is_imported_once_backed_up_and_rewritten_as_v2()
     {
