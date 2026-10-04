@@ -84,4 +84,22 @@ public class RecordingDependencyServiceTests
         Assert.Equal(1, inner.KeptCalls);
         Assert.Equal(1, inner.ReinstallCalls);
     }
+
+    // Review fix round 1, minor 5: a KEPT ledger's files are still there, so its recorded problem is still
+    // relevant — only an ACTUAL removal forgets it (matching Remove_and_RemoveAll_forget_failures above).
+    [Fact]
+    public async Task RemoveAllUnlessKept_forgets_a_failure_only_when_it_actually_removed_something()
+    {
+        var inner = new Scripted { RemoveAllUnlessKeptAnswer = false }; // simulates "kept" — nothing removed
+        var sut = new RecordingDependencyService(inner);
+        await sut.EnsureAsync("/g", "p", new[] { Fx }, new HashSet<string>(), default);
+        Assert.Equal("HTTP 404", sut.LastProblem("/g", "p", Fx)?.Detail);
+
+        Assert.False(await sut.RemoveAllUnlessKeptAsync("/g", "p"));
+        Assert.Equal("HTTP 404", sut.LastProblem("/g", "p", Fx)?.Detail); // kept — still relevant
+
+        inner.RemoveAllUnlessKeptAnswer = true;
+        Assert.True(await sut.RemoveAllUnlessKeptAsync("/g", "p"));
+        Assert.Null(sut.LastProblem("/g", "p", Fx)); // actually removed — forgotten
+    }
 }

@@ -73,6 +73,8 @@ public interface IDependencyService
 
     /// <summary>v3 V3: read-only (no gate, never quarantines): whether this plugin's ledger is marked kept. False when
     /// there is no readable ledger or the id is invalid.</summary>
+    /// <remarks>Fail-open; never gate a removal on it — use <see cref="RemoveAllUnlessKeptAsync"/> instead, which is
+    /// GATED and treats a present-but-unreadable ledger as kept rather than fail-opening into a removal.</remarks>
     bool IsKept(string gameMini, string pluginId);
 
     /// <summary>v3 V2: the next <see cref="EnsureAsync"/> for this plugin removes the files of every declared, non-skipped

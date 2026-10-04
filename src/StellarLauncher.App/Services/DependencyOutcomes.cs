@@ -86,8 +86,11 @@ public sealed class RecordingDependencyService : IDependencyService, IDependency
     public async Task<bool> RemoveAllUnlessKeptAsync(string gameMini, string pluginId, CancellationToken ct = default)
     {
         var removed = await _inner.RemoveAllUnlessKeptAsync(gameMini, pluginId, ct);
-        lock (_gate)
-            foreach (var k in _problems.Keys.Where(k => k.GameMini == gameMini && k.PluginId == pluginId).ToList()) _problems.Remove(k);
+        // Review fix round 1, minor 5: a kept ledger's files are still there — its recorded problems (if any)
+        // are still relevant, so only an ACTUAL removal forgets them (matching RemoveAllAsync's own behaviour).
+        if (removed)
+            lock (_gate)
+                foreach (var k in _problems.Keys.Where(k => k.GameMini == gameMini && k.PluginId == pluginId).ToList()) _problems.Remove(k);
         return removed;
     }
 }

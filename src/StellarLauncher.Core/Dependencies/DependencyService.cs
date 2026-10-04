@@ -228,14 +228,10 @@ public sealed partial class DependencyService : IDependencyService
 
     /// <summary>Fix round 2, Critical: the gate is only ever AWAITED — never a blocking Wait(). A caller on
     /// the UI thread blocked in Wait() behind an EnsureAsync whose continuations need that same thread would
-    /// deadlock the launcher. The work itself runs on the pool once the gate is held.</summary>
-    private async Task LockedAsync(string gameMini, Action action, CancellationToken ct)
-    {
-        var gate = Gate(gameMini);
-        await gate.WaitAsync(ct).ConfigureAwait(false);
-        try { await Task.Run(action).ConfigureAwait(false); }   // never on the caller's (UI) thread, even with a free gate
-        finally { gate.Release(); }
-    }
+    /// deadlock the launcher. The work itself runs on the pool once the gate is held. Review fix round 1,
+    /// minor 2: delegates to the generic overload — one gate-acquire/release implementation, not two.</summary>
+    private Task LockedAsync(string gameMini, Action action, CancellationToken ct) =>
+        LockedAsync(gameMini, () => { action(); return true; }, ct);
 
     /// <summary>Same contract as <see cref="LockedAsync(string,Action,CancellationToken)"/>, for the one mutating
     /// member (<see cref="RemoveAllUnlessKeptAsync"/>) that needs to report back whether it actually removed anything.</summary>

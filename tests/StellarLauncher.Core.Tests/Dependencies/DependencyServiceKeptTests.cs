@@ -216,10 +216,12 @@ public sealed partial class DependencyServiceTests
         Assert.Equal(1, _downloads);   // re-downloaded even though adopted, not merely left alone
     }
 
-    // Review carry-over (b): a remove that fails during a requested reinstall must NOT clear the flag — otherwise
-    // the still-wrong dependency is never retried.
+    // Review fix round 1, minor 1: a remove that fails but leaves the dependency reading Installed anyway (a
+    // transient read hiccup here — nothing on disk was actually touched) must NOT force a retry: the flag
+    // clears, so a persistently read-only (but otherwise correct) file doesn't force re-removing-and-redownloading
+    // every OTHER dependency on every future launch.
     [Fact]
-    public async Task A_failed_remove_during_a_requested_reinstall_leaves_the_flag_set_for_a_retry()
+    public async Task A_remove_that_fails_but_leaves_the_dependency_reading_installed_clears_the_flag_anyway()
     {
         var a = File("a", new byte[] { 1 }, "a.dll");
         var b = File("b", new byte[] { 2 }, "b.dll");
@@ -227,13 +229,45 @@ public sealed partial class DependencyServiceTests
         await s.EnsureAsync(G, "p", new[] { a, b }, None, default);
         await s.RequestReinstallAsync(G, "p");
 
-        // Let RemoveUndeclared's own read (call 1) and "a"'s RemoveCore read (call 2) through; fail "b"'s.
+        // Let RemoveUndeclared's own read (call 1) and "a"'s RemoveCore read (call 2) through; fail "b"'s — "b" is
+        // never touched by this attempt, so its ledger entry and file are untouched and still match each other.
         var faulty = new FaultInjectingFileSystem(_fs, LedgerPath, once: true, afterCalls: 2, "ReadAllText");
         var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+        _downloads = 0;
 
-        await s2.EnsureAsync(G, "p", new[] { a, b }, None, default);
+        var st = await s2.EnsureAsync(G, "p", new[] { a, b }, None, default);
 
-        Assert.True(LedgerOf().ReinstallRequested);   // "b" never got re-downloaded — the next ensure must retry it
+        Assert.Equal(DependencyState.Installed, st[0].State);
+        Assert.Equal(DependencyState.Installed, st[1].State);
+        Assert.Equal(1, _downloads);                 // only "a" was actually re-fetched; "b" already matched
+        Assert.False(LedgerOf().ReinstallRequested);  // "b" still reads Installed — nothing left to retry
+    }
+
+    // Review fix round 1, minor 1 (the other half): a remove that fails and GENUINELY leaves the dependency
+    // wrong (its ledger entry now names a file that no longer exists) keeps the flag set for a real retry.
+    [Fact]
+    public async Task A_remove_that_fails_and_leaves_the_dependency_genuinely_wrong_keeps_the_flag_set()
+    {
+        // Three dependencies, not two: removing "b" (the middle one) must still leave "c" in the ledger, so the
+        // write it attempts takes the normal rewrite path rather than DependencyLedgerStore's "last entry gone ⇒
+        // delete the whole file" shortcut — which would otherwise wipe ReinstallRequested along with it and
+        // defeat this test regardless of Adopt's own logic.
+        var a = File("a", new byte[] { 1 }, "a.dll");
+        var b = File("b", new byte[] { 2 }, "b.dll");
+        var c = File("c", new byte[] { 3 }, "c.dll");
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { a, b, c }, None, default);
+        await s.RequestReinstallAsync(G, "p");
+
+        // Let "a"'s own remove-and-rewrite through; fail the SECOND ledger write — "b"'s file is already deleted
+        // (DeleteEntryFiles ran first) by the time the write that would have dropped its ledger entry fails, so
+        // the ledger still names a file that no longer exists: genuinely broken, not merely unlucky timing.
+        var faulty = new FaultInjectingFileSystem(_fs, LedgerPath + ".tmp", once: true, afterCalls: 1, "WriteAllText");
+        var s2 = new DependencyService(faulty, new HttpClient(new Stub(this)));
+
+        await s2.EnsureAsync(G, "p", new[] { a, b, c }, None, default);
+
+        Assert.True(LedgerOf().ReinstallRequested);   // "b" really was left wrong by the failed remove — must retry
     }
 
     // Review carry-over (a): the gated check used by the orphan sweep — a present-but-unreadable ledger is

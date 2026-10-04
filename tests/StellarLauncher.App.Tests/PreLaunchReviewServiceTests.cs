@@ -76,6 +76,7 @@ public class PreLaunchReviewServiceTests
             if (Unreadable.Contains(pluginId)) throw new InvalidOperationException("dependency record could not be read");
             if (Kept.Contains(pluginId)) return Task.FromResult(false);
             Calls.Add($"RemoveAll:{pluginId}");
+            if (ThrowOnRemoveAll) throw new IOException("locked");
             return Task.FromResult(true);
         }
     }
@@ -453,5 +454,6 @@ public class PreLaunchReviewServiceTests
         Assert.True(await sut.ReviewAsync(new ClientProfile { Modded = true, GameMiniDir = "/g", AutoUpdateBeforeLaunch = true }, CancellationToken.None));
 
         Assert.DoesNotContain("RemoveAll:unreadable", fake.Calls);
+        Assert.Contains("Ensure:p1", fake.Calls); // the sweep's failure never stops the rest of the review
     }
 }
