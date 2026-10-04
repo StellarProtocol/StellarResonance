@@ -16,9 +16,17 @@ public sealed record LedgerEntry(string DependencyId, string Version, IReadOnlyL
 /// is moved into place and cleared by the ledger write that commits it. If the launcher dies in between, the
 /// next run finds the files it already placed listed here with their expected sha256 — a live file that
 /// matches is the launcher's own half-finished work, never the player's. Null/absent in a ledger written by
-/// an older launcher, and whenever nothing is in flight.</summary>
+/// an older launcher, and whenever nothing is in flight.
+/// <paramref name="Kept"/> (v3 V3): the plugin was removed with "Remove &lt;plugin&gt; only" — its dependencies stay
+/// launcher-managed (parked for Vanilla, skipped by the orphan sweep) until removed from its page or adopted again by an
+/// ensure after a reinstall. <paramref name="ReinstallRequested"/> (v3 V2): the next ensure removes this plugin's
+/// dependency files (hash-checked) and downloads + verifies them afresh, then clears it. Both are omitted from the JSON
+/// while false, so a ledger without them is exactly what earlier launchers wrote, and earlier launchers (System.Text.Json
+/// skips unknown properties) still read one that has them.</summary>
 public sealed record DependencyLedger(string PluginId, IReadOnlyList<LedgerEntry> Entries,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<LedgerEntry>? Pending = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<LedgerEntry>? Pending = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Kept = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool ReinstallRequested = false)
 {
     /// <summary>The pending entries other than <paramref name="dependencyId"/>'s, or null when none remain.</summary>
     public IReadOnlyList<LedgerEntry>? PendingWithout(string dependencyId)

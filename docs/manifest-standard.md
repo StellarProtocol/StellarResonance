@@ -253,6 +253,7 @@ interpreting what it is.
 | `licenseUrl` | string (URL) | ✓ | licence text or legal link (http(s)) |
 | `sourceUrl` | string (URL) | ✓ | source repository or home page (http(s)) |
 | `notice` | string | — | copyright notice or attribution text, shown on the plugin page |
+| `description` | string | — | one or two player-facing sentences saying what the dependency adds; shown in the launcher's install step next to the checkbox |
 
 The launcher refuses (state *Failed*, nothing downloaded) a dependency whose `id`, `url`, `size`, `license`,
 `licenseUrl` or `sourceUrl` breaks these rules, whatever registry it came from.

@@ -43,4 +43,16 @@ public sealed class PluginDependencyModelTests
     public void A_version_without_dependencies_reads_null() =>
         Assert.Null(JsonSerializer.Deserialize<PluginRegistry>(Json.Replace("\"dependencies\"", "\"other\""),
             PluginRegistry.JsonOptions)!.Plugins[0].Versions[0].Dependencies);
+
+    // v3 V1: the install step shows "what it does" — an optional manifest string, absent in older manifests.
+    [Fact]
+    public void Description_is_optional_and_read_when_present()
+    {
+        var reg = JsonSerializer.Deserialize<PluginRegistry>(Json, PluginRegistry.JsonOptions)!;
+        Assert.Null(Assert.Single(reg.Plugins[0].Versions[0].Dependencies!).Description);
+
+        var withText = Json.Replace("\"notice\": \"n\"", "\"notice\": \"n\", \"description\": \"Adds effects.\"");
+        var reg2 = JsonSerializer.Deserialize<PluginRegistry>(withText, PluginRegistry.JsonOptions)!;
+        Assert.Equal("Adds effects.", Assert.Single(reg2.Plugins[0].Versions[0].Dependencies!).Description);
+    }
 }

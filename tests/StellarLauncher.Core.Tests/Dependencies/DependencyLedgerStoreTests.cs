@@ -1,12 +1,57 @@
 using System;
+using System.Collections.Generic;
 using System.IO.Abstractions.TestingHelpers;
 using System.Security.Cryptography;
+using System.Text.Json;
 using StellarLauncher.Core.Dependencies;
 using Xunit;
 namespace StellarLauncher.Core.Tests.Dependencies;
 
 public sealed class DependencyLedgerStoreTests
 {
+    private static readonly LedgerEntry[] FxEntry = { new("fx", "1.0", new[] { new LedgerFile("dxgi.dll", "ab", true) }) };
+
+    // v3 V2/V3: the two flags round-trip, and a ledger without them is byte-shaped exactly as before (additive).
+    [Fact]
+    public void Kept_and_reinstall_flags_round_trip_and_are_absent_from_the_json_while_false()
+    {
+        var fs = new MockFileSystem(); fs.AddDirectory("/game_mini");
+        var store = new DependencyLedgerStore(fs);
+        store.Write("/game_mini", new DependencyLedger("p", FxEntry));
+        var plain = fs.File.ReadAllText("/game_mini/stellar/deps/p.json");
+        Assert.DoesNotContain("Kept", plain);
+        Assert.DoesNotContain("ReinstallRequested", plain);
+
+        store.Write("/game_mini", new DependencyLedger("p", FxEntry, Kept: true, ReinstallRequested: true));
+        var back = store.Read("/game_mini", "p");
+        Assert.True(back.Kept);
+        Assert.True(back.ReinstallRequested);
+    }
+
+    [Fact]
+    public void A_ledger_written_by_the_previous_launcher_reads_both_flags_as_false()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile("/game_mini/stellar/deps/p.json", new MockFileData(
+            """{"PluginId":"p","Entries":[{"DependencyId":"fx","Version":"1.0","Files":[{"Path":"dxgi.dll","Sha256":"ab","ModdedOnly":true}]}]}"""));
+        var back = new DependencyLedgerStore(fs).Read("/game_mini", "p");
+        Assert.Equal("fx", Assert.Single(back.Entries).DependencyId);
+        Assert.False(back.Kept);
+        Assert.False(back.ReinstallRequested);
+    }
+
+    /// <summary>The previous launcher's ledger record (no flags) — what an older launcher deserializes into.</summary>
+    private sealed record PreviousLedger(string PluginId, IReadOnlyList<LedgerEntry> Entries, IReadOnlyList<LedgerEntry>? Pending = null);
+
+    // "Older launchers still read the ledger": System.Text.Json skips the unknown flag properties.
+    [Fact]
+    public void A_flagged_ledger_still_reads_in_the_previous_launchers_shape()
+    {
+        var fs = new MockFileSystem(); fs.AddDirectory("/game_mini");
+        new DependencyLedgerStore(fs).Write("/game_mini", new DependencyLedger("p", FxEntry, Kept: true, ReinstallRequested: true));
+        var old = JsonSerializer.Deserialize<PreviousLedger>(fs.File.ReadAllText("/game_mini/stellar/deps/p.json"));
+        Assert.Equal("fx", Assert.Single(old!.Entries).DependencyId);
+    }
     [Fact]
     public void Write_then_read_round_trips_and_missing_reads_empty()
     {

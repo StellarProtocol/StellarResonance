@@ -26,4 +26,6 @@ public sealed record PluginDependency(
     [property: JsonPropertyName("license")]    string License = "",
     [property: JsonPropertyName("licenseUrl")] string? LicenseUrl = null,
     [property: JsonPropertyName("sourceUrl")]  string? SourceUrl = null,
-    [property: JsonPropertyName("notice")]     string? Notice = null);
+    [property: JsonPropertyName("notice")]     string? Notice = null,
+    // v3 V1: one or two player-facing sentences — what this dependency adds (shown in the install step).
+    [property: JsonPropertyName("description")] string? Description = null);
