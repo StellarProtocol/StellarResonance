@@ -122,4 +122,24 @@ public sealed class DependencyServiceConcurrencyTests
         await first;
         Assert.Equal(new[] { "a" }, new DependencyLedgerStore(_fs).Read(G, "p").Entries.Select(e => e.DependencyId));
     }
+
+    // v3: the flag writes are mutating members too — they wait for the folder's gate (an ensure mid-download)
+    // instead of racing its ledger write, so the entry the ensure writes is the one that gets marked.
+    [Fact]
+    public async Task SetKept_waits_for_an_ensure_in_flight_and_marks_the_ledger_it_wrote()
+    {
+        Hold = TimeSpan.FromSeconds(5);
+        var s = Make();
+        var a = Dep("a", 1);
+        var ensure = s.EnsureAsync(G, "p", new[] { a }, None, default);
+        await Started.Task;
+
+        var keep = s.SetKeptAsync(G, "p", true);
+        await Task.Delay(100);
+        Assert.False(keep.IsCompleted);
+
+        Release.TrySetResult();
+        await Task.WhenAll(ensure, keep);
+        Assert.True(s.IsKept(G, "p"));
+    }
 }

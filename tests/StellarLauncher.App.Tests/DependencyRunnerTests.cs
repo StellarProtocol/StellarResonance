@@ -27,6 +27,9 @@ public class DependencyRunnerTests
         public Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) => Task.CompletedTask;
         public readonly List<string> Ledgers = new();
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Ledgers;
+        public Task SetKeptAsync(string gameMini, string pluginId, bool kept, CancellationToken ct = default) => Task.CompletedTask;
+        public bool IsKept(string gameMini, string pluginId) => false;
+        public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     private static PluginDependency Dep(string id, bool optional = false) =>

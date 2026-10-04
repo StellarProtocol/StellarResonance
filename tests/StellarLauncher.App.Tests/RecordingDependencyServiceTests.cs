@@ -17,6 +17,12 @@ public class RecordingDependencyServiceTests
         public Task ParkModdedOnlyAsync(string g, CancellationToken ct = default) => Task.CompletedTask;
         public Task UnparkModdedOnlyAsync(string g, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) => Task.CompletedTask;
         public IReadOnlyList<string> LedgerPluginIds(string g) => Array.Empty<string>();
+
+        public int KeptCalls, ReinstallCalls;
+        public bool KeptAnswer;
+        public Task SetKeptAsync(string g, string p, bool kept, CancellationToken ct = default) { KeptCalls++; return Task.CompletedTask; }
+        public bool IsKept(string g, string p) => KeptAnswer;
+        public Task RequestReinstallAsync(string g, string p, CancellationToken ct = default) { ReinstallCalls++; return Task.CompletedTask; }
     }
 
     private static readonly PluginDependency Fx = new("fx", "Fx", "1.0", "https://cdn/fx", new string('a', 64), 1, "file",
@@ -61,5 +67,18 @@ public class RecordingDependencyServiceTests
 
         Assert.Equal(DependencyState.Blocked, sut.LastProblem("/g", "p", Fx)?.State);
         Assert.Null(sut.LastProblem("/g", "p", Fx with { Sha256 = new string('b', 64) }));
+    }
+
+    // v3: the app wires the recorder around the real service — the new members must reach it.
+    [Fact]
+    public async Task Forwards_the_kept_and_reinstall_members()
+    {
+        var inner = new Scripted { KeptAnswer = true };
+        var sut = new RecordingDependencyService(inner);
+        await sut.SetKeptAsync("/g", "p", true);
+        await sut.RequestReinstallAsync("/g", "p");
+        Assert.True(sut.IsKept("/g", "p"));
+        Assert.Equal(1, inner.KeptCalls);
+        Assert.Equal(1, inner.ReinstallCalls);
     }
 }

@@ -59,6 +59,14 @@ public class PreLaunchReviewServiceTests
             if (ThrowOnUnpark) throw new IOException("boom");
             return Task.CompletedTask;
         }
+
+        public readonly List<string> Flags = new();
+        public HashSet<string> Kept = new();
+        public Task SetKeptAsync(string gameMini, string pluginId, bool kept, CancellationToken ct = default)
+        { Flags.Add($"Kept:{pluginId}:{kept}"); return Task.CompletedTask; }
+        public bool IsKept(string gameMini, string pluginId) => Kept.Contains(pluginId);
+        public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default)
+        { Flags.Add($"Reinstall:{pluginId}"); return Task.CompletedTask; }
     }
 
     // Shared by any test that needs one installed plugin whose installed version declares a dependency.

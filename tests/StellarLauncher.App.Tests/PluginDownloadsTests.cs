@@ -42,6 +42,14 @@ public class PluginDownloadsTests
             return Task.CompletedTask;
         }
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
+
+        public readonly List<string> Flags = new();
+        public HashSet<string> Kept = new();
+        public Task SetKeptAsync(string gameMini, string pluginId, bool kept, CancellationToken ct = default)
+        { Flags.Add($"Kept:{pluginId}:{kept}"); return Task.CompletedTask; }
+        public bool IsKept(string gameMini, string pluginId) => Kept.Contains(pluginId);
+        public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default)
+        { Flags.Add($"Reinstall:{pluginId}"); return Task.CompletedTask; }
     }
 
     private sealed class DllHandler : HttpMessageHandler

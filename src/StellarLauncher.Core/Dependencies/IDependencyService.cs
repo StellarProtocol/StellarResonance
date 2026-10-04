@@ -63,4 +63,21 @@ public interface IDependencyService
     /// only; nothing is read or quarantined). Used to find ledgers left behind by a plugin that is no
     /// longer installed.</summary>
     IReadOnlyList<string> LedgerPluginIds(string gameMini);
+
+    /// <summary>v3 V3: marks (<paramref name="kept"/> true) or un-marks this plugin's ledger as KEPT — the plugin was
+    /// removed but its dependencies stay launcher-managed: still parked for Vanilla launches, skipped by the orphan
+    /// sweep, adopted again by the next <see cref="EnsureAsync"/>. A flag write only — no file moves, so it is safe while
+    /// files are parked. No-op without a ledger or for an invalid id; a present-but-unreadable ledger throws
+    /// <see cref="System.InvalidOperationException"/> and nothing is written.</summary>
+    Task SetKeptAsync(string gameMini, string pluginId, bool kept, CancellationToken ct = default);
+
+    /// <summary>v3 V3: read-only (no gate, never quarantines): whether this plugin's ledger is marked kept. False when
+    /// there is no readable ledger or the id is invalid.</summary>
+    bool IsKept(string gameMini, string pluginId);
+
+    /// <summary>v3 V2: the next <see cref="EnsureAsync"/> for this plugin removes the files of every declared, non-skipped
+    /// dependency (hash-checked — a file the player changed is left, and then reads Blocked) and downloads + verifies
+    /// them afresh. A flag write only (safe while parked, so a Vanilla client defers it to the next Modded launch).
+    /// No-op without a ledger; throws like <see cref="SetKeptAsync"/>.</summary>
+    Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default);
 }

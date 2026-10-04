@@ -149,6 +149,9 @@ public partial class ClientPluginsViewModelTests
         public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) => Task.CompletedTask;
         public Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) => Task.CompletedTask;
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
+        public Task SetKeptAsync(string gameMini, string pluginId, bool kept, CancellationToken ct = default) => Task.CompletedTask;
+        public bool IsKept(string gameMini, string pluginId) => false;
+        public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     [Fact]
@@ -471,6 +474,9 @@ public partial class ClientPluginsViewModelTests
         public Task ParkModdedOnlyAsync(string g, CancellationToken ct = default) => inner.ParkModdedOnlyAsync(g, ct);
         public Task UnparkModdedOnlyAsync(string g, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) => inner.UnparkModdedOnlyAsync(g, keepParked, ct);
         public IReadOnlyList<string> LedgerPluginIds(string g) => inner.LedgerPluginIds(g);
+        public Task SetKeptAsync(string g, string p, bool kept, CancellationToken ct = default) => inner.SetKeptAsync(g, p, kept, ct);
+        public bool IsKept(string g, string p) => inner.IsKept(g, p);
+        public Task RequestReinstallAsync(string g, string p, CancellationToken ct = default) => inner.RequestReinstallAsync(g, p, ct);
     }
 
     [Fact]

@@ -63,7 +63,9 @@ public sealed partial class DependencyService : IDependencyService
             return deps.Select(d => new DependencyStatus(d.Id, DependencyState.Failed, "invalid plugin id")).ToList();
 
         // Final review I3: FIRST, so a dependency renamed by a plugin update can reuse its old destination.
-        RemoveUndeclared(gameMini, pluginId, deps);
+        var seen = RemoveUndeclared(gameMini, pluginId, deps);
+        // v3 V3/V2: adopt a kept ledger; prepare a requested reinstall (no extra ledger read unless a flag is set).
+        var reinstall = Adopt(gameMini, pluginId, seen, deps, skippedIds);
 
         var results = new Dictionary<string, DependencyStatus>();
         foreach (var d in deps)
@@ -77,6 +79,7 @@ public sealed partial class DependencyService : IDependencyService
             else
                 results[Key(d)] = await EnsureGuardedAsync(gameMini, pluginId, d, ct).ConfigureAwait(false);
         }
+        if (reinstall) ClearReinstallRequest(gameMini, pluginId);
         return deps.Select(d => results[Key(d)]).ToList();
     }
 
@@ -115,8 +118,10 @@ public sealed partial class DependencyService : IDependencyService
     /// <summary>Final review I3: a dependency this plugin no longer declares (dropped or renamed by an update —
     /// or every one of them, when the new version declares none) is removed exactly like an unticked one:
     /// hash-checked, so a file the player changed since is left alone. Best-effort — an unreadable ledger or
-    /// an IO failure leaves it for the next run and never fails the dependencies that ARE declared.</summary>
-    private void RemoveUndeclared(string gameMini, string pluginId, IReadOnlyList<PluginDependency> deps)
+    /// an IO failure leaves it for the next run and never fails the dependencies that ARE declared.
+    /// Returns the ledger it read (v3: <see cref="Adopt"/> takes the flags from it, so an ensure makes no extra
+    /// ledger read).</summary>
+    private DependencyLedger RemoveUndeclared(string gameMini, string pluginId, IReadOnlyList<PluginDependency> deps)
     {
         var declared = deps.Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
         var ledger = _store.Read(gameMini, pluginId, quarantine: false);
@@ -127,6 +132,7 @@ public sealed partial class DependencyService : IDependencyService
             try { RemoveCore(gameMini, pluginId, id); }
             catch (Exception) { /* best effort: retried on the next ensure */ }
         }
+        return ledger;
     }
 
     public IReadOnlyList<DependencyStatus> Status(string gameMini, string pluginId,
