@@ -11,15 +11,17 @@ public static class SessionPresenter
     public static string StateLine(LaunchSession s, InventorySnapshot inv, bool modded) => s.State switch
     {
         _ when !s.IsBusy && s.ReviewText is { Length: > 0 } review => review,   // pre-launch review (e.g. dependencies)
-        // R-2: the sticky "Added <dependency> for <plugin>" notice — shown whenever nothing busier is going
-        // on, same slot and priority as ReviewText above (which wins if somehow both are set at once), but
-        // never cleared by Begin/the review's own end, so it's actually visible once the launch settles.
-        _ when !s.IsBusy && s.DependencyNotice is { Length: > 0 } notice => notice,
         SessionState.Running when s.StartedAt is { } t => $"running · {Elapsed(t)}",
         SessionState.Running => "running",
         SessionState.Launching or SessionState.Preparing => s.StatusText,
         SessionState.SteamHandoff => "launched via Steam",
         SessionState.Failed => s.StatusText.Length > 0 ? s.StatusText : "failed",
+        // N-1: the sticky "Added <dependency> for <plugin>" notice — checked AFTER Failed/SteamHandoff
+        // (neither is in IsBusy, so without this ordering the notice would hide a launch failure's reason,
+        // or Steam's "launched via Steam") — but still BEFORE the plain Exited/idle fallbacks below, which
+        // is exactly where a notice is meant to show: once the launch has settled with nothing more urgent
+        // to report. Never cleared by Begin/the review's own end, so it's actually visible.
+        _ when !s.IsBusy && s.DependencyNotice is { Length: > 0 } notice => notice,
         SessionState.Exited => "exited",
         _ => !inv.FolderExists ? "folder missing" : modded ? "idle" : "idle · launches vanilla until the framework is installed",
     };
@@ -27,10 +29,11 @@ public static class SessionPresenter
     public static IBrush StateBrush(LaunchSession s, InventorySnapshot inv) => new SolidColorBrush(Color.Parse(s.State switch
     {
         _ when !s.IsBusy && s.ReviewText is { Length: > 0 } => "#9ec2ff",   // same colour as Launching/Preparing
-        _ when !s.IsBusy && s.DependencyNotice is { Length: > 0 } => "#9ec2ff",   // R-2: same neutral info colour
         SessionState.Running or SessionState.SteamHandoff => "#54e3a0",
         SessionState.Launching or SessionState.Preparing => "#9ec2ff",
         SessionState.Failed => "#ff9a9a",
+        // N-1: moved below Failed/SteamHandoff — same reasoning as StateLine above.
+        _ when !s.IsBusy && s.DependencyNotice is { Length: > 0 } => "#9ec2ff",   // R-2: neutral info colour
         _ => inv.FolderExists ? "#697297" : "#ff9a9a",
     }));
 
