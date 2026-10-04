@@ -116,6 +116,18 @@ public sealed partial class DependencyService
         return null;
     }
 
+    /// <summary>R-1: <see cref="StatusBlocked"/>'s write-path twin — called from <see cref="EnsureOneAsync"/>
+    /// before a download, so a destination already known foreign/unowned is reported Blocked without ever
+    /// fetching bytes for it. <c>quarantine: true</c> (unlike the read-only <see cref="StatusBlocked"/>),
+    /// matching every other ownership check <see cref="EnsureOneAsync"/>'s own <see cref="CheckDestination"/>
+    /// makes.</summary>
+    private DependencyStatus? StatusBlockedForWrite(string gameMini, string pluginId, PluginDependency d)
+    {
+        foreach (var abs in KnownDestinations(gameMini, pluginId, d))
+            if (ForeignClaim(gameMini, pluginId, d.Id, abs, quarantine: true, out _) is { } blocked) return blocked;
+        return null;
+    }
+
     private (string PluginId, string DependencyId)? FindOwner(string gameMini, string relativePath, bool quarantine = true)
     {
         foreach (var ledger in _store.ReadAll(gameMini, quarantine))

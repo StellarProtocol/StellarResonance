@@ -33,6 +33,13 @@ public sealed partial class DependencyService
         var existing = ledger.Entries.FirstOrDefault(e => e.DependencyId == dep.Id);
         if (!force && IsInstalled(gameMini, existing, dep))
             return new DependencyStatus(dep.Id, DependencyState.Installed, null);
+        // R-1: a destination already known blocked — a foreign claim, or a file nobody's ledger owns sitting
+        // there — never needs a download to find that out again. Without this, a dependency whose destination
+        // was already discovered blocked (e.g. a reinstall that found the player's own edit, dropping the
+        // ledger entry) would re-download its bytes on every single future ensure just to rediscover the same
+        // Blocked outcome. Same read-only ownership check Status()/StatusBlocked use, but quarantining a
+        // corrupt ledger (write-path semantics) rather than merely reading past it.
+        if (StatusBlockedForWrite(gameMini, pluginId, dep) is { } alreadyBlocked) return alreadyBlocked;
 
         byte[] bytes;
         List<(string Abs, byte[] Bytes)> files;

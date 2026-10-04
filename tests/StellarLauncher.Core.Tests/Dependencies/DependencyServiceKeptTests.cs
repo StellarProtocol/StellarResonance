@@ -217,6 +217,14 @@ public sealed partial class DependencyServiceTests
         Assert.Equal(DependencyState.Blocked, st[1].State);
         Assert.Equal(DependencyReason.PlayerFile, st[1].Reason);
         Assert.Equal(new byte[] { 7 }, _fs.File.ReadAllBytes("/game_mini/b.dll"));
+
+        // R-1: Blocked is a FINAL outcome for a reinstall attempt — the player's file isn't going to stop
+        // being in the way on its own — so the flag clears instead of forcing "a" to re-download forever on
+        // every future launch just because "b" can never be un-blocked this way.
+        Assert.False(LedgerOf().ReinstallRequested);
+        _downloads = 0;
+        await s.EnsureAsync(G, "p", new[] { a, b }, None, default);
+        Assert.Equal(0, _downloads);
     }
 
     // Review carry-over (c): the request itself throws like SetKeptAsync on a present-but-unreadable ledger — a

@@ -80,10 +80,14 @@ public sealed partial class DependencyService : IDependencyService
             else
                 results[Key(d)] = await EnsureGuardedAsync(gameMini, pluginId, d, force?.Contains(d.Id) == true, ct).ConfigureAwait(false);
         }
-        // Final-review I-1: cleared only once every FORCED dependency's real outcome (after the loop actually
-        // ran it through download/verify/commit) reads Installed — never pre-emptively, and never when one of
-        // them is still wrong (Failed/Blocked), so a failed reinstall attempt keeps the flag set for a retry.
-        if (force is not null && force.All(id => results.TryGetValue(id, out var s) && s.State == DependencyState.Installed))
+        // Final-review I-1/R-1: cleared unless a FORCED dependency ends Failed. Installed, Blocked (the
+        // player's own file is in the way) and Skipped (waiting behind a blocked prerequisite, or skipped
+        // outright) are all FINAL outcomes for a reinstall attempt — none of them resolves itself by
+        // retrying, so clearing is correct; only Failed (a download/verify problem that might go away, e.g.
+        // a flaky connection) deserves the flag staying set for a retry on the next launch. R-1 fixed a
+        // regression where a Blocked/Skipped forced dependency left the flag set forever, re-forcing every
+        // OTHER forced dependency through a pointless re-download on every future launch.
+        if (force is not null && !force.Any(id => results.TryGetValue(id, out var s) && s.State == DependencyState.Failed))
             ClearReinstallRequest(gameMini, pluginId);
         return deps.Select(d => results[Key(d)]).ToList();
     }
