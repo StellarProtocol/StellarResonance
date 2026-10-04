@@ -28,6 +28,7 @@ public class DependencyRunnerTests
         public readonly List<string> Ledgers = new();
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Ledgers;
         public IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) => Array.Empty<LedgerEntry>();
+        public KeptDependencyDiskState KeptDiskState(string gameMini, string pluginId, string dependencyId) => KeptDependencyDiskState.Missing;
         public Task SetKeptAsync(string gameMini, string pluginId, bool kept, CancellationToken ct = default) => Task.CompletedTask;
         public bool IsKept(string gameMini, string pluginId) => false;
         public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.CompletedTask;

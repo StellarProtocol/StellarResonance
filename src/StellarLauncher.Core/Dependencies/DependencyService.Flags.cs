@@ -22,6 +22,22 @@ public sealed partial class DependencyService
     public IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) =>
         DependencyPaths.IsValidPluginId(pluginId) ? _store.Read(gameMini, pluginId, quarantine: false).Entries : Array.Empty<LedgerEntry>();
 
+    /// <summary>I-2: all-files-must-match at ONE location, same "every recorded file" rule <see cref="IsInstalled"/>
+    /// uses for the live location — a dependency with several files (a zip) is "Kept" only when every one of them
+    /// is present there, "Parked" only when every one of them is present (matching) at its parked copy instead,
+    /// else "Missing". An entry with no files at all is Missing (nothing to find).</summary>
+    public KeptDependencyDiskState KeptDiskState(string gameMini, string pluginId, string dependencyId)
+    {
+        if (!DependencyPaths.IsValidPluginId(pluginId)) return KeptDependencyDiskState.Missing;
+        var entry = _store.Read(gameMini, pluginId, quarantine: false).Entries.FirstOrDefault(e => e.DependencyId == dependencyId);
+        if (entry is null || entry.Files.Count == 0) return KeptDependencyDiskState.Missing;
+        if (entry.Files.All(f => DependencyPaths.FromLedger(gameMini, f.Path) is { } abs && DependencyFileHash.Matches(_fs, abs, f.Sha256)))
+            return KeptDependencyDiskState.Kept;
+        if (entry.Files.All(f => DependencyFileHash.Matches(_fs, DependencyPaths.ParkedPath(gameMini, pluginId, f.Path), f.Sha256)))
+            return KeptDependencyDiskState.Parked;
+        return KeptDependencyDiskState.Missing;
+    }
+
     /// <summary>Read-for-write (round 6: a present-but-unreadable ledger is never written blind), change, write back
     /// only when something changed. No ledger → nothing to mark (an empty ledger is never written into existence).</summary>
     private void WriteFlags(string gameMini, string pluginId, Func<DependencyLedger, DependencyLedger> change)

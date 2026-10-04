@@ -43,6 +43,7 @@ public class PluginDownloadsTests
         }
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Array.Empty<string>();
         public IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) => Array.Empty<LedgerEntry>();
+        public KeptDependencyDiskState KeptDiskState(string gameMini, string pluginId, string dependencyId) => KeptDependencyDiskState.Missing;
 
         public readonly List<string> Flags = new();
         public HashSet<string> Kept = new();

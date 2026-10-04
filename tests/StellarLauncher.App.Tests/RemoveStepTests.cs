@@ -191,7 +191,16 @@ public class RemoveStepTests
         Assert.True(item.DependenciesKept);
         Assert.True(item.ShowDependencySection);
         Assert.Equal("Kept after Photo Thing was removed. Still moved aside for Vanilla launches; reinstalling Photo Thing uses it again.", item.KeptNote);
-        Assert.All(item.Dependencies, d => Assert.Equal("Installed", d.StateText));
+        // Final-review I-2: the pill comes from disk ("Kept" — present at its normal location), not a blanket
+        // "Installed"; the plugin isn't installed, so every row — even the optional "fx" — is locked read-only,
+        // and the untick/remove footnote is suppressed in favour of the KeptNote + its own button.
+        Assert.All(item.Dependencies, d => Assert.Equal("Kept", d.StateText));
+        Assert.All(item.Dependencies, d => Assert.False(d.CanChange));
+        Assert.False(item.ShowDependencyFootnote);
+
+        // I-2: SetDependencyUse itself refuses too — not merely disabled on the checkbox's binding.
+        vm.SetDependencyUse(item, "fx", false);
+        Assert.Empty(f.Shell.Config.Clients.Single(c => c.Id == "c1").SkippedDependencies);
 
         await item.RemoveKeptDependenciesCommand.ExecuteAsync(null);
         await item.DependencyRefresh;
@@ -220,7 +229,8 @@ public class RemoveStepTests
         // The shown version is "2.0.0" (newest, since nothing is installed) and declares only "lut" — but the
         // ledger still holds Fx + Bridge, kept from when "1.0.0" was removed.
         Assert.Equal(new[] { "Effects runtime", "Effects bridge" }, item.Dependencies.Select(d => d.Name));
-        Assert.All(item.Dependencies, d => Assert.Equal("Installed", d.StateText));
+        Assert.All(item.Dependencies, d => Assert.Equal("Kept", d.StateText));
+        Assert.All(item.Dependencies, d => Assert.False(d.CanChange));
         Assert.True(item.ShowDependencySection);
         Assert.Contains("Still moved aside for Vanilla launches", item.KeptNote);
     }
@@ -241,6 +251,10 @@ public class RemoveStepTests
         Assert.True(item.DependenciesKept);
         Assert.True(item.ShowDependencySection);
         Assert.Equal("Kept after Photo Thing was removed. Still moved aside for Vanilla launches; reinstalling Photo Thing uses it again.", item.KeptNote);
+        // Final-review I-2: the checkbox lock carve-out is "kept AND NOT installed" — here the plugin IS still
+        // installed (the post-crash case), so the optional "fx" row stays interactive, unlike the normal
+        // kept-and-removed case.
+        Assert.True(item.Dependencies.Single(d => d.Id == "fx").CanChange);
     }
 
     [Fact]

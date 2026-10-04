@@ -57,6 +57,9 @@ public sealed partial class ClientPluginsViewModel
 
     public void SetDependencyUse(PluginItemViewModel item, string dependencyId, bool use)
     {
+        // Final-review I-2: a kept row on an uninstalled plugin is read-only — nothing to skip or use right
+        // now (reinstalling adopts the ledger again, at which point this is no longer "kept").
+        if (item.DependenciesKept && !item.Installed) return;
         var dep = item.ShownDependencies.FirstOrDefault(d => d.Id == dependencyId);
         if (dep is not { Optional: true }) return;   // Task 6 (e): a required dependency can't be skipped
         if (_ws.Session.IsBusy)                       // fix round M3: files are in use while the game runs

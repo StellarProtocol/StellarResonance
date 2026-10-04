@@ -282,7 +282,10 @@
                                   Padding="12,6" CornerRadius="8"/>
                         </Grid>
                       </Border>
-                      <TextBlock Text="{Binding DependencyFootnote}" Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
+                      <!-- v3 final-review I-2: in kept mode, the KeptNote + "Remove kept dependencies" above are
+                           the only actions — the untick/remove footnote would describe choices that aren't live. -->
+                      <TextBlock Text="{Binding DependencyFootnote}" IsVisible="{Binding ShowDependencyFootnote}"
+                                 Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
                     </StackPanel>
                   </Border>
                 </StackPanel>

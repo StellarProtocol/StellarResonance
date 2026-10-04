@@ -34,4 +34,8 @@ public interface IPluginActions
     /// the kept section's rows and Vanilla clause must reflect what's REALLY on disk, not what the shown version
     /// happens to declare.</summary>
     Task<IReadOnlyList<LedgerEntry>> KeptLedgerEntriesAsync(PluginItemViewModel item);
+
+    /// <summary>Final-review I-2: each kept dependency's disk state right now (read off the UI thread), keyed by
+    /// dependency id — "Kept"/"Kept · moved aside"/"Missing" instead of a blanket "Installed" pill.</summary>
+    Task<IReadOnlyDictionary<string, KeptDependencyDiskState>> KeptDiskStatesAsync(PluginItemViewModel item);
 }

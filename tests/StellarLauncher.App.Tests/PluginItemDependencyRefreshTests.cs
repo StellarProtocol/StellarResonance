@@ -27,6 +27,46 @@ public class PluginItemDependencyRefreshTests
         public Task<bool> DependenciesKeptAsync(PluginItemViewModel item) => Task.FromResult(false);
         public Task RemoveKeptDependenciesAsync(PluginItemViewModel item) => Task.CompletedTask;
         public Task<IReadOnlyList<LedgerEntry>> KeptLedgerEntriesAsync(PluginItemViewModel item) => Task.FromResult<IReadOnlyList<LedgerEntry>>(Array.Empty<LedgerEntry>());
+        public Task<IReadOnlyDictionary<string, KeptDependencyDiskState>> KeptDiskStatesAsync(PluginItemViewModel item) =>
+            Task.FromResult<IReadOnlyDictionary<string, KeptDependencyDiskState>>(new Dictionary<string, KeptDependencyDiskState>());
+    }
+
+    // Final-review M-2: in kept mode, RefreshCoreAsync never awaits the shown version's status task (its
+    // result is irrelevant then) — but it must still OBSERVE it, so a fault in it never surfaces later as an
+    // unobserved task exception.
+    private sealed class KeptFaultingStatusActions : IPluginActions
+    {
+        public Task InstallAsync(PluginItemViewModel item) => Task.CompletedTask;
+        public Task RemoveAsync(PluginItemViewModel item) => Task.CompletedTask;
+        public Task EnableAsync(PluginItemViewModel item) => Task.CompletedTask;
+        public Task<IReadOnlyList<DependencyStatus>> DependencyStatusAsync(PluginItemViewModel item) =>
+            Task.FromException<IReadOnlyList<DependencyStatus>>(new InvalidOperationException("irrelevant in kept mode"));
+        public void SetDependencyUse(PluginItemViewModel item, string dependencyId, bool use) { }
+        public bool HasInstallStep(PluginItemViewModel item) => false;
+        public Task<bool> DependenciesKeptAsync(PluginItemViewModel item) => Task.FromResult(true);
+        public Task RemoveKeptDependenciesAsync(PluginItemViewModel item) => Task.CompletedTask;
+        public Task<IReadOnlyList<LedgerEntry>> KeptLedgerEntriesAsync(PluginItemViewModel item) => Task.FromResult<IReadOnlyList<LedgerEntry>>(Array.Empty<LedgerEntry>());
+        public Task<IReadOnlyDictionary<string, KeptDependencyDiskState>> KeptDiskStatesAsync(PluginItemViewModel item) =>
+            Task.FromResult<IReadOnlyDictionary<string, KeptDependencyDiskState>>(new Dictionary<string, KeptDependencyDiskState>());
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static async Task RunKeptRefreshWithFaultingStatusAsync() => await Item(new KeptFaultingStatusActions()).RefreshDependenciesAsync();
+
+    [Fact]
+    public async Task Kept_mode_observes_the_unused_status_task_so_a_fault_in_it_never_becomes_unobserved()
+    {
+        UnobservedTaskExceptionEventArgs? caught = null;
+        void Handler(object? s, UnobservedTaskExceptionEventArgs e) { caught = e; e.SetObserved(); }
+        TaskScheduler.UnobservedTaskException += Handler;
+        try
+        {
+            await RunKeptRefreshWithFaultingStatusAsync();
+            GC.Collect(); GC.WaitForPendingFinalizers();
+            GC.Collect(); GC.WaitForPendingFinalizers();
+            Assert.Null(caught);
+        }
+        finally { TaskScheduler.UnobservedTaskException -= Handler; }
     }
 
     private static PluginItemViewModel Item(IPluginActions actions)

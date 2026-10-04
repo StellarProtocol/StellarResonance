@@ -45,8 +45,15 @@ public sealed partial class DependencyItemViewModel : ObservableObject
     /// <summary>Fix round M3: set while the client's game is running — no toggling then.</summary>
     [ObservableProperty] private bool _locked;
     partial void OnLockedChanged(bool value) => OnPropertyChanged(nameof(CanChange));
-    /// <summary>What the checkbox's IsEnabled binds to: optional, and the game isn't running.</summary>
-    public bool CanChange => IsOptional && !Locked;
+
+    /// <summary>Final-review I-2: set while this row is shown from a KEPT ledger and the plugin itself isn't
+    /// installed — there is nothing to use/skip right now (reinstalling the plugin adopts the ledger again,
+    /// at which point the row is no longer kept).</summary>
+    [ObservableProperty] private bool _keptLocked;
+    partial void OnKeptLockedChanged(bool value) => OnPropertyChanged(nameof(CanChange));
+
+    /// <summary>What the checkbox's IsEnabled binds to: optional, the game isn't running, and not a read-only kept row.</summary>
+    public bool CanChange => IsOptional && !Locked && !KeptLocked;
 
     public string Where => string.Equals(Dependency.Target, "game", StringComparison.OrdinalIgnoreCase)
         ? (Dependency.ModdedOnly ? "game folder · Modded launches only" : "game folder")
@@ -96,6 +103,24 @@ public sealed partial class DependencyItemViewModel : ObservableObject
             DependencyState.Installed => "ok",
             DependencyState.NotInstalled or DependencyState.Skipped => "off",
             DependencyState.Blocked => "warn",
+            _ => "bad",
+        };
+    }
+
+    /// <summary>Final-review I-2: overrides the generic "Installed" pill a kept row would otherwise get, with
+    /// what's actually on disk right now.</summary>
+    public void ApplyKeptDiskState(KeptDependencyDiskState state)
+    {
+        StateText = state switch
+        {
+            KeptDependencyDiskState.Kept => "Kept",
+            KeptDependencyDiskState.Parked => "Kept · moved aside",
+            _ => "Missing",
+        };
+        StateClass = state switch
+        {
+            KeptDependencyDiskState.Kept => "ok",
+            KeptDependencyDiskState.Parked => "warn",
             _ => "bad",
         };
     }

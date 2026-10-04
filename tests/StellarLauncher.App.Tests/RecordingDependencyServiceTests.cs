@@ -18,6 +18,7 @@ public class RecordingDependencyServiceTests
         public Task UnparkModdedOnlyAsync(string g, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default) => Task.CompletedTask;
         public IReadOnlyList<string> LedgerPluginIds(string g) => Array.Empty<string>();
         public IReadOnlyList<LedgerEntry> LedgerEntries(string g, string p) => Array.Empty<LedgerEntry>();
+        public KeptDependencyDiskState KeptDiskState(string g, string p, string d) => KeptDependencyDiskState.Missing;
 
         public int KeptCalls, ReinstallCalls;
         public bool KeptAnswer;

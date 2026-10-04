@@ -16,6 +16,13 @@ public enum DependencyState { NotInstalled, Installed, Skipped, Blocked, Failed 
 /// itself waiting) — <c>Detail</c> is then that prerequisite's id.</summary>
 public enum DependencyReason { None, PlayerFile, OtherOwner, WaitingForPrerequisite }
 
+/// <summary>v3 final-review I-2: where a KEPT dependency's recorded files actually are right now — independent
+/// of <see cref="DependencyState"/>, which describes an ENSURE's outcome, not a static ledger's disk state.
+/// <see cref="Kept"/>: every recorded file is present at its normal location with matching content.
+/// <see cref="Parked"/>: absent there, but present (matching) at its parked copy (a Vanilla launch, or the
+/// plugin disabled, moved it aside). <see cref="Missing"/>: neither — the file is gone from both places.</summary>
+public enum KeptDependencyDiskState { Kept, Parked, Missing }
+
 /// <summary>One dependency's outcome. <paramref name="Detail"/> carries the reason for
 /// <see cref="DependencyState.Blocked"/>/<see cref="DependencyState.Failed"/> (and, with
 /// <see cref="DependencyReason.WaitingForPrerequisite"/>, the prerequisite's id), or null otherwise.</summary>
@@ -77,10 +84,11 @@ public interface IDependencyService
     /// GATED and treats a present-but-unreadable ledger as kept rather than fail-opening into a removal.</remarks>
     bool IsKept(string gameMini, string pluginId);
 
-    /// <summary>v3 V2: the next <see cref="EnsureAsync"/> for this plugin removes the files of every declared, non-skipped
-    /// dependency (hash-checked — a file the player changed is left, and then reads Blocked) and downloads + verifies
-    /// them afresh. A flag write only (safe while parked, so a Vanilla client defers it to the next Modded launch).
-    /// No-op without a ledger; throws like <see cref="SetKeptAsync"/>.</summary>
+    /// <summary>v3 V2: the next <see cref="EnsureAsync"/> for this plugin FORCES every declared, non-skipped
+    /// dependency through the normal update path (download, verify, backed-up replace — a file the player
+    /// changed is left, and then reads Blocked) even though it already reads Installed. A flag write only
+    /// (safe while parked, so a Vanilla client defers it to the next Modded launch). No-op without a ledger;
+    /// throws like <see cref="SetKeptAsync"/>.</summary>
     Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default);
 
     /// <summary>v3 V3 review carry-over (a): the GATED equivalent of a bare <see cref="IsKept"/> read followed by a
@@ -96,4 +104,10 @@ public interface IDependencyService
     /// plugin version happens to declare. Read-only (no gate, never quarantines); empty for no/unreadable ledger
     /// or an invalid id.</summary>
     IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId);
+
+    /// <summary>v3 final-review I-2: this ONE kept dependency's disk state right now, straight from its ledger
+    /// entry's recorded files (read-only, no gate, never quarantines) — used to pill a kept row "Kept",
+    /// "Kept · moved aside" or "Missing" instead of a blanket "Installed". <see cref="KeptDependencyDiskState.Missing"/>
+    /// for no ledger, an invalid id, or no entry for <paramref name="dependencyId"/>.</summary>
+    KeptDependencyDiskState KeptDiskState(string gameMini, string pluginId, string dependencyId);
 }

@@ -99,6 +99,13 @@ public sealed partial class ClientPluginsViewModel
         return Task.Run(() => svc.LedgerEntries(gameMini, id));
     }
 
+    public Task<IReadOnlyDictionary<string, KeptDependencyDiskState>> KeptDiskStatesAsync(PluginItemViewModel item)
+    {
+        var (svc, gameMini, id) = (_ws.Services.Core.Install.Dependencies, _ws.Client.GameMiniDir, item.Entry.Id);
+        return Task.Run(() => (IReadOnlyDictionary<string, KeptDependencyDiskState>)svc.LedgerEntries(gameMini, id)
+            .ToDictionary(e => e.DependencyId, e => svc.KeptDiskState(gameMini, id, e.DependencyId)));
+    }
+
     public async Task RemoveKeptDependenciesAsync(PluginItemViewModel item)
     {
         if (_ws.Session.IsBusy) { Status = $"{item.Name}: close the game to change its dependencies"; return; }   // files in use

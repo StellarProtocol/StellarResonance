@@ -30,10 +30,15 @@ public partial class PluginItemViewModel
     {
         OnPropertyChanged(nameof(ShowDependencySection));
         OnPropertyChanged(nameof(KeptNote));
+        OnPropertyChanged(nameof(ShowDependencyFootnote));
     }
 
     /// <summary>The section shows for declared dependencies, and for kept ones even when the shown version declares none.</summary>
     public bool ShowDependencySection => HasDependencies || DependenciesKept;
+
+    /// <summary>Final-review I-2: the untick/remove footnote describes choices that aren't live in kept mode —
+    /// the KeptNote and "Remove kept dependencies" above are the only actions then.</summary>
+    public bool ShowDependencyFootnote => !DependenciesKept;
 
     /// <summary>Mockup v3 "removed, dependency kept" wording; the Vanilla clause only when something kept is moddedOnly.</summary>
     public string KeptNote => Dependencies.Any(d => d.Dependency.ModdedOnly)
@@ -80,14 +85,21 @@ public partial class PluginItemViewModel
 
         IReadOnlyList<PluginDependency> deps;
         IReadOnlyList<DependencyStatus> statuses;
+        IReadOnlyDictionary<string, KeptDependencyDiskState>? diskStates = null;
         if (kept)
         {
             // Review fix round 3 (4): the kept section shows what the LEDGER actually holds, not what the
             // currently shown version happens to declare (which may have changed, or dropped it entirely).
-            // statusTask (started above) is irrelevant here and deliberately left unobserved.
+            // M-2: statusTask's RESULT is unused here, but it must still be OBSERVED — otherwise, should it
+            // fault (e.g. a transient ledger-read error for the shown version), the exception could surface
+            // later as an unobserved task exception instead of being contained here. ExecuteSynchronously so
+            // an already-completed task is observed immediately, with no added latency on this branch.
+            _ = statusTask.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.ExecuteSynchronously);
             IReadOnlyList<LedgerEntry> entries;
             try { entries = await _parent.KeptLedgerEntriesAsync(this); }
             catch (Exception) { entries = Array.Empty<LedgerEntry>(); }
+            try { diskStates = await _parent.KeptDiskStatesAsync(this); }
+            catch (Exception) { diskStates = null; }
             deps = entries.Select(ResolveKeptDependency).ToList();
             statuses = deps.Select(d => new DependencyStatus(d.Id, DependencyState.Installed, null)).ToList();
         }
@@ -99,7 +111,10 @@ public partial class PluginItemViewModel
         }
 
         if (generation != _refreshGeneration) return;   // a newer refresh started meanwhile; it owns the rows
-        ApplyDependencyRows(deps, statuses);
+        // Final-review I-2: a kept row on a plugin that ISN'T installed is read-only — there's nothing to
+        // use/skip right now. A kept row while the plugin IS installed (the rare post-crash case) keeps its
+        // checkbox interactive, same as before.
+        ApplyDependencyRows(deps, statuses, keptLocked: kept && !Installed, keptDiskStates: diskStates);
         DependenciesKept = kept;
     }
 
@@ -116,11 +131,19 @@ public partial class PluginItemViewModel
             Array.Empty<PluginDependencyFile>(), "game", ModdedOnly: entry.Files.Any(f => f.ModdedOnly), License: "");
     }
 
-    private void ApplyDependencyRows(IReadOnlyList<PluginDependency> deps, IReadOnlyList<DependencyStatus> statuses)
+    private void ApplyDependencyRows(IReadOnlyList<PluginDependency> deps, IReadOnlyList<DependencyStatus> statuses,
+        bool keptLocked = false, IReadOnlyDictionary<string, KeptDependencyDiskState>? keptDiskStates = null)
     {
         var byId = statuses.ToDictionary(s => s.DependencyId);
         DependencyStatus StatusOf(PluginDependency d) =>
             byId.TryGetValue(d.Id, out var s) ? Named(s, deps) : new DependencyStatus(d.Id, DependencyState.NotInstalled, null);
+        // Final-review I-2: every kept row is locked the same way regardless of disk state, and gets its
+        // Kept/Parked/Missing pill when disk states were read successfully.
+        void ApplyKept(DependencyItemViewModel row)
+        {
+            row.KeptLocked = keptLocked;
+            if (keptDiskStates is not null && keptDiskStates.TryGetValue(row.Id, out var ds)) row.ApplyKeptDiskState(ds);
+        }
 
         if (Dependencies.Select(r => r.Id).SequenceEqual(deps.Select(d => d.Id)))
         {
@@ -128,6 +151,7 @@ public partial class PluginItemViewModel
             {
                 var st = StatusOf(deps[i]);
                 Dependencies[i].Update(st, Used(st));
+                ApplyKept(Dependencies[i]);
             }
         }
         else
@@ -136,8 +160,10 @@ public partial class PluginItemViewModel
             foreach (var d in deps)
             {
                 var st = StatusOf(d);
-                Dependencies.Add(new DependencyItemViewModel(d, st, Used(st),
-                    (id, use) => _parent.SetDependencyUse(this, id, use), RequiresLabel(d, deps)) { Locked = DependenciesLocked });
+                var row = new DependencyItemViewModel(d, st, Used(st),
+                    (id, use) => _parent.SetDependencyUse(this, id, use), RequiresLabel(d, deps)) { Locked = DependenciesLocked };
+                ApplyKept(row);
+                Dependencies.Add(row);
             }
         }
         OnPropertyChanged(nameof(HasDependencies));

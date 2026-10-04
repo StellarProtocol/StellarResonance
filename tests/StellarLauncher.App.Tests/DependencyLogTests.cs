@@ -23,6 +23,7 @@ public class DependencyLogTests
             FailUnpark ? throw new IOException("unpark boom") : Task.CompletedTask;
         public IReadOnlyList<string> LedgerPluginIds(string g) => Array.Empty<string>();
         public IReadOnlyList<LedgerEntry> LedgerEntries(string g, string p) => Array.Empty<LedgerEntry>();
+        public KeptDependencyDiskState KeptDiskState(string g, string p, string d) => KeptDependencyDiskState.Missing;
         public Task SetKeptAsync(string gameMini, string pluginId, bool kept, CancellationToken ct = default) => Task.CompletedTask;
         public bool IsKept(string gameMini, string pluginId) => false;
         public Task RequestReinstallAsync(string gameMini, string pluginId, CancellationToken ct = default) => Task.CompletedTask;

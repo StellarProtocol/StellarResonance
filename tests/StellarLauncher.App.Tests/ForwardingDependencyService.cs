@@ -23,4 +23,5 @@ public class ForwardingDependencyService(IDependencyService inner) : IDependency
     public virtual Task<bool> RemoveAllUnlessKeptAsync(string gameMini, string pluginId, CancellationToken ct = default) =>
         inner.RemoveAllUnlessKeptAsync(gameMini, pluginId, ct);
     public virtual IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) => inner.LedgerEntries(gameMini, pluginId);
+    public virtual KeptDependencyDiskState KeptDiskState(string gameMini, string pluginId, string dependencyId) => inner.KeptDiskState(gameMini, pluginId, dependencyId);
 }

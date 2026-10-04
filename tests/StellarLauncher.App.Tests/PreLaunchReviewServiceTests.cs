@@ -54,6 +54,7 @@ public class PreLaunchReviewServiceTests
         }
         public IReadOnlyList<string> LedgerPluginIds(string gameMini) => Ledgers;
         public IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) => Array.Empty<LedgerEntry>();
+        public KeptDependencyDiskState KeptDiskState(string gameMini, string pluginId, string dependencyId) => KeptDependencyDiskState.Missing;
         public Task ParkModdedOnlyAsync(string gameMini, CancellationToken ct = default) { Calls.Add("Park"); return Task.CompletedTask; }
         public Task UnparkModdedOnlyAsync(string gameMini, IReadOnlySet<string>? keepParked = null, CancellationToken ct = default)
         {

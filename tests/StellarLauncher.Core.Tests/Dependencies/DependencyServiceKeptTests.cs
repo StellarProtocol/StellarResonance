@@ -101,6 +101,26 @@ public sealed partial class DependencyServiceTests
         Assert.Equal(0, _downloads);
     }
 
+    // Final-review I-2: the kept page's row pill is derived from DISK, not a blanket "Installed" — present
+    // and owned (Kept), present only at its parked copy (Kept · moved aside), or neither (Missing).
+    [Fact]
+    public async Task KeptDiskState_reports_kept_parked_or_missing_from_disk()
+    {
+        var d = File("fx", new byte[] { 1 }, "dxgi.dll", modded: true);
+        var s = Make();
+        await s.EnsureAsync(G, "p", new[] { d }, None, default);
+        Assert.Equal(KeptDependencyDiskState.Kept, s.KeptDiskState(G, "p", "fx"));
+
+        await s.ParkModdedOnlyAsync(G);
+        Assert.Equal(KeptDependencyDiskState.Parked, s.KeptDiskState(G, "p", "fx"));
+
+        _fs.File.Delete("/game_mini/stellar/deps-parked/p/dxgi.dll");
+        Assert.Equal(KeptDependencyDiskState.Missing, s.KeptDiskState(G, "p", "fx"));
+
+        Assert.Equal(KeptDependencyDiskState.Missing, s.KeptDiskState(G, "p", "no-such-id"));
+        Assert.Equal(KeptDependencyDiskState.Missing, s.KeptDiskState(G, "../x", "fx"));
+    }
+
     // Controller brief: once adopted, the existing dropped-dependency cleanup (final review I3) applies.
     [Fact]
     public async Task Adopting_a_kept_ledger_removes_what_the_new_version_no_longer_declares()

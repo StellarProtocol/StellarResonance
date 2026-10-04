@@ -95,4 +95,5 @@ public sealed class RecordingDependencyService : IDependencyService, IDependency
     }
 
     public IReadOnlyList<LedgerEntry> LedgerEntries(string gameMini, string pluginId) => _inner.LedgerEntries(gameMini, pluginId);
+    public KeptDependencyDiskState KeptDiskState(string gameMini, string pluginId, string dependencyId) => _inner.KeptDiskState(gameMini, pluginId, dependencyId);
 }
