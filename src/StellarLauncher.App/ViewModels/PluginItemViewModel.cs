@@ -223,7 +223,15 @@ public partial class PluginItemViewModel : ObservableObject
         OnSelectedVersionChanged(SelectedVersion);
     }
 
-    [RelayCommand] private void RequestInstall() { if (Compatible) ConfirmVisible = true; }
+    // v3: when the click opens a step dialog, that dialog is the confirmation — no inline Confirm first.
+    [RelayCommand]
+    private Task RequestInstall()
+    {
+        if (!Compatible) return Task.CompletedTask;
+        if (_parent.HasInstallStep(this)) return _parent.InstallAsync(this);
+        ConfirmVisible = true;
+        return Task.CompletedTask;
+    }
     [RelayCommand] private void CancelInstall() => ConfirmVisible = false;
     [RelayCommand] private Task ConfirmInstall() { ConfirmVisible = false; return _parent.InstallAsync(this); }
     [RelayCommand] private Task Remove() => _parent.RemoveAsync(this);

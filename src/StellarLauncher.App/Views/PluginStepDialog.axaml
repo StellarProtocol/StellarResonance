@@ -66,12 +66,13 @@
         </Border>
       </StackPanel>
 
+      <!-- Review fix round 1 (b): IsCancel (Esc) / IsDefault (Enter) — the same keyboard behaviour every other dialog gets for free. -->
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-        <Button Content="Cancel" Command="{Binding CancelCommand}"
+        <Button Content="Cancel" Command="{Binding CancelCommand}" IsCancel="True"
                 Foreground="#9aa3bf" Background="Transparent" BorderBrush="#2f3a5a" BorderThickness="1" Padding="14,9" CornerRadius="10"/>
-        <Button Content="{Binding OkLabel}" Command="{Binding OkCommand}" IsVisible="{Binding !IsRemove}"
+        <Button Content="{Binding OkLabel}" Command="{Binding OkCommand}" IsVisible="{Binding !IsRemove}" IsDefault="True"
                 Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="16,9" CornerRadius="10"/>
-        <Button Content="{Binding OkLabel}" Command="{Binding OkCommand}" IsVisible="{Binding IsRemove}"
+        <Button Content="{Binding OkLabel}" Command="{Binding OkCommand}" IsVisible="{Binding IsRemove}" IsDefault="True"
                 Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1" Padding="16,9" CornerRadius="10"/>
       </StackPanel>
     </StackPanel>

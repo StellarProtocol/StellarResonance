@@ -97,9 +97,15 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
         if (cell.Kind is not (MatrixCellKind.NotInstalled or MatrixCellKind.UpdateAvailable) || cell.TargetVersion is null) return null;
         var entry = col.Registry.First(e => e.Id == pluginId);
         var version = entry.Versions.First(v => v.Version == cell.TargetVersion);
+        var present = col.Inventory.Plugins.FirstOrDefault(p => p.Entry.Id == pluginId);
+        var request = new PluginInstallRequest(col.Client, entry, version, present?.Installed ?? false, present?.Version);
         return async () =>
         {
-            try { await PluginDownloads.InstallAsync(_svc.Install, col.Client, entry, version, s => Status = $"{col.Client.Name}: {entry.Name} — {s}"); }
+            try
+            {
+                if (!await PluginInstallFlow.RunAsync(_svc.Install, _svc.Steps, request, _shell.SaveConfig,
+                        s => Status = $"{col.Client.Name}: {entry.Name} — {s}")) return;
+            }
             catch (Exception ex) { Status = $"{col.Client.Name}: {entry.Name} failed — {ex.Message}"; }
             await RefreshAsync();
         };

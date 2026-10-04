@@ -86,4 +86,34 @@ public class PluginStepViewModelTests
     [InlineData(new[] { "A", "B" }, "A and B")]
     [InlineData(new[] { "A", "B", "C" }, "A, B and C")]
     public void JoinNames_reads_as_a_list(string[] names, string expected) => Assert.Equal(expected, PluginStepText.JoinNames(names));
+
+    // Review fix round 1 (d): edge cases the main-path tests above don't reach.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_notice_shows_no_notice_row(string? notice)
+    {
+        var option = new InstallStepOption("fx", "ReShade", "detail", notice);
+        var vm = PluginStepViewModel.ForInstall(new InstallStep("Photo Studio", "1.5.0", new[] { option }));
+        var row = Assert.Single(vm.Options);
+        Assert.Null(row.NoticeText);
+        Assert.False(row.HasNotice);
+    }
+
+    [Fact]
+    public void Multiple_options_with_one_unticked_reports_only_that_one()
+    {
+        var a = new InstallStepOption("a", "A", "detail a", null);
+        var b = new InstallStepOption("b", "B", "detail b", null);
+        var c = new InstallStepOption("c", "C", "detail c", null);
+        var vm = PluginStepViewModel.ForInstall(new InstallStep("Photo Studio", "1.5.0", new[] { a, b, c }));
+
+        vm.Options.Single(o => o.Option.DependencyId == "b").Use = false;
+
+        Assert.Equal(new[] { "b" }, vm.InstallResult().Unticked);
+    }
+
+    [Fact]
+    public void Sentence_of_an_empty_string_stays_empty() => Assert.Equal("", PluginStepText.Sentence(""));
 }

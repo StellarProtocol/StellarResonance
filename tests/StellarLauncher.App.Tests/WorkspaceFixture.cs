@@ -52,11 +52,18 @@ public sealed class WorkspaceFixture
     private sealed class NoProc : IProcessFactory { public IGameProcess? Start(ProcessStartInfo p) => null; public IGameProcess? Attach(int pid) => null; }
     /// <summary>URL → bytes overrides; every other URL serves <see cref="DllBytes"/>.</summary>
     public Dictionary<string, byte[]> Downloads { get; } = new();
+    /// <summary>Every URL the fake web served, in order.</summary>
+    public List<string> Requested { get; } = new();
+    /// <summary>Wraps the dependency service <see cref="Start"/> builds — a spy over the real one.</summary>
+    public Func<IDependencyService, IDependencyService>? WrapDependencies { get; set; }
     private sealed class DllHandler(WorkspaceFixture f) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)
-            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            lock (f.Requested) f.Requested.Add(r.RequestUri!.ToString());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             { Content = new ByteArrayContent(f.Downloads.TryGetValue(r.RequestUri!.ToString(), out var b) ? b : DllBytes) });
+        }
     }
     public sealed class AutoConfirm : IConfirm { public int Asked; public Task<bool> AskAsync(string t, string b, string ok) { Asked++; return Task.FromResult(true); } }
 
@@ -112,7 +119,8 @@ public sealed class WorkspaceFixture
     {
         var sessions = new ClientSessions(Store, new Orch(), new NoScan(), new NoProc(), () => DateTimeOffset.UnixEpoch, a => a());
         var http = new HttpClient(new DllHandler(this));
-        var dependencies = Dependencies ?? new RecordingDependencyService(new DependencyService(Fs, http));   // as App wires it
+        IDependencyService dependencies = Dependencies ?? new RecordingDependencyService(new DependencyService(Fs, http));   // as App wires it
+        if (WrapDependencies is not null) dependencies = WrapDependencies(dependencies);
         var deps = new PluginInstallDeps(new Installer(Fs), new PluginInstaller(Fs), http, dependencies);
         var core = new DashboardServices(new ClientInventory(Fs, deps.Installer, deps.Plugins, new DoorstopToggle(Fs)),
             new RegistryCache(new Reg(Registry), () => Store.Load()), new FrameworkManifests(Manifests), new Review(), deps,

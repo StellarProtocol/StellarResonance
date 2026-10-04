@@ -20,4 +20,7 @@ public interface IPluginActions
 
     /// <summary>Records whether an OPTIONAL dependency is used (required ones are ignored).</summary>
     void SetDependencyUse(PluginItemViewModel item, string dependencyId, bool use);
+
+    /// <summary>v3 V1/V2: true when installing the selected version opens a step dialog (the page then shows no inline Confirm).</summary>
+    bool HasInstallStep(PluginItemViewModel item);
 }

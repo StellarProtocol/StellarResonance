@@ -131,10 +131,19 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     {
         var v = row.Item.Entry.Versions.FirstOrDefault(x => x.Version == version) ?? row.Item.SelectedVersion;
         if (v is null) return;
-        try { await PluginDownloads.InstallAsync(_ws.Services.Core.Install, _ws.Client, row.Item.Entry, v, s => Status = $"{row.Name}: {s}"); }
+        var request = new PluginInstallRequest(_ws.Client, row.Item.Entry, v, row.Item.Installed, row.Item.InstalledVersion);
+        try
+        {
+            // v3: Cancel in the step changes nothing — no refresh either.
+            if (!await PluginInstallFlow.RunAsync(_ws.Services.Core.Install, _ws.Services.Core.Steps, request, _ws.SaveProfile,
+                    s => Status = $"{row.Name}: {s}")) return;
+        }
         catch (Exception ex) { Status = $"{row.Name} failed: {ex.Message}"; }
         await _ws.RefreshAsync();
     }
+
+    public bool HasInstallStep(PluginItemViewModel item) => item.SelectedVersion is { } v
+        && PluginInstallFlow.NeedsStep(new PluginInstallRequest(_ws.Client, item.Entry, v, item.Installed, item.InstalledVersion));
 
     public async Task SetEnabledAsync(PluginRowViewModel row, bool enabled)
     {

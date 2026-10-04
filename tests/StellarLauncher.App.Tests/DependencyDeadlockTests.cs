@@ -83,4 +83,38 @@ public class DependencyDeadlockTests
         await all;
         Assert.True(fs.File.Exists("/g/stellar/plugins/p2/P2.dll"));
     }
+
+    // v3: the install step and the two flag writes, started on the UI context while a UI-started ensure holds the
+    // folder's gate, all finish — nothing waits synchronously on the gate.
+    [Fact]
+    public async Task Install_step_and_flag_writes_on_the_UI_context_never_deadlock_behind_a_UI_started_ensure()
+    {
+        var fs = new MockFileSystem(); fs.AddDirectory("/g");
+        var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var http = new HttpClient(new HeldHandler(hold, started));
+        var deps = new PluginInstallDeps(new Installer(fs), new PluginInstaller(fs), http, new DependencyService(fs, http));
+        var plugin = new PluginEntry("p2", "P2", "d", null, new[]
+        {
+            new PluginVersion("1.0.0", null, "P2.dll", "https://cdn/p2.dll", DllSha, "0.1.0", null, null, Dependencies: new[] { Dep("b") with { Optional = true } }),
+        });
+        var steps = new WorkspaceFixture.ScriptedSteps();
+        var client = new ClientProfile { Modded = true, GameMiniDir = "/g" };
+        using var ui = new SingleThreadContext();
+
+        var ensure = ui.Run(() => deps.Dependencies.EnsureAsync("/g", "p1", new[] { Dep("a") }, new HashSet<string>(), CancellationToken.None));
+        await started.Task.WaitAsync(Limit);
+        var install = ui.Run(() => PluginInstallFlow.RunAsync(deps, steps, new PluginInstallRequest(client, plugin, plugin.Versions[0], false, null), () => { }, null));
+        var keep = ui.Run(() => deps.Dependencies.SetKeptAsync("/g", "p1", true));
+        var again = ui.Run(() => deps.Dependencies.RequestReinstallAsync("/g", "p1"));
+        await Task.Delay(200);
+        hold.TrySetResult();
+
+        var all = Task.WhenAll(ensure, install, keep, again);
+        var finished = await Task.WhenAny(all, Task.Delay(Limit));
+        Assert.True(finished == all, "deadlock: the UI context was blocked waiting for the dependency gate");
+        await all;
+        Assert.Single(steps.Asked);
+        Assert.True(fs.File.Exists("/g/stellar/plugins/p2/P2.dll"));
+    }
 }
