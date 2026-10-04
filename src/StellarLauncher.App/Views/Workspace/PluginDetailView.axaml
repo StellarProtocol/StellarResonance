@@ -212,7 +212,7 @@
                 </StackPanel>
 
                 <!-- dependencies: declared by the shown version's manifest, installed by the launcher -->
-                <StackPanel Spacing="7" IsVisible="{Binding HasDependencies}">
+                <StackPanel Spacing="7" IsVisible="{Binding ShowDependencySection}">
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Classes="section" Text="DEPENDENCIES"/>
                     <TextBlock Text="— declared by this plugin, installed by the launcher before the game starts"
@@ -270,6 +270,18 @@
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
+                      <!-- v3 V3: dependencies kept when the plugin was removed (mockup "removed, dependency kept") -->
+                      <Border IsVisible="{Binding DependenciesKept}" Background="#141a2e" BorderBrush="#222a44"
+                              BorderThickness="1" CornerRadius="8" Padding="11,9">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                          <TextBlock Grid.Column="0" Text="{Binding KeptNote}" Foreground="#8a93b2" FontSize="12"
+                                     TextWrapping="Wrap" VerticalAlignment="Center"/>
+                          <Button Grid.Column="1" Content="Remove kept dependencies" Command="{Binding RemoveKeptDependenciesCommand}"
+                                  IsEnabled="{Binding !DependenciesLocked}"
+                                  Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
+                                  Padding="12,6" CornerRadius="8"/>
+                        </Grid>
+                      </Border>
                       <TextBlock Text="{Binding DependencyFootnote}" Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
                     </StackPanel>
                   </Border>

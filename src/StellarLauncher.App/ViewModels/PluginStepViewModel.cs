@@ -10,13 +10,15 @@ namespace StellarLauncher.App.ViewModels;
 
 public enum PluginStepKind { Install, Reinstall, Remove }
 
-/// <summary>One install-step checkbox row (V1): ticked by default.</summary>
+/// <summary>One install-step checkbox row (V1): ticked by default — unless review fix round 2 (b)'s
+/// <see cref="InstallStepOption.InitiallyUnticked"/> says the player already opted out of it.</summary>
 public sealed partial class InstallOptionViewModel : ObservableObject
 {
     public InstallOptionViewModel(InstallStepOption option, string pluginName)
     {
         Option = option;
         NoticeText = string.IsNullOrWhiteSpace(option.Notice) ? null : $"Notice from {pluginName}: {option.Notice.Trim()}";
+        Use = !option.InitiallyUnticked;
     }
 
     public InstallStepOption Option { get; }

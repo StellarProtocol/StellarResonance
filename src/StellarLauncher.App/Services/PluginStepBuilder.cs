@@ -19,15 +19,19 @@ public static class PluginStepBuilder
         return (target.Dependencies ?? Array.Empty<PluginDependency>()).Where(d => d.Optional && !known.Contains(d.Id)).ToList();
     }
 
-    public static InstallStep Install(PluginEntry entry, PluginVersion target, IReadOnlyList<PluginDependency> offered)
+    /// <summary>Review fix round 2 (b): <paramref name="client"/> is optional (additive — every existing call site
+    /// compiles unchanged) so each offered row can be pre-unticked from the client's current <c>SkippedDependencies</c>,
+    /// a returning player's earlier opt-out reading back as unticked instead of defaulting to ticked again.</summary>
+    public static InstallStep Install(PluginEntry entry, PluginVersion target, IReadOnlyList<PluginDependency> offered, ClientProfile? client = null)
     {
         var all = target.Dependencies ?? Array.Empty<PluginDependency>();
-        return new InstallStep(entry.Name, target.Version, offered.Select(o => Option(o, all)).ToList());
+        var alreadySkipped = client is null ? null : DependencyRunner.Skipped(client, entry.Id, offered);
+        return new InstallStep(entry.Name, target.Version, offered.Select(o => Option(o, all, alreadySkipped?.Contains(o.Id) == true)).ToList());
     }
 
     /// <summary>An optional dependency plus every REQUIRED one that needs it (directly or through another): unticking it
     /// skips those too (the requires gate), so they share its row — "&lt;name&gt; &lt;version&gt; + &lt;names&gt;".</summary>
-    private static InstallStepOption Option(PluginDependency o, IReadOnlyList<PluginDependency> all)
+    private static InstallStepOption Option(PluginDependency o, IReadOnlyList<PluginDependency> all, bool initiallyUnticked)
     {
         var group = new List<PluginDependency> { o };
         var ids = new HashSet<string>(StringComparer.Ordinal) { o.Id };
@@ -40,7 +44,7 @@ public static class PluginStepBuilder
         var detail = string.Join(" ", new[] { description, WhereSentence(o), licences.Length > 0 ? licences + "." : null }
             .Where(s => !string.IsNullOrEmpty(s)));
         var notice = string.Join(" ", group.Select(d => d.Notice?.Trim()).Where(n => !string.IsNullOrEmpty(n)).Distinct());
-        return new InstallStepOption(o.Id, title, detail, notice.Length == 0 ? null : notice);
+        return new InstallStepOption(o.Id, title, detail, notice.Length == 0 ? null : notice, initiallyUnticked);
     }
 
     public static string WhereSentence(PluginDependency d) =>

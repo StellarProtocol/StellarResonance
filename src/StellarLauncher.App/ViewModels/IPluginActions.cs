@@ -23,4 +23,10 @@ public interface IPluginActions
 
     /// <summary>v3 V1/V2: true when installing the selected version opens a step dialog (the page then shows no inline Confirm).</summary>
     bool HasInstallStep(PluginItemViewModel item);
+
+    /// <summary>v3 V3: whether this plugin's dependencies were kept when it was removed (read off the UI thread).</summary>
+    Task<bool> DependenciesKeptAsync(PluginItemViewModel item);
+
+    /// <summary>v3 V3: the page's "Remove kept dependencies".</summary>
+    Task RemoveKeptDependenciesAsync(PluginItemViewModel item);
 }

@@ -69,6 +69,30 @@ public class PluginStepBuilderTests
         Assert.Equal("Goes in the plugin's own folder.", PluginStepBuilder.WhereSentence(Dep("p", "P", true, modded: false) with { Target = "plugin" }));
     }
 
+    // Review fix round 2 (b): a returning player's earlier opt-out reads back as unticked.
+    [Fact]
+    public void Install_marks_a_previously_skipped_offered_dependency_as_initially_unticked()
+    {
+        var entry = new PluginEntry("photo", "Photo Studio", "d", null, new[] { V("1.5.0", Fx, Bridge) });
+        var offered = PluginStepBuilder.OfferedOptional(entry, entry.Versions[0], installedVersion: null);
+        var client = new ClientProfile { SkippedDependencies = { "photo/fx" } };
+
+        var step = PluginStepBuilder.Install(entry, entry.Versions[0], offered, client);
+
+        Assert.True(Assert.Single(step.Options).InitiallyUnticked);
+    }
+
+    [Fact]
+    public void Install_without_a_client_defaults_every_row_to_not_initially_unticked()
+    {
+        var entry = new PluginEntry("photo", "Photo Studio", "d", null, new[] { V("1.5.0", Fx, Bridge) });
+        var offered = PluginStepBuilder.OfferedOptional(entry, entry.Versions[0], installedVersion: null);
+
+        var step = PluginStepBuilder.Install(entry, entry.Versions[0], offered);
+
+        Assert.False(Assert.Single(step.Options).InitiallyUnticked);
+    }
+
     [Fact]
     public void The_reinstall_step_names_the_used_dependencies_and_is_skipped_when_every_one_is_skipped()
     {

@@ -60,6 +60,20 @@ public class InstallStepTests
         Assert.True(f.Fs.File.Exists($"{G}/bridge.bin"));
     }
 
+    // Review fix round 2 (b): a returning player's earlier opt-out (from a prior session's config) reads back as
+    // unticked when the install step reopens, instead of defaulting to ticked again.
+    [Fact]
+    public async Task A_fresh_install_step_pre_unticks_a_previously_skipped_dependency()
+    {
+        var (f, vm) = await Open(Photo(V("1.5.0", Fx, Bridge)));
+        f.Shell.Config.Clients.Single().SkippedDependencies.Add("photo/fx");   // carried over from an earlier session
+
+        await Row(vm).InstallCommand.ExecuteAsync(null);
+
+        var step = Assert.IsType<InstallStep>(Assert.Single(f.Steps.Asked));
+        Assert.True(Assert.Single(step.Options).InitiallyUnticked);
+    }
+
     private sealed class SkipsAtEnsure(IDependencyService inner, WorkspaceFixture f) : ForwardingDependencyService(inner)
     {
         public readonly List<string[]> SavedAtEnsure = new();
@@ -148,6 +162,48 @@ public class InstallStepTests
         Assert.Equal(new[] { "photo/fx" }, f.Store.Load().Clients.Single().SkippedDependencies);
         Assert.True(f.Fs.File.Exists($"{G}/stellar/plugins/photo/Stellar.Photo.dll"));
         Assert.False(f.Fs.File.Exists($"{G}/fx.bin"));
+    }
+
+    // Review fix round 2 (d): Cancel through the dashboard path changes nothing either — the same guarantee
+    // already pinned for the plugins-tab row (Cancelling_the_install_step_downloads_and_records_nothing).
+    [Fact]
+    public async Task Cancelling_the_install_step_from_the_dashboard_downloads_and_records_nothing()
+    {
+        var f = new WorkspaceFixture();
+        f.Registry.Add(Photo(V("1.5.0", Fx, Bridge)));
+        f.AddClient("c1", "Main", G, framework: "2.8.0");
+        f.Start();
+        var dash = (DashboardViewModel)f.Shell.Current!;
+        await dash.RefreshAsync();
+        dash.ShowAllRows = true;
+        f.Steps.Install = _ => null;
+
+        await dash.Rows.Single(r => r.PluginId == "photo").Cells.Single().ClickCommand.ExecuteAsync(null);
+
+        Assert.Empty(f.Requested);
+        Assert.False(f.Fs.File.Exists($"{G}/stellar/plugins/photo/Stellar.Photo.dll"));
+        Assert.Empty(f.Store.Load().Clients.Single().SkippedDependencies);
+    }
+
+    // Review fix round 2 (d): an update started from the dashboard matrix offers only a NEW optional dependency,
+    // the same guarantee already pinned for the plugins-tab row (An_update_asks_only_about_a_new_optional_dependency).
+    [Fact]
+    public async Task A_dashboard_update_asks_only_about_a_new_optional_dependency()
+    {
+        var lut = Dep("lut", "Colour tables", optional: true);
+        var f = new WorkspaceFixture();
+        f.Registry.Add(Photo(V("2.0.0", Fx, Bridge, lut), V("1.5.0", Fx, Bridge)));
+        f.AddClient("c1", "Main", G, framework: "2.8.0");
+        f.InstallPlugin(G, "photo", "Stellar.Photo.dll", "1.5.0");
+        f.Start();
+        var dash = (DashboardViewModel)f.Shell.Current!;
+        await dash.RefreshAsync();
+        f.Steps.Install = _ => new InstallStepResult(new HashSet<string>());
+
+        await dash.Rows.Single(r => r.PluginId == "photo").Cells.Single().ClickCommand.ExecuteAsync(null);
+
+        var step = Assert.IsType<InstallStep>(Assert.Single(f.Steps.Asked));
+        Assert.Equal(new[] { "lut" }, step.Options.Select(o => o.DependencyId));
     }
 
     [Fact]

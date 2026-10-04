@@ -24,6 +24,20 @@ public class PluginStepViewModelTests
         Assert.Equal(new[] { "fx" }, vm.InstallResult().Unticked);
     }
 
+    // Review fix round 2 (b): InstallStepOption.InitiallyUnticked (set by PluginStepBuilder.Install from the
+    // client's current SkippedDependencies) reads back as unticked, not the usual ticked-by-default.
+    [Fact]
+    public void An_initially_unticked_option_starts_unticked()
+    {
+        var alreadySkipped = Fx with { InitiallyUnticked = true };
+        var vm = PluginStepViewModel.ForInstall(new InstallStep("Photo Studio", "1.5.0", new[] { alreadySkipped }));
+
+        var row = Assert.Single(vm.Options);
+
+        Assert.False(row.Use);
+        Assert.Equal(new[] { "fx" }, vm.InstallResult().Unticked);
+    }
+
     [Fact]
     public void Reinstall_step_leaves_dependencies_unticked_by_default()
     {

@@ -40,7 +40,7 @@ public static class PluginInstallFlow
         }
         else if (PluginStepBuilder.OfferedOptional(r.Entry, r.Version, r.InstalledVersion) is { Count: > 0 } offered)
         {
-            if (await steps.AskInstallAsync(PluginStepBuilder.Install(r.Entry, r.Version, offered)) is not { } choice) return false;
+            if (await steps.AskInstallAsync(PluginStepBuilder.Install(r.Entry, r.Version, offered, r.Client)) is not { } choice) return false;
             PluginStepBuilder.ApplyInstallChoice(r.Client, r.Entry.Id, offered, choice.Unticked);
             saveProfile();
         }

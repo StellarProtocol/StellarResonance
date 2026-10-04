@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Model;
 
@@ -20,8 +21,26 @@ public partial class PluginItemViewModel
         Dependencies.Where(d => d.HasNotice).Select(d => $"Notice from {Name}: {d.Notice!.Trim()}").Distinct();
     public bool HasOptionalDependency => Dependencies.Any(d => d.IsOptional);
     public string DependencyFootnote => HasOptionalDependency
-        ? $"Untick an optional dependency to skip it; {Name} works without it. Removing the plugin removes everything listed here."
-        : "Removing the plugin removes everything listed here.";
+        ? $"Untick an optional dependency to skip it; {Name} works without it. Removing {Name} asks whether to remove these too."
+        : $"Removing {Name} asks whether to remove these too.";
+
+    /// <summary>v3 V3: this plugin's dependencies were kept when it was removed — still launcher-managed.</summary>
+    [ObservableProperty] private bool _dependenciesKept;
+    partial void OnDependenciesKeptChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowDependencySection));
+        OnPropertyChanged(nameof(KeptNote));
+    }
+
+    /// <summary>The section shows for declared dependencies, and for kept ones even when the shown version declares none.</summary>
+    public bool ShowDependencySection => HasDependencies || DependenciesKept;
+
+    /// <summary>Mockup v3 "removed, dependency kept" wording; the Vanilla clause only when something kept is moddedOnly.</summary>
+    public string KeptNote => Dependencies.Any(d => d.Dependency.ModdedOnly)
+        ? $"Kept after {Name} was removed. Still moved aside for Vanilla launches; reinstalling {Name} uses it again."
+        : $"Kept after {Name} was removed. Reinstalling {Name} uses it again.";
+
+    [RelayCommand] private Task RemoveKeptDependencies() => _parent.RemoveKeptDependenciesAsync(this);
 
     /// <summary>Fix round M3: true while this client's game is running — the checkboxes are disabled and
     /// no dependency is installed or removed (files in use).</summary>
@@ -49,10 +68,14 @@ public partial class PluginItemViewModel
         var generation = ++_refreshGeneration;
         var deps = ShownDependencies;
         IReadOnlyList<DependencyStatus> statuses;
+        bool kept;
         try { statuses = deps.Count == 0 ? Array.Empty<DependencyStatus>() : await _parent.DependencyStatusAsync(this); }
         catch (Exception) { return; }
+        try { kept = await _parent.DependenciesKeptAsync(this); }
+        catch (Exception) { kept = false; }
         if (generation != _refreshGeneration) return;   // a newer refresh started meanwhile; it owns the rows
         ApplyDependencyRows(deps, statuses);
+        DependenciesKept = kept;
     }
 
     private void ApplyDependencyRows(IReadOnlyList<PluginDependency> deps, IReadOnlyList<DependencyStatus> statuses)
@@ -82,6 +105,8 @@ public partial class PluginItemViewModel
         OnPropertyChanged(nameof(HasDependencies));
         OnPropertyChanged(nameof(DependencyNotices));
         OnPropertyChanged(nameof(DependencyFootnote));
+        OnPropertyChanged(nameof(ShowDependencySection));
+        OnPropertyChanged(nameof(KeptNote));
     }
 
     /// <summary>Ticked unless the player skipped it — a dependency only WAITING for a blocked prerequisite is

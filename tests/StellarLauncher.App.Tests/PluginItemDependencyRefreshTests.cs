@@ -24,6 +24,8 @@ public class PluginItemDependencyRefreshTests
         public Task<IReadOnlyList<DependencyStatus>> DependencyStatusAsync(PluginItemViewModel item) => Task.Run(() => DependencyStatus(item));
         public void SetDependencyUse(PluginItemViewModel item, string dependencyId, bool use) { }
         public bool HasInstallStep(PluginItemViewModel item) => false;
+        public Task<bool> DependenciesKeptAsync(PluginItemViewModel item) => Task.FromResult(false);
+        public Task RemoveKeptDependenciesAsync(PluginItemViewModel item) => Task.CompletedTask;
     }
 
     private static PluginItemViewModel Item(IPluginActions actions)

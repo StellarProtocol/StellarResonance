@@ -48,6 +48,26 @@ public class DependencyDeadlockTests
         new(id, id, "1.0", $"https://cdn/deps/{id}", DllSha, DllBytes.Length, "file",
             new[] { new PluginDependencyFile(null, $"{id}.bin") }, "game", ModdedOnly: true, License: "MIT", LicenseUrl: "https://l", SourceUrl: "https://s");
 
+    /// <summary>Review fix round 2 (c): unlike WorkspaceFixture.ScriptedSteps (answers synchronously — no real
+    /// suspension), this genuinely YIELDS while "waiting for the player" (a real async gap via a held
+    /// TaskCompletionSource), so the deadlock test proves the single-threaded UI context keeps processing the
+    /// OTHER queued work (keep, again) while a step dialog is still open — not just that a step which never
+    /// actually suspends happens to complete.</summary>
+    private sealed class YieldingSteps : IPluginSteps
+    {
+        public readonly List<object> Asked = new();
+        private readonly TaskCompletionSource<InstallStepResult?> _installAnswer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void AnswerInstall(InstallStepResult? result) => _installAnswer.TrySetResult(result);
+        public async Task<InstallStepResult?> AskInstallAsync(InstallStep step)
+        {
+            Asked.Add(step);
+            await Task.Yield();
+            return await _installAnswer.Task;
+        }
+        public Task<bool?> AskReinstallAsync(ReinstallStep step) { Asked.Add(step); return Task.FromResult<bool?>(false); }
+        public Task<RemoveChoice?> AskRemoveAsync(RemoveStep step) { Asked.Add(step); return Task.FromResult<RemoveChoice?>(RemoveChoice.PluginAndDependencies); }
+    }
+
     [Fact]
     public async Task Launch_review_and_install_on_the_UI_context_never_deadlock_behind_a_UI_started_ensure()
     {
@@ -98,7 +118,7 @@ public class DependencyDeadlockTests
         {
             new PluginVersion("1.0.0", null, "P2.dll", "https://cdn/p2.dll", DllSha, "0.1.0", null, null, Dependencies: new[] { Dep("b") with { Optional = true } }),
         });
-        var steps = new WorkspaceFixture.ScriptedSteps();
+        var steps = new YieldingSteps();
         var client = new ClientProfile { Modded = true, GameMiniDir = "/g" };
         using var ui = new SingleThreadContext();
 
@@ -109,6 +129,7 @@ public class DependencyDeadlockTests
         var again = ui.Run(() => deps.Dependencies.RequestReinstallAsync("/g", "p1"));
         await Task.Delay(200);
         hold.TrySetResult();
+        steps.AnswerInstall(new InstallStepResult(new HashSet<string>()));   // the "player" answers while the ensure is still unblocking
 
         var all = Task.WhenAll(ensure, install, keep, again);
         var finished = await Task.WhenAny(all, Task.Delay(Limit));

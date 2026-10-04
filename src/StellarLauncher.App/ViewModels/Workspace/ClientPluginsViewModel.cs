@@ -158,36 +158,6 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     }
 
     public Task InstallAsync(PluginItemViewModel item) => InstallVersionAsync(RowOf(item), item.SelectedVersion?.Version);
-    public async Task RemoveAsync(PluginItemViewModel item)
-    {
-        try
-        {
-            // Fix round 1, Minor 2: dependency cleanup runs BEFORE the plugin DLL is removed. If it
-            // fails, the plugin is still removed (the player's "remove" request must not get stuck on a
-            // dependency problem) — but its skip entries are KEPT (cleanup never confirmed done) and the
-            // failure is logged rather than silently dropped.
-            string? depCleanupFailure = null;
-            // Awaited (fix round 2): the game folder's dependency gate may be held by a download for a while,
-            // and the UI thread must never block on it.
-            try { await _ws.Services.Core.Install.Dependencies.RemoveAllAsync(_ws.Client.GameMiniDir, item.Entry.Id); }
-            catch (Exception ex) { depCleanupFailure = ex.Message; }
-
-            _ws.Services.Core.Install.Plugins.Remove(_ws.Client.GameMiniDir, item.Entry.Id, item.CanonicalDll);
-
-            if (depCleanupFailure is null)
-            {
-                _ws.Client.SkippedDependencies.RemoveAll(s => s.StartsWith(item.Entry.Id + "/", StringComparison.Ordinal));
-                _ws.SaveProfile();
-            }
-
-            item.MarkRemoved();
-            Status = depCleanupFailure is null
-                ? $"{item.Name}: removed"
-                : $"{item.Name}: removed (dependency cleanup failed — {depCleanupFailure})";
-        }
-        catch (Exception ex) { Status = $"{item.Name} failed: {ex.Message}"; }
-        await _ws.RefreshAsync();
-    }
     public Task EnableAsync(PluginItemViewModel item) => SetEnabledAsync(RowOf(item), true);
     private PluginRowViewModel RowOf(PluginItemViewModel item) => _all.First(r => ReferenceEquals(r.Item, item));
 

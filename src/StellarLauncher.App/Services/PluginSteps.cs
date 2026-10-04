@@ -15,8 +15,11 @@ public interface IPluginSteps
     Task<RemoveChoice?> AskRemoveAsync(RemoveStep step);
 }
 
-/// <summary>One install-step row: an optional dependency, plus the required ones that need it (they share its checkbox).</summary>
-public sealed record InstallStepOption(string DependencyId, string Title, string Detail, string? Notice);
+/// <summary>One install-step row: an optional dependency, plus the required ones that need it (they share its checkbox).
+/// Review fix round 2 (b): <paramref name="InitiallyUnticked"/> is true when the player already opted out of this
+/// dependency in an earlier session (<c>SkippedDependencies</c>) — the row reads back unticked instead of defaulting
+/// to ticked.</summary>
+public sealed record InstallStepOption(string DependencyId, string Title, string Detail, string? Notice, bool InitiallyUnticked = false);
 public sealed record InstallStep(string PluginName, string Version, IReadOnlyList<InstallStepOption> Options);
 /// <summary>The ids (of <see cref="InstallStepOption.DependencyId"/>) the player unticked.</summary>
 public sealed record InstallStepResult(IReadOnlySet<string> Unticked);
