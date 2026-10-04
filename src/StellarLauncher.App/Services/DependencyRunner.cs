@@ -75,12 +75,16 @@ public static class DependencyRunner
 
     /// <summary>Ensures every installed plugin's dependencies. Before a plugin whose dependencies still need
     /// downloading, reports "Preparing &lt;plugin&gt;: &lt;dependency names&gt;…" through
-    /// <paramref name="progress"/>. Owner decision ("install it ticked, tell me"): a version bump (or the
-    /// copy-set path) that declares an optional dependency not yet in this plugin's ledger — one the player
-    /// was never asked about, because no step dialog runs here — installs it the same as a fresh install's
-    /// ticked default, and this reports "Added &lt;dependency&gt; for &lt;plugin&gt;" once it actually lands
-    /// (a player who already opted out via <see cref="ClientProfile.SkippedDependencies"/> never sees either
-    /// the download or the message). Returns one status line per dependency.</summary>
+    /// <paramref name="progress"/>. Owner decision ("install it ticked, tell me"): a pre-launch version bump
+    /// that declares an optional dependency not yet in this plugin's ledger — one the player was never asked
+    /// about, because no step dialog runs here — installs it the same as a fresh install's ticked default,
+    /// and this reports "Added &lt;dependency&gt; for &lt;plugin&gt;" once it actually lands (a player who
+    /// already opted out via <see cref="ClientProfile.SkippedDependencies"/> never sees either the download
+    /// or the message). R-3: this is the ONLY caller of this method — the copy-set path
+    /// (<c>ClientPluginsViewModel.CopySetFrom</c>) never goes through it, so a new optional dependency on an
+    /// already-installed plugin copied from another client is NOT announced; it only installs plugins the
+    /// target client doesn't already have, each going through the ordinary fresh-install ticked-by-default
+    /// flow with no announcement needed. Returns one status line per dependency.</summary>
     public static async Task<IReadOnlyList<DependencyLine>> EnsureForClientAsync(IDependencyService svc, ClientProfile c,
         IReadOnlyList<(PluginEntry Entry, string Version)> installed, CancellationToken ct, Action<string>? progress = null)
     {
