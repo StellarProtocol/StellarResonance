@@ -38,4 +38,10 @@ public interface IPluginActions
     /// <summary>Final-review I-2: each kept dependency's disk state right now (read off the UI thread), keyed by
     /// dependency id — "Kept"/"Kept · moved aside"/"Missing" instead of a blanket "Installed" pill.</summary>
     Task<IReadOnlyDictionary<string, KeptDependencyDiskState>> KeptDiskStatesAsync(PluginItemViewModel item);
+
+    /// <summary>2.1.2 (discoverability): this plugin's currently-skipped OPTIONAL dependency ids — a pure
+    /// profile lookup, no I/O, safe to call synchronously on the UI thread. Backs the plugin list row's
+    /// extras pill, which must be available before the detail page's own async status refresh ever runs
+    /// (the player may never have opened the detail page this session).</summary>
+    ISet<string> SkippedOptionalIds(PluginItemViewModel item);
 }

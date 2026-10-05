@@ -66,6 +66,8 @@ public sealed partial class PluginRowViewModel : ObservableObject
     [RelayCommand] private Task Install() => _host.InstallVersionAsync(this, Cell.TargetVersion);
     [RelayCommand] private Task Update() => _host.InstallVersionAsync(this, Cell.TargetVersion);
     [RelayCommand] private void Open() => _host.OpenPluginCommand.Execute(Item);
+    /// <summary>2.1.2: the row's extras pill — opens the detail page already scrolled to DEPENDENCIES.</summary>
+    [RelayCommand] private Task OpenDependencies() => _host.OpenPluginDependenciesCommand.ExecuteAsync(Item);
 
     partial void OnEnabledChanged(bool value) { if (!_loading) _ = _host.SetEnabledAsync(this, value); }
 }

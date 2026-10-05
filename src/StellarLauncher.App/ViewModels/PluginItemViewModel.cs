@@ -214,6 +214,7 @@ public partial class PluginItemViewModel : ObservableObject
         InstalledVersion = version;
         Installed = true;
         OnSelectedVersionChanged(SelectedVersion);   // recompute the label against the new installed version
+        NotifyExtrasChanged();   // 2.1.2: ShowExtrasPill depends on Installed; ShownDependencies may have changed version
     }
 
     public void MarkRemoved()
@@ -221,6 +222,7 @@ public partial class PluginItemViewModel : ObservableObject
         InstalledVersion = null;
         Installed = false;
         OnSelectedVersionChanged(SelectedVersion);
+        NotifyExtrasChanged();   // 2.1.2: no longer installed — the pill must disappear
     }
 
     // v3: when the click opens a step dialog, that dialog is the confirmation — no inline Confirm first.

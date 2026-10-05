@@ -193,6 +193,20 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         _ = item.RefreshDependenciesAsync();   // re-read every time the page opens: disk may have changed since (a launch, a remove)
         _ = item.EnsureDetailLoadedAsync(_ws.Services.Core.Install.Http, bmp => LightboxImage = bmp);
     }
+
+    /// <summary>2.1.2 (discoverability): the plugin list row's extras pill opens the detail page already
+    /// scrolled to DEPENDENCIES — same open as <see cref="OpenPlugin"/>, plus a one-shot signal the view
+    /// uses to scroll once the section has actually rendered (awaits the refresh the open just started, so
+    /// the section exists in the visual tree by the time the view goes looking for it).</summary>
+    public event Action? ScrollToDependenciesRequested;
+    [RelayCommand]
+    private async Task OpenPluginDependencies(PluginItemViewModel item)
+    {
+        OpenPlugin(item);
+        try { await item.DependencyRefresh; } catch { /* the view still scrolls to whatever is there */ }
+        ScrollToDependenciesRequested?.Invoke();
+    }
+
     [RelayCommand] private void CloseDetail() => SelectedPlugin = null;
     [RelayCommand] private void CloseLightbox() { var old = LightboxImage; LightboxImage = null; old?.Dispose(); }
     [RelayCommand] private void OpenLink(string? url) => Services.Browser.Open(url);

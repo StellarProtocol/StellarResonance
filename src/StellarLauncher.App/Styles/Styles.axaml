@@ -34,6 +34,15 @@
   <Style Selector="Border.tag-blue > TextBlock"><Setter Property="Foreground" Value="#9fe9f5"/></Style>
   <Style Selector="Border.tag-red"><Setter Property="Background" Value="#29ff6b6b"/></Style>
   <Style Selector="Border.tag-red > TextBlock"><Setter Property="Foreground" Value="#ff9a9a"/></Style>
+  <!-- 2.1.2: a CLICKABLE tag pill — Border.tag's exact shape/colour on a Button, for the plugin list row's
+       extras pill (small, compact, same visual language as every other tag badge, but responds to clicks). -->
+  <Style Selector="Button.tag">
+    <Setter Property="Background" Value="#2E7c5cff"/><Setter Property="CornerRadius" Value="20"/>
+    <Setter Property="Padding" Value="9,2"/><Setter Property="FontSize" Value="10.5"/><Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="#dcd4ff"/><Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="MinHeight" Value="0"/><Setter Property="MinWidth" Value="0"/>
+  </Style>
+  <Style Selector="Button.tag:pointerover"><Setter Property="Background" Value="#4a7c5cff"/></Style>
   <!-- buttons -->
   <Style Selector="Button">
     <Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="16,8"/>

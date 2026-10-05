@@ -31,6 +31,7 @@ public class PluginItemDependencyRefreshTests
         public Task<IReadOnlyList<LedgerEntry>> KeptLedgerEntriesAsync(PluginItemViewModel item) => Task.FromResult<IReadOnlyList<LedgerEntry>>(Array.Empty<LedgerEntry>());
         public Task<IReadOnlyDictionary<string, KeptDependencyDiskState>> KeptDiskStatesAsync(PluginItemViewModel item) =>
             Task.FromResult<IReadOnlyDictionary<string, KeptDependencyDiskState>>(new Dictionary<string, KeptDependencyDiskState>());
+        public ISet<string> SkippedOptionalIds(PluginItemViewModel item) => new HashSet<string>();
     }
 
     // Final-review M-2: in kept mode, RefreshCoreAsync never awaits the shown version's status task (its
@@ -50,6 +51,7 @@ public class PluginItemDependencyRefreshTests
         public Task<IReadOnlyList<LedgerEntry>> KeptLedgerEntriesAsync(PluginItemViewModel item) => Task.FromResult<IReadOnlyList<LedgerEntry>>(Array.Empty<LedgerEntry>());
         public Task<IReadOnlyDictionary<string, KeptDependencyDiskState>> KeptDiskStatesAsync(PluginItemViewModel item) =>
             Task.FromResult<IReadOnlyDictionary<string, KeptDependencyDiskState>>(new Dictionary<string, KeptDependencyDiskState>());
+        public ISet<string> SkippedOptionalIds(PluginItemViewModel item) => new HashSet<string>();
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
