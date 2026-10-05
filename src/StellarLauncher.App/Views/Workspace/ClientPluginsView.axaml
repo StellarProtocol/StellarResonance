@@ -38,7 +38,15 @@
                     </Panel>
                   </Border>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="White" FontSize="12.5" Padding="0" HorizontalAlignment="Left"/>
+                    <WrapPanel>
+                      <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="White" FontSize="12.5" Padding="0" Margin="0,0,8,2"/>
+                      <!-- 2.1.2 (owner feedback): discoverable extras — opens the detail page scrolled to
+                           DEPENDENCIES. Count-based text (never a dependency's own name): robust to any name
+                           length, so it can never crowd the row even at the launcher's minimum width. -->
+                      <Button Classes="tag" Content="{Binding Item.ExtrasPillText}" Command="{Binding OpenDependenciesCommand}"
+                              IsVisible="{Binding Item.ShowExtrasPill}" Margin="0,0,0,2"
+                              ToolTip.Tip="Optional extras — click to review them"/>
+                    </WrapPanel>
                     <TextBlock Classes="sub" TextTrimming="CharacterEllipsis"><Run Text="{Binding Author}"/><Run Text=" · "/><Run Text="{Binding Description}"/></TextBlock>
                   </StackPanel>
                   <TextBlock Grid.Column="2" Text="{Binding VersionLine}" Classes="mono body" FontSize="11.5" VerticalAlignment="Center" Classes.amber="{Binding HasUpdate}"/>
@@ -73,7 +81,12 @@
                     </Panel>
                   </Border>
                   <StackPanel Margin="12,10,12,12" Spacing="5">
-                    <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="White" FontSize="13" FontWeight="Bold" Padding="0" HorizontalAlignment="Left"/>
+                    <WrapPanel>
+                      <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="White" FontSize="13" FontWeight="Bold" Padding="0" Margin="0,0,8,2"/>
+                      <Button Classes="tag" Content="{Binding Item.ExtrasPillText}" Command="{Binding OpenDependenciesCommand}"
+                              IsVisible="{Binding Item.ShowExtrasPill}" Margin="0,0,0,2"
+                              ToolTip.Tip="Optional extras — click to review them"/>
+                    </WrapPanel>
                     <TextBlock Text="{Binding Description}" Classes="sub" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" Height="30"/>
                     <TextBlock Text="{Binding VersionLine}" Classes="mono body" FontSize="11.5" Classes.amber="{Binding HasUpdate}"/>
                     <ItemsControl ItemsSource="{Binding AlsoOn}">

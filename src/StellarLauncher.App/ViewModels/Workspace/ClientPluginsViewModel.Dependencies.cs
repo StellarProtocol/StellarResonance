@@ -74,9 +74,15 @@ public sealed partial class ClientPluginsViewModel
         if (use) skipped.RemoveAll(s => s == key);
         else if (!skipped.Contains(key)) skipped.Add(key);
         _ws.SaveProfile();
+        item.NotifyExtrasChanged();   // 2.1.2: the plugin list row's extras pill reflects this choice too
 
         DependencyWork = use ? UseAsync(item, dep) : UnuseAsync(item, dep);
     }
+
+    /// <summary>2.1.2 (discoverability): this plugin's currently-skipped optional dependency ids — pure
+    /// profile lookup, safe to call synchronously. Backs the plugin list row's extras pill.</summary>
+    public ISet<string> SkippedOptionalIds(PluginItemViewModel item) =>
+        DependencyRunner.Skipped(_ws.Client, item.Entry.Id, item.ShownDependencies);
 
     /// <summary>Un-using removes the dependency at once — and every dependency that requires it (directly
     /// or through another), since those would be skipped at the next launch anyway. Awaited: the removal waits

@@ -50,7 +50,42 @@ public partial class PluginItemViewModel
     /// <summary>Fix round M3: true while this client's game is running — the checkboxes are disabled and
     /// no dependency is installed or removed (files in use).</summary>
     [ObservableProperty] private bool _dependenciesLocked;
-    partial void OnDependenciesLockedChanged(bool value) { foreach (var r in Dependencies) r.Locked = value; }
+    partial void OnDependenciesLockedChanged(bool value) { foreach (var r in Dependencies) r.Locked = value; OnPropertyChanged(nameof(ShowLockedHint)); }
+
+    /// <summary>2.1.2 (owner feedback): explains why the tick boxes are disabled while the client's game is
+    /// running — shown only when there's an optional dependency that WOULD become interactive once the game
+    /// closes (the running game is genuinely the only thing blocking it right now). A row locked for a
+    /// DIFFERENT reason (a kept, uninstalled dependency — KeptLocked) is excluded: closing the game wouldn't
+    /// unlock that one, and kept mode already explains itself via KeptNote. If no optional dependency would
+    /// otherwise be changeable, there's nothing to explain.</summary>
+    public bool ShowLockedHint => DependenciesLocked && Dependencies.Any(d => d.IsOptional && !d.KeptLocked);
+
+    /// <summary>2.1.2 (discoverability): how many of this plugin's declared optional dependencies are in use
+    /// right now — computed from <see cref="ShownDependencies"/> and the client's skip list only (no async
+    /// I/O), so it's available for the plugin LIST row before the detail page's own async refresh ever runs
+    /// (the player may never have opened the detail page this session).</summary>
+    public int OptionalExtrasTotal => ShownDependencies.Count(d => d.Optional);
+    public int OptionalExtrasUsed => OptionalExtrasTotal - _parent.SkippedOptionalIds(this).Count;
+    public bool HasOptionalExtras => OptionalExtrasTotal > 0;
+
+    /// <summary>Compact pill for the plugin list row — "Extras N/M". Deliberately count-based rather than
+    /// naming a specific extra: robust to any dependency name length (never crowds the row) and to any
+    /// count, where naming one declared dependency by name wouldn't scale or stay safe at narrow widths.</summary>
+    public string ExtrasPillText => $"Extras {OptionalExtrasUsed}/{OptionalExtrasTotal}";
+    public bool ShowExtrasPill => Installed && HasOptionalExtras;
+
+    /// <summary>Raised after <see cref="Core.Clients.ClientProfile.SkippedDependencies"/> changes
+    /// (<see cref="Workspace.ClientPluginsViewModel.SetDependencyUse"/>) and whenever install state changes
+    /// (<see cref="MarkInstalled"/>/<see cref="MarkRemoved"/>) — keeps the plugin list row's extras pill in
+    /// sync without it needing its own refresh plumbing.</summary>
+    public void NotifyExtrasChanged()
+    {
+        OnPropertyChanged(nameof(OptionalExtrasUsed));
+        OnPropertyChanged(nameof(OptionalExtrasTotal));
+        OnPropertyChanged(nameof(HasOptionalExtras));
+        OnPropertyChanged(nameof(ExtrasPillText));
+        OnPropertyChanged(nameof(ShowExtrasPill));
+    }
 
     /// <summary>The most recent <see cref="RefreshDependenciesAsync"/> (completed when idle) — awaited by tests.</summary>
     public Task DependencyRefresh { get; private set; } = Task.CompletedTask;
@@ -171,6 +206,8 @@ public partial class PluginItemViewModel
         OnPropertyChanged(nameof(DependencyFootnote));
         OnPropertyChanged(nameof(ShowDependencySection));
         OnPropertyChanged(nameof(KeptNote));
+        OnPropertyChanged(nameof(ShowLockedHint));
+        NotifyExtrasChanged();   // 2.1.2: rows just rebuilt/updated — the skip count may have moved
     }
 
     /// <summary>Ticked unless the player skipped it — a dependency only WAITING for a blocked prerequisite is

@@ -261,6 +261,11 @@
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
+                      <!-- 2.1.2 (owner feedback): the tick boxes going grey with no explanation read as broken —
+                           one plain line, muted style, only when an optional dependency would otherwise be
+                           changeable right now (a kept-mode lock explains itself via KeptNote instead). -->
+                      <TextBlock Text="Close the game to change these." IsVisible="{Binding ShowLockedHint}"
+                                 Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
                       <ItemsControl ItemsSource="{Binding DependencyNotices}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="sys:String">
