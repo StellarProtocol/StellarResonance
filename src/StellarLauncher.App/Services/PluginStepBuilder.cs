@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Model;
 
@@ -26,7 +27,7 @@ public static class PluginStepBuilder
     {
         var all = target.Dependencies ?? Array.Empty<PluginDependency>();
         var alreadySkipped = client is null ? null : DependencyRunner.Skipped(client, entry.Id, offered);
-        return new InstallStep(entry.Name, target.Version, offered.Select(o => Option(o, all, alreadySkipped?.Contains(o.Id) == true)).ToList());
+        return new InstallStep(entry.DisplayName(Loc.Service.ActiveLanguage), target.Version, offered.Select(o => Option(o, all, alreadySkipped?.Contains(o.Id) == true)).ToList());
     }
 
     /// <summary>An optional dependency plus every REQUIRED one that needs it (directly or through another): unticking it
@@ -49,8 +50,8 @@ public static class PluginStepBuilder
 
     public static string WhereSentence(PluginDependency d) =>
         string.Equals(d.Target, "game", StringComparison.OrdinalIgnoreCase)
-            ? (d.ModdedOnly ? "Goes in the game folder; Modded launches only." : "Goes in the game folder.")
-            : "Goes in the plugin's own folder.";
+            ? (d.ModdedOnly ? Loc.T("step.where.gameModded") : Loc.T("step.where.game"))
+            : Loc.T("step.where.plugin");
 
     /// <summary>V1: records the step's answer for the OFFERED dependencies only (others keep their earlier choice).</summary>
     public static void ApplyInstallChoice(ClientProfile client, string pluginId, IReadOnlyList<PluginDependency> offered,
@@ -72,7 +73,7 @@ public static class PluginStepBuilder
         var deps = target.Dependencies ?? Array.Empty<PluginDependency>();
         var skipped = DependencyRunner.Skipped(client, entry.Id, deps);
         var used = deps.Where(d => !skipped.Contains(d.Id)).Select(d => d.Name).ToList();
-        return used.Count == 0 ? null : new ReinstallStep(entry.Name, target.Version, used);
+        return used.Count == 0 ? null : new ReinstallStep(entry.DisplayName(Loc.Service.ActiveLanguage), target.Version, used);
     }
 
     /// <summary>V3: the names the remove step shows — the declared, non-skipped dependencies ("the dependencies" when
@@ -84,7 +85,7 @@ public static class PluginStepBuilder
     {
         var skipped = DependencyRunner.Skipped(client, entry.Id, declared);
         var used = declared.Where(d => !skipped.Contains(d.Id)).ToList();
-        IReadOnlyList<string> names = used.Count > 0 ? used.Select(d => d.Name).ToList() : new[] { "the dependencies" };
-        return new RemoveStep(entry.Name, names, Plural: used.Count != 1, AnyModdedOnly: used.Any(d => d.ModdedOnly));
+        IReadOnlyList<string> names = used.Count > 0 ? used.Select(d => d.Name).ToList() : new[] { Loc.T("step.theDependencies") };
+        return new RemoveStep(entry.DisplayName(Loc.Service.ActiveLanguage), names, Plural: used.Count != 1, AnyModdedOnly: used.Any(d => d.ModdedOnly));
     }
 }

@@ -20,7 +20,7 @@ public partial class AddClientView : UserControl
             if (top is null) return;
             var folders = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
-                Title = "Select a game_mini folder, a StarLauncher\\game folder, or a Steam \"Blue Protocol Star Resonance\" folder",
+                Title = StellarLauncher.App.Localization.Loc.T("add.pick"),
                 AllowMultiple = false,
             });
             if (folders.Count > 0) (DataContext as AddClientViewModel)?.AddFromPath(folders[0].Path.LocalPath);

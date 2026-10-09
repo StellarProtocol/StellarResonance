@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Matrix;
 
 namespace StellarLauncher.App.ViewModels.Workspace;
@@ -39,12 +40,17 @@ public sealed partial class PluginRowViewModel : ObservableObject
             StartPoint = new Avalonia.RelativePoint(0, 0, Avalonia.RelativeUnit.Relative), EndPoint = new Avalonia.RelativePoint(1, 1, Avalonia.RelativeUnit.Relative),
             GradientStops = { new GradientStop(Color.Parse(g[0]), 0), new GradientStop(Color.Parse(g[1]), 1) },
         };
+        Loc.Subscribe(this, vm =>
+        {
+            foreach (var p in new[] { nameof(VersionLine), nameof(Name), nameof(Description), nameof(Initials) }) vm.OnPropertyChanged(p);
+        });
     }
 
-    public string Name => Item.Entry.Name;
+    // Launcher i18n: name/description in the active language (per-field English fallback) — same source as the detail page.
+    public string Name => Item.Name;
     public string Author => Item.Entry.Author ?? "";
-    public string Description => Item.Entry.Description;
-    public string Initials => string.Concat(Item.Entry.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
+    public string Description => Item.Description;
+    public string Initials => string.Concat(Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
     public IBrush BadgeBrush { get; }
     public bool IsInstalled => Item.Installed;
     public bool IsDisabled => Item.IsDisabled;
@@ -55,11 +61,11 @@ public sealed partial class PluginRowViewModel : ObservableObject
     {
         MatrixCellKind.UpdateAvailable => $"{Cell.InstalledVersion} ↑ {Cell.TargetVersion}",
         MatrixCellKind.Installed => $"{Cell.InstalledVersion ?? "?"} ✓",
-        MatrixCellKind.Incompatible => $"{Cell.InstalledVersion} ✗ needs another framework",
-        MatrixCellKind.Disabled => $"{Cell.InstalledVersion ?? "?"} · disabled",
-        MatrixCellKind.NotInstalled => $"{Cell.TargetVersion} · not installed",
-        MatrixCellKind.NoCompatibleVersion => "no version for this framework",
-        MatrixCellKind.NeedsFramework => "needs framework",
+        MatrixCellKind.Incompatible => Loc.TFormat("row.incompatible", Cell.InstalledVersion),
+        MatrixCellKind.Disabled => Loc.TFormat("matrix.disabled", Cell.InstalledVersion ?? "?"),
+        MatrixCellKind.NotInstalled => Loc.TFormat("row.notInstalled", Cell.TargetVersion),
+        MatrixCellKind.NoCompatibleVersion => Loc.T("row.noVersion"),
+        MatrixCellKind.NeedsFramework => Loc.T("matrix.needsFramework"),
         _ => "—",
     };
 

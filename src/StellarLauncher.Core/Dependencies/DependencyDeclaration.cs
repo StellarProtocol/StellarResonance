@@ -14,7 +14,8 @@ public static class DependencyDeclaration
 
     /// <summary>Why <paramref name="d"/> can't be installed, or null when it is acceptable: an id outside
     /// [A-Za-z0-9._-], a non-https download URL, a missing <c>license</c>/<c>licenseUrl</c>/<c>sourceUrl</c>,
-    /// or a declared size over <see cref="MaxBytes"/>.</summary>
+    /// or a declared size over <see cref="MaxBytes"/>. The reasons stay ENGLISH on purpose (launcher i18n): they are
+    /// manifest-author diagnostics mirroring <c>build-registry.py</c>, recorded in the dependency ledger/log.</summary>
     public static string? Problem(PluginDependency d)
     {
         if (!DependencyPaths.IsValidPluginId(d.Id)) return "invalid dependency id";   // same charset as a plugin id

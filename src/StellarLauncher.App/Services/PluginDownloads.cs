@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Model;
@@ -27,13 +28,13 @@ public static class PluginDownloads
         var progress = new Progress<DownloadProgress>(p =>
         {
             long tick = p.Fraction is { } f ? (long)(f * 100) : p.BytesRead >> 20;
-            if (tick != lastTick) { lastTick = tick; status?.Invoke(DownloadStatus.Line("downloading…", p)); }
+            if (tick != lastTick) { lastTick = tick; status?.Invoke(DownloadStatus.Line(Loc.T("download.downloading"), p)); }
         });
         await deps.Http.DownloadToAsync(new Uri(v.DllUrl), buffer, progress);
         buffer.Position = 0;
         var fileName = v.Dll ?? Path.GetFileName(new Uri(v.DllUrl).LocalPath);
         await deps.Plugins.InstallAsync(buffer, v.Sha256, gameMini, entry.Id, fileName, v.Version, CancellationToken.None);
-        status?.Invoke($"installed v{v.Version}");
+        status?.Invoke(Loc.TFormat("ov.installedV", v.Version));
 
         if (v.Dependencies is not { Count: > 0 } pluginDeps) return;
         // v3 V3: the plugin is installed again, so dependencies kept when it was removed are its own again — on a Vanilla
@@ -46,7 +47,7 @@ public static class PluginDownloads
                 () => deps.Dependencies.RequestReinstallAsync(gameMini, entry.Id));
         if (!client.Modded)
         {
-            status?.Invoke(reinstallDependencies ? "dependencies will be reinstalled at next modded launch" : "will be installed at next modded launch");
+            status?.Invoke(reinstallDependencies ? Loc.T("download.depsReinstallNext") : Loc.T("download.installNext"));
             return;
         }
 

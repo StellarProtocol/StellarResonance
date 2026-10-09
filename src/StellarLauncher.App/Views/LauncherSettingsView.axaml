@@ -1,11 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StellarLauncher.App.ViewModels" xmlns:shell="using:StellarLauncher.App.ViewModels.Shell"
-             xmlns:sys="using:System"
+             xmlns:sys="using:System" xmlns:loc="using:StellarLauncher.App.Localization"
              x:Class="StellarLauncher.App.Views.LauncherSettingsView" x:DataType="vm:LauncherSettingsViewModel">
   <DockPanel Margin="24,18,24,0">
     <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,14">
-      <TextBlock Text="Launcher settings" Foreground="White" FontSize="22" FontWeight="ExtraBold"/>
-      <TextBlock Text="Applies to the launcher, not to any client" Classes="sub"/>
+      <TextBlock Text="{loc:T shell.launcherSettings}" Foreground="White" FontSize="22" FontWeight="ExtraBold"/>
+      <TextBlock Text="{loc:T settings.subtitle}" Classes="sub"/>
     </StackPanel>
     <TextBlock DockPanel.Dock="Bottom" Text="{Binding Status}" Foreground="#ffcf6b" FontSize="11.5" Margin="0,6,0,18" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
     <ScrollViewer>
@@ -14,16 +14,16 @@
         <!-- Launcher updates -->
         <Border Classes="card" Margin="0,0,12,12">
           <StackPanel Spacing="8">
-            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#7c5cff"/><TextBlock Classes="h4" Text="LAUNCHER UPDATES" Margin="0"/></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#7c5cff"/><TextBlock Classes="h4" Text="{loc:T settings.updates}" Margin="0"/></StackPanel>
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="3">
-              <TextBlock Text="Installed" Classes="sub"/><TextBlock Grid.Column="1" Text="{Binding InstalledLabel}" Foreground="White" FontWeight="SemiBold"/>
-              <TextBlock Grid.Row="1" Text="Available" Classes="sub"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding AvailableLabel}" Classes="body"/>
+              <TextBlock Text="{loc:T ov.installed}" Classes="sub"/><TextBlock Grid.Column="1" Text="{Binding InstalledLabel}" Foreground="White" FontWeight="SemiBold"/>
+              <TextBlock Grid.Row="1" Text="{loc:T settings.available}" Classes="sub"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding AvailableLabel}" Classes="body"/>
             </Grid>
-            <ToggleSwitch IsChecked="{Binding TestingChannel}" OnContent="Testing (pre-release) — stable releases included" OffContent="Stable"/>
+            <ToggleSwitch IsChecked="{Binding TestingChannel}" OnContent="{loc:T settings.channel.testing}" OffContent="{loc:T channel.stable}"/>
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Classes="green" Content="Update &amp; restart" Command="{Binding UpdateLauncherCommand}"
+              <Button Classes="green" Content="{loc:T settings.updateRestart}" Command="{Binding UpdateLauncherCommand}"
                       IsVisible="{Binding $parent[Window].((shell:ShellViewModel)DataContext).LauncherUpdateAvailable}"/>
-              <Button Classes="ghost2" Content="Check now" Command="{Binding CheckUpdatesCommand}"/>
+              <Button Classes="ghost2" Content="{loc:T settings.checkNow}" Command="{Binding CheckUpdatesCommand}"/>
             </StackPanel>
             <ProgressBar IsVisible="{Binding IsDownloading}" Value="{Binding DownloadPercent}" Minimum="0" Maximum="100" Height="4" Foreground="{StaticResource BrandGradient}" Background="#1c2740"/>
           </StackPanel>
@@ -32,14 +32,14 @@
         <!-- Plugin sources -->
         <Border Classes="card" Margin="0,0,0,12">
           <StackPanel Spacing="8">
-            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#2dd4bf"/><TextBlock Classes="h4" Text="PLUGIN SOURCES" Margin="0"/></StackPanel>
-            <TextBlock Text="Built in: cdn.revette.io — stable + testing registries" Classes="sub"/>
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#2dd4bf"/><TextBlock Classes="h4" Text="{loc:T settings.sources}" Margin="0"/></StackPanel>
+            <TextBlock Text="{loc:T settings.sources.builtin}" Classes="sub"/>
             <ItemsControl ItemsSource="{Binding Sources}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="sys:String">
                   <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
                     <TextBlock Text="{Binding}" Classes="mono body" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                    <Button Grid.Column="1" Classes="ghost2 tiny" Content="🗑" CommandParameter="{Binding}" ToolTip.Tip="Remove this source"
+                    <Button Grid.Column="1" Classes="ghost2 tiny" Content="🗑" CommandParameter="{Binding}" ToolTip.Tip="{loc:T settings.sources.remove}"
                             Command="{Binding $parent[ItemsControl].((vm:LauncherSettingsViewModel)DataContext).RemoveSourceCommand}"/>
                   </Grid>
                 </DataTemplate>
@@ -47,7 +47,7 @@
             </ItemsControl>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
               <TextBox Text="{Binding NewSource}" PlaceholderText="https://…/manifest.json" Classes="mono"/>
-              <Button Grid.Column="1" Classes="ghost tiny" Content="Add" Command="{Binding AddSourceCommand}"/>
+              <Button Grid.Column="1" Classes="ghost tiny" Content="{loc:T settings.sources.add}" Command="{Binding AddSourceCommand}"/>
             </Grid>
           </StackPanel>
         </Border>
@@ -55,13 +55,13 @@
         <!-- Data -->
         <Border Classes="card" Margin="0,0,12,12">
           <StackPanel Spacing="8">
-            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#37c8e0"/><TextBlock Classes="h4" Text="DATA" Margin="0"/></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#37c8e0"/><TextBlock Classes="h4" Text="{loc:T settings.data}" Margin="0"/></StackPanel>
             <TextBlock Text="{Binding SettingsPath}" Classes="sub mono" TextWrapping="Wrap"/>
             <TextBlock Text="{Binding FormatLine}" Classes="sub"/>
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Classes="ghost2 tiny" Content="Export clients…" Click="ExportClicked"/>
-              <Button Classes="ghost2 tiny" Content="Import…" Click="ImportClicked"/>
-              <Button Classes="ghost2 tiny" Content="Open folder" Click="OpenFolder"/>
+              <Button Classes="ghost2 tiny" Content="{loc:T settings.export}" Click="ExportClicked"/>
+              <Button Classes="ghost2 tiny" Content="{loc:T settings.import}" Click="ImportClicked"/>
+              <Button Classes="ghost2 tiny" Content="{loc:T common.openFolder}" Click="OpenFolder"/>
             </StackPanel>
           </StackPanel>
         </Border>
@@ -69,10 +69,26 @@
         <!-- Behaviour -->
         <Border Classes="card" Margin="0,0,0,12">
           <StackPanel Spacing="9">
-            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#ffb347"/><TextBlock Classes="h4" Text="BEHAVIOUR" Margin="0"/></StackPanel>
-            <CheckBox IsChecked="{Binding KeepOpen}" Content="Keep the launcher open while a game runs"/>
-            <CheckBox IsChecked="{Binding StartOnLastClient}" Content="Start on the last selected client instead of the Dashboard"/>
-            <CheckBox IsChecked="{Binding ShowMatrix}" Content="Show the plugin matrix on the Dashboard"/>
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#ffb347"/><TextBlock Classes="h4" Text="{loc:T settings.behaviour}" Margin="0"/></StackPanel>
+            <CheckBox IsChecked="{Binding KeepOpen}" Content="{loc:T settings.keepOpen}"/>
+            <CheckBox IsChecked="{Binding StartOnLastClient}" Content="{loc:T settings.startOnLast}"/>
+            <CheckBox IsChecked="{Binding ShowMatrix}" Content="{loc:T settings.showMatrix}"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Language (launcher UI only; switches live) -->
+        <Border Classes="card" Margin="0,0,12,12">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#b46bff"/><TextBlock Classes="h4" Text="{loc:T settings.language.title}" Margin="0"/></StackPanel>
+            <TextBlock Text="{loc:T settings.language.label}" Classes="sub"/>
+            <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}" MinWidth="240">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:LanguageOption">
+                  <TextBlock Text="{Binding Label}"/>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Text="{loc:T settings.language.hint}" Classes="sub" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
       </UniformGrid>

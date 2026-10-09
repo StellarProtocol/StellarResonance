@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using StellarLauncher.Core.Localization;
 
 namespace StellarLauncher.Core.Services;
 
@@ -30,7 +31,7 @@ public sealed class DxvkNvapiInstaller : IDxvkNvapiInstaller
 
         var markerPath = Path.Combine(winePrefix, Marker);
         if (File.Exists(markerPath) && File.ReadAllText(markerPath).Trim() == tag)
-            return $"DXVK-NVAPI {tag} (up to date)";
+            return L.TFormat("nvapi.upToDate", tag);
 
         // GitHub release tarball layout: x64/nvapi64.dll, x32/nvapi.dll
         await using var net = await _http.GetStreamAsync(tarUrl, ct);
@@ -64,7 +65,7 @@ public sealed class DxvkNvapiInstaller : IDxvkNvapiInstaller
             throw new InvalidOperationException("DXVK-NVAPI tarball missing x64/nvapi64.dll");
 
         File.WriteAllText(markerPath, tag);
-        return wrote32 ? $"DXVK-NVAPI {tag} installed" : $"DXVK-NVAPI {tag} installed (64-bit only)";
+        return wrote32 ? L.TFormat("nvapi.installed", tag) : L.TFormat("nvapi.installed64", tag);
     }
 
     private async Task<(string tag, string tarUrl)> LatestReleaseAsync(CancellationToken ct)

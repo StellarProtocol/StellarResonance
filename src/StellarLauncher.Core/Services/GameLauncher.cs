@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using StellarLauncher.Core.Platform;
+using StellarLauncher.Core.Localization;
 
 namespace StellarLauncher.Core.Services;
 
@@ -29,7 +30,7 @@ public sealed class GameLauncher : IGameLauncher
         }
 
         if (string.IsNullOrEmpty(r.Runner) || string.IsNullOrEmpty(r.WinePrefix))
-            throw new InvalidOperationException("Linux launch needs a Runner + WINEPREFIX (set them in Settings)");
+            throw new InvalidOperationException(L.T("launch.needsRunner"));
 
         var psi = new ProcessStartInfo { UseShellExecute = false };
 

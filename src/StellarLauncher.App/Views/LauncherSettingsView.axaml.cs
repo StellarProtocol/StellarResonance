@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.ViewModels;
 
 namespace StellarLauncher.App.Views;
@@ -19,7 +20,7 @@ public partial class LauncherSettingsView : UserControl
         {
             var top = TopLevel.GetTopLevel(this);
             if (top is null || Vm is null) return;
-            var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Export clients", SuggestedFileName = "stellar-clients.json" });
+            var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = Loc.T("settings.export.title"), SuggestedFileName = "stellar-clients.json" });
             if (file is not null) Vm.Export(file.Path.LocalPath);
         }
         catch (Exception) { /* picker unavailable */ }
@@ -31,7 +32,7 @@ public partial class LauncherSettingsView : UserControl
         {
             var top = TopLevel.GetTopLevel(this);
             if (top is null || Vm is null) return;
-            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Import clients", AllowMultiple = false });
+            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = Loc.T("settings.import.title"), AllowMultiple = false });
             if (files.Count > 0) Vm.Import(files[0].Path.LocalPath);
         }
         catch (Exception) { /* picker unavailable */ }

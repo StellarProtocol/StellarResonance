@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.App.ViewModels.Shell;
 using StellarLauncher.Core.Clients;
@@ -48,6 +49,7 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
         _onSession = s => { if (s.ClientId == client.Id) RaiseHeader(); };
         shell.Sessions.SessionChanged += _onSession;
         ShowTab(WorkspaceTab.Overview);
+        Loc.Subscribe(this, vm => vm.RaiseHeader());   // header tags/state line re-render on a language switch
         _ = RefreshAsync();
     }
 
@@ -68,9 +70,9 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
     public IBrush AccentBrush => AccentBrushes.Solid(Client.Accent);
     public IBrush AccentSoftBrush => AccentBrushes.Soft(Client.Accent);
     public IBrush AccentGlowBrush => AccentBrushes.Glow(Client.Accent);
-    public string ChannelTag => Client.Channel == "testing" ? "Testing" : "Stable";
+    public string ChannelTag => SessionPresenter.ChannelLabel(Client.Channel);
     public bool IsTesting => Client.Channel == "testing";
-    public string ModeTag => Client.Modded ? "Modded" : "Vanilla";
+    public string ModeTag => Client.Modded ? Loc.T("mode.modded") : Loc.T("mode.vanilla");
     public string RuntimeTag => Client.Linux?.Runner is { } r
         ? $"Linux · {System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(r) ?? r)}" : "Windows";
     public string RegionTag => Inventory.Region;                        // "SEA" / "JP" / "" (from the game's data folder)
@@ -142,10 +144,12 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
             var col = new Core.Matrix.ClientColumn(Client, Inventory, Registry);
             UpdatesBadge = Registry.Count(e => Core.Matrix.PluginMatrixBuilder.Classify(col, e.Id).Kind == Core.Matrix.MatrixCellKind.UpdateAvailable);
             NewerGameMini = FindNewerRelease();
+            // i18n: callout text is composed (Core L) at scan time — NOT live on a language switch; this page is rebuilt on
+            // navigation, and the language can only change from Launcher settings.
             Callouts = LogPatterns.Scan(Array.Empty<LogLine>(), Inventory, ShadowCopyFix.Find(Services.Fs, Client.GameMiniDir), NewerGameMini);
             Status = "";
         }
-        catch (Exception ex) { Status = $"offline — {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("ws.offline", ex.Message); }
         RaiseHeader();
         Refreshed?.Invoke();
     }

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Model;
 using StellarLauncher.Core.Services;
 
@@ -24,7 +25,7 @@ public partial class PluginItemViewModel : ObservableObject
     [ObservableProperty] private PluginVersion? _selectedVersion;   // bound to the per-row ComboBox
     [ObservableProperty] private bool _compatible;
     [ObservableProperty] private string _compatNote = "";
-    [ObservableProperty] private string _installLabel = "Install";
+    [ObservableProperty] private string _installLabel = Loc.T("common.install");
     [ObservableProperty] private bool _confirmVisible;
     [ObservableProperty] private bool _isDowngrade;
     [ObservableProperty] private bool _isUpdate;
@@ -42,10 +43,38 @@ public partial class PluginItemViewModel : ObservableObject
         _installedVersion = installedVersion;
         foreach (var v in entry.Versions) Versions.Add(v);
         SelectedVersion = Versions.FirstOrDefault();   // newest first
+        // Labels/notes are rendered at selection time: re-render them in the new language, keeping an open confirm.
+        Loc.Subscribe(this, vm =>
+        {
+            var confirm = vm.ConfirmVisible;
+            vm.OnSelectedVersionChanged(vm.SelectedVersion);
+            vm.ConfirmVisible = confirm;
+            if (vm._guideStatusKey is { } k) vm.GuideStatus = Loc.T(k);
+            foreach (var p in new[] { nameof(InstalledBadge), nameof(DependencyNotices), nameof(DependencyFootnote), nameof(KeptNote) })
+                vm.OnPropertyChanged(p);
+            vm.NotifyExtrasChanged();
+            vm.OnLanguageChanged();
+        });
     }
 
-    public string Name => Entry.Name;
-    public string Description => Entry.Description;
+    // Launcher i18n (spec § C): presentation in the active launcher language, per-field English fallback.
+    private static string Lang => Loc.Service.ActiveLanguage;
+    public string Name => Entry.DisplayName(Lang);
+    public string Description => Entry.DisplayDescription(Lang);
+    /// <summary>The guide shown: the active language's when published (<c>guideUrls</c>), else the English one.</summary>
+    public string? GuideUrl => Entry.GuideUrlFor(Lang);
+    /// <summary>The changelog cards: each version's changelog in the active language (section-level fallback).</summary>
+    public IReadOnlyList<ChangelogVersionViewModel> ChangelogVersions =>
+        Versions.Select(v => new ChangelogVersionViewModel(v.Version, v.Date, v.ChangelogFor(Lang))).ToList();
+
+    private void OnLanguageChanged()
+    {
+        foreach (var p in new[] { nameof(Name), nameof(Description), nameof(Monogram), nameof(GuideUrl), nameof(ChangelogVersions), nameof(SelectedChangelog) })
+            OnPropertyChanged(p);
+        foreach (var m in Media) m.RefreshCaption();
+        // The guide is per language: re-fetch when the page has already loaded one and the URL actually changed.
+        if (_guideHttp is not null && GuideUrl != _loadedGuideUrl) _ = LoadGuideAsync(_guideHttp);
+    }
     public string Author => Entry.Author ?? "";
 
     // ---- detail page data (media gallery, guide, links) — loaded lazily on first open ----
@@ -67,7 +96,7 @@ public partial class PluginItemViewModel : ObservableObject
     // List-card badge: the plugin's icon, else its first screenshot, else a monogram tile.
     [ObservableProperty] private Bitmap? _thumbnail;
     public bool ShowMonogram => Thumbnail is null;
-    public string Monogram => Entry.Name.Length > 0 ? Entry.Name[..1].ToUpperInvariant() : "?";
+    public string Monogram => Name.Length > 0 ? Name[..1].ToUpperInvariant() : "?";
     partial void OnThumbnailChanged(Bitmap? value) => OnPropertyChanged(nameof(ShowMonogram));
 
     private bool _thumbnailRequested;
@@ -94,6 +123,8 @@ public partial class PluginItemViewModel : ObservableObject
     }
     [ObservableProperty] private string? _guideMarkdown;
     [ObservableProperty] private string _guideStatus = "";
+    private string? _guideStatusKey;
+    private void SetGuideStatus(string? key) { _guideStatusKey = key; GuideStatus = key is null ? "" : Loc.T(key); }
     public bool HasGuideStatus => GuideStatus.Length > 0;
     partial void OnGuideStatusChanged(string value) => OnPropertyChanged(nameof(HasGuideStatus));
 
@@ -107,32 +138,57 @@ public partial class PluginItemViewModel : ObservableObject
         _detailLoaded = true;
         if (Entry.Media is { Count: > 0 } media)
         {
-            foreach (var m in media)
-                if (!string.IsNullOrWhiteSpace(m?.Url)) Media.Add(new MediaItemViewModel(m!, http, openLightbox));
+            for (var i = 0; i < media.Count; i++)
+            {
+                var m = media[i];
+                var index = i;   // captions are translated BY INDEX into the manifest's media list
+                if (!string.IsNullOrWhiteSpace(m?.Url))
+                    Media.Add(new MediaItemViewModel(m!, http, openLightbox) { CaptionSource = () => Entry.MediaCaption(index, Lang) });
+            }
             OnPropertyChanged(nameof(HasMedia));
             foreach (var tile in Media) _ = tile.LoadAsync();
         }
-        if (Entry.GuideUrl is { } guideUrl)
-        {
-            GuideStatus = "loading guide…";
-            try
-            {
-                GuideMarkdown = await http.GetStringAsync(guideUrl);
-                GuideStatus = "";
-            }
-            catch { GuideStatus = "guide unavailable (couldn't download it — check your connection)"; }
-        }
+        _guideHttp = http;
+        await LoadGuideAsync(http);
     }
 
+    private HttpClient? _guideHttp;
+    private string? _loadedGuideUrl;
+    private int _guideGeneration;   // UI thread: only the newest guide request may apply its result
+
+    /// <summary>Fetches <see cref="GuideUrl"/> (the active language's guide, else English). A translated guide that fails
+    /// to download falls back to the English one. Only the newest request may apply its result.</summary>
+    private async Task LoadGuideAsync(HttpClient http)
+    {
+        if (GuideUrl is not { } url) return;
+        _loadedGuideUrl = url;
+        var generation = ++_guideGeneration;
+        SetGuideStatus("detail.guide.loading");
+        try
+        {
+            string md;
+            try { md = await http.GetStringAsync(url); }
+            catch when (url != Entry.GuideUrl && Entry.GuideUrl is not null) { url = Entry.GuideUrl; md = await http.GetStringAsync(url); }
+            if (generation != _guideGeneration) return;   // the language changed again while this was downloading
+            GuideBaseUrl = url;
+            GuideMarkdown = md;
+            SetGuideStatus(null);
+        }
+        catch { if (generation == _guideGeneration) SetGuideStatus("detail.guide.unavailable"); }
+    }
+
+    /// <summary>The URL the shown guide was actually downloaded from — relative image paths resolve against it.</summary>
+    [ObservableProperty] private string? _guideBaseUrl;
+
     // Selected version's changelog (may be null); the view guards visibility.
-    public Changelog? SelectedChangelog => SelectedVersion?.Changelog;
+    public Changelog? SelectedChangelog => SelectedVersion?.ChangelogFor(Lang);
 
     // Canonical on-disk DLL filename for the selected version (for install/detect/remove).
     public string? CanonicalDll => SelectedVersion is { } v
         ? (v.Dll ?? System.IO.Path.GetFileName(new System.Uri(v.DllUrl).LocalPath))
         : null;
 
-    public string InstalledBadge => InstalledVersion is { } iv ? $"INSTALLED v{iv}" : "INSTALLED";
+    public string InstalledBadge => InstalledVersion is { } iv ? Loc.TFormat("detail.installedV", iv) : Loc.T("detail.installed");
 
     // True when the newest registry version is strictly newer than what's installed.
     public bool HasUpdate => Installed && InstalledVersion is { } iv
@@ -175,13 +231,13 @@ public partial class PluginItemViewModel : ObservableObject
         IsDowngrade = false;
         OnPropertyChanged(nameof(SelectedChangelog));
 
-        if (value is null) { Compatible = false; CompatNote = ""; InstallLabel = "Install"; IsUpdate = false; IsReinstall = false; IsPlainInstall = false; return; }
+        if (value is null) { Compatible = false; CompatNote = ""; InstallLabel = Loc.T("common.install"); IsUpdate = false; IsReinstall = false; IsPlainInstall = false; return; }
 
         if (IsDisabled) { IsPlainInstall = false; IsUpdate = false; IsReinstall = false; CompatNote = ""; return; }
 
         if (_framework is null)
         {
-            Compatible = false; CompatNote = "install the framework first"; InstallLabel = "Install"; IsUpdate = false; IsReinstall = false; IsPlainInstall = false;
+            Compatible = false; CompatNote = Loc.T("detail.compat.noFramework"); InstallLabel = Loc.T("common.install"); IsUpdate = false; IsReinstall = false; IsPlainInstall = false;
             return;
         }
 
@@ -189,23 +245,23 @@ public partial class PluginItemViewModel : ObservableObject
         if (!Compatible)
         {
             CompatNote = VersionService.IsNewer(value.MinModSystemVersion, _framework)
-                ? $"requires StellarResonance ≥ {value.MinModSystemVersion}"
-                : $"needs StellarResonance ≤ {value.MaxModSystemVersion}";
-            InstallLabel = "Incompatible"; IsUpdate = false; IsReinstall = false; IsPlainInstall = false;
+                ? Loc.TFormat("detail.compat.min", value.MinModSystemVersion)
+                : Loc.TFormat("detail.compat.max", value.MaxModSystemVersion);
+            InstallLabel = Loc.T("detail.incompatible"); IsUpdate = false; IsReinstall = false; IsPlainInstall = false;
             return;
         }
 
         CompatNote = "";
         if (!Installed)
-            { InstallLabel = $"Install v{value.Version}"; IsUpdate = false; IsReinstall = false; IsPlainInstall = true; }
+            { InstallLabel = Loc.TFormat("ov.action.installV", value.Version); IsUpdate = false; IsReinstall = false; IsPlainInstall = true; }
         else if (InstalledVersion is null)
-            { InstallLabel = $"Reinstall v{value.Version}"; IsUpdate = false; IsReinstall = true; IsPlainInstall = false; }   // present but unmanaged (no version marker) → adopt
+            { InstallLabel = Loc.TFormat("ov.action.reinstall", value.Version); IsUpdate = false; IsReinstall = true; IsPlainInstall = false; }   // present but unmanaged (no version marker) → adopt
         else if (VersionService.IsNewer(value.Version, InstalledVersion))
-            { InstallLabel = $"Update to v{value.Version}"; IsUpdate = true; IsReinstall = false; IsPlainInstall = false; }
+            { InstallLabel = Loc.TFormat("ov.action.updateTo", value.Version); IsUpdate = true; IsReinstall = false; IsPlainInstall = false; }
         else if (VersionService.IsNewer(InstalledVersion, value.Version))
-            { InstallLabel = $"Downgrade to v{value.Version}"; IsDowngrade = true; IsUpdate = false; IsReinstall = false; IsPlainInstall = false; }
+            { InstallLabel = Loc.TFormat("ov.action.downgradeTo", value.Version); IsDowngrade = true; IsUpdate = false; IsReinstall = false; IsPlainInstall = false; }
         else
-            { InstallLabel = $"Reinstall v{value.Version}"; IsUpdate = false; IsReinstall = true; IsPlainInstall = false; }
+            { InstallLabel = Loc.TFormat("ov.action.reinstall", value.Version); IsUpdate = false; IsReinstall = true; IsPlainInstall = false; }
     }
 
     // Called by the parent after a successful install to refresh installed state + label.
@@ -239,3 +295,6 @@ public partial class PluginItemViewModel : ObservableObject
     [RelayCommand] private Task Remove() => _parent.RemoveAsync(this);
     [RelayCommand] private Task ReEnable() => _parent.EnableAsync(this);
 }
+
+/// <summary>One changelog card on the plugin page: a version with its changelog already picked for the active language.</summary>
+public sealed record ChangelogVersionViewModel(string Version, string? Date, Changelog? Changelog);

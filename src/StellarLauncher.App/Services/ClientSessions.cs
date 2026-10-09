@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Launch;
 
@@ -71,7 +72,7 @@ public sealed class ClientSessions
             }
             catch (OperationCanceledException)
             {
-                _marshal(() => s.Apply(new FailedEvent("Launch cancelled")));
+                _marshal(() => s.Apply(new FailedEvent(Loc.T("launch.cancelled"))));
             }
             catch (Exception ex)
             {

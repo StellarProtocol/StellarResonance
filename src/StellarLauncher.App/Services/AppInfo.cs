@@ -8,6 +8,4 @@ public static class AppInfo
     public static readonly string LauncherVersion =
         typeof(AppInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion.Split('+', 2)[0] ?? "0.0.0";
-
-    public static string LauncherVersionLabel => $"Launcher v{LauncherVersion}";
 }

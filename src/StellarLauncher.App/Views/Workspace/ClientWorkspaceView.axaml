@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StellarLauncher.App.ViewModels.Workspace" xmlns:v="using:StellarLauncher.App.Views.Workspace"
+             xmlns:loc="using:StellarLauncher.App.Localization"
              x:Class="StellarLauncher.App.Views.Workspace.ClientWorkspaceView" x:DataType="vm:ClientWorkspaceViewModel">
   <DockPanel>
     <Border DockPanel.Dock="Top" Background="{Binding AccentSoftBrush}" Padding="24,18,24,14">
@@ -13,12 +14,12 @@
             <Border Classes="tag" Margin="0,6,6,0" IsVisible="{Binding HasEdition}"><TextBlock Text="{Binding EditionTag}"/></Border>
             <Border Classes="tag" Margin="0,6,6,0"><TextBlock Text="{Binding ModeTag}"/></Border>
             <Border Classes="tag" Margin="0,6,6,0"><TextBlock Text="{Binding RuntimeTag}"/></Border>
-            <Border Classes="tag tag-mint" Margin="0,6,0,0" IsVisible="{Binding IsRunningVisible}"><TextBlock Text="● RUNNING"/></Border>
-            <Border Classes="tag tag-blue" Margin="0,6,0,0" IsVisible="{Binding IsPrepVisible}"><TextBlock Text="● PREPARING"/></Border>
+            <Border Classes="tag tag-mint" Margin="0,6,0,0" IsVisible="{Binding IsRunningVisible}"><TextBlock Text="{loc:T tag.running}"/></Border>
+            <Border Classes="tag tag-blue" Margin="0,6,0,0" IsVisible="{Binding IsPrepVisible}"><TextBlock Text="{loc:T tag.preparing}"/></Border>
           </WrapPanel>
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="{Binding Path}" Classes="sub mono" Foreground="#8f97c2"/>
-            <Button Classes="link" Content="⧉" Click="CopyPath" Padding="2,0" ToolTip.Tip="Copy path"/>
+            <Button Classes="link" Content="⧉" Click="CopyPath" Padding="2,0" ToolTip.Tip="{loc:T ws.copyPath}"/>
           </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="6">
             <Ellipse Width="7" Height="7" Fill="{Binding StateBrush}" VerticalAlignment="Center"/>
@@ -31,13 +32,13 @@
           <Button Classes="primary" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}">
             <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
               <Path Data="M0,0 L9,5 L0,10 Z" Fill="White" Stretch="None" VerticalAlignment="Center"/>
-              <TextBlock Text="LAUNCH" VerticalAlignment="Center"/>
+              <TextBlock Text="{loc:T common.launch}" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
           <Button Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" Padding="30,12" FontSize="13.5" MinWidth="150" HorizontalAlignment="Right">
             <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
               <Rectangle Width="10" Height="10" Fill="White" VerticalAlignment="Center"/>
-              <TextBlock Text="STOP" VerticalAlignment="Center"/>
+              <TextBlock Text="{loc:T common.stop}" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
         </StackPanel>
@@ -45,18 +46,18 @@
     </Border>
     <Border DockPanel.Dock="Top" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="24,10,24,0">
       <StackPanel Orientation="Horizontal" Spacing="22">
-        <Button Classes="tab" Classes.active="{Binding IsOverview}" Content="Overview" Command="{Binding ShowOverviewCommand}" BorderBrush="{Binding OverviewUnderline}"/>
+        <Button Classes="tab" Classes.active="{Binding IsOverview}" Content="{loc:T ws.tab.overview}" Command="{Binding ShowOverviewCommand}" BorderBrush="{Binding OverviewUnderline}"/>
         <Button Classes="tab" Classes.active="{Binding IsPlugins}" Command="{Binding ShowPluginsCommand}" BorderBrush="{Binding PluginsUnderline}">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Text="Plugins"/>
+            <TextBlock Text="{loc:T ws.tab.plugins}"/>
             <Border Background="{Binding AccentSoftBrush}" CornerRadius="10" Padding="6,0"><TextBlock Text="{Binding PluginsBadge}" Foreground="{Binding AccentBrush}" FontSize="10" FontWeight="Bold"/></Border>
             <Border Background="#29ffcf6b" CornerRadius="10" Padding="6,0" IsVisible="{Binding HasUpdates}"><TextBlock Text="{Binding UpdatesBadge, StringFormat='{}{0}↑'}" Foreground="#ffcf6b" FontSize="10" FontWeight="Bold"/></Border>
           </StackPanel>
         </Button>
-        <Button Classes="tab" Classes.active="{Binding IsSettings}" Content="Settings" Command="{Binding ShowSettingsCommand}" BorderBrush="{Binding SettingsUnderline}"/>
+        <Button Classes="tab" Classes.active="{Binding IsSettings}" Content="{loc:T ws.tab.settings}" Command="{Binding ShowSettingsCommand}" BorderBrush="{Binding SettingsUnderline}"/>
         <Button Classes="tab" Classes.active="{Binding IsLogs}" Command="{Binding ShowLogsCommand}" BorderBrush="{Binding LogsUnderline}">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Text="Logs"/>
+            <TextBlock Text="{loc:T ws.tab.logs}"/>
             <Border Background="#29ffcf6b" CornerRadius="10" Padding="6,0" IsVisible="{Binding HasCallouts}"><TextBlock Text="{Binding LogsBadge}" Foreground="#ffcf6b" FontSize="10" FontWeight="Bold"/></Border>
           </StackPanel>
         </Button>

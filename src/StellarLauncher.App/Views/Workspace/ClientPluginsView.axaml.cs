@@ -51,7 +51,8 @@ public partial class ClientPluginsView : UserControl
         var detail = this.GetVisualDescendants().OfType<PluginDetailView>().FirstOrDefault();
         if (detail is null) return;
         var scroller = detail.GetVisualDescendants().OfType<ScrollViewer>().OrderByDescending(s => s.Extent.Height).FirstOrDefault();
-        var header = detail.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault(t => t.Text == "DEPENDENCIES");
+        // Found by NAME, never by its text: the section label is localized (i18n Task 3).
+        var header = detail.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault(t => t.Name == "DependenciesHeader");
         if (scroller is null || header is null || scroller.Content is not Visual content) return;
         var y = header.TranslatePoint(new Point(0, 0), content)?.Y ?? 0;
         scroller.Offset = new Vector(0, Math.Max(0, y - 20));

@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -88,7 +89,7 @@ public sealed class MarkdownView : ContentControl
         return tb;
     }
 
-    private static TextBlock RenderText(IReadOnlyList<MdInline> inlines, double size, IBrush brush, string? baseUrl)
+    internal static TextBlock RenderText(IReadOnlyList<MdInline> inlines, double size, IBrush brush, string? baseUrl)
     {
         var tb = new TextBlock
         {
@@ -97,12 +98,39 @@ public sealed class MarkdownView : ContentControl
             Foreground = brush,
             LineHeight = size * 1.45,
         };
+        MdText? previous = null;
         foreach (var inline in inlines)
-            tb.Inlines!.Add(RenderInline(inline, size, baseUrl));
+        {
+            // Avalonia 12.0.4 shaping reuses the PREVIOUS run's fallback typeface for the next run whenever that face has
+            // the glyph — ignoring the run's own weight/style — so in a CJK/Thai/Hangul paragraph a bold run after a
+            // regular one rendered regular (measured on the ja Photo Studio guide; parser was correct). Upstream issue
+            // (drafted in .superpowers/sdd/li-task-4-report.md, to be filed): "Font fallback reuses previous run's
+            // typeface regardless of FontWeight/FontStyle". Workaround: a zero-width space opening a run whose formatting
+            // changed AND that starts with a fallback-script character is shaped by the UI face, which resets the chain
+            // so that character gets a fresh lookup with ITS run's weight. Latin runs never need it (English guides are
+            // byte-identical); U+2060 WORD JOINER was measured and rejected — it glued the following CJK into an Inter
+            // run (no glyphs) — so U+200B stays, costing only a line-break opportunity CJK/Thai allow anyway.
+            if (inline is MdText t && previous is { } p && (p.Bold, p.Italic, p.Code) != (t.Bold, t.Italic, t.Code)
+                && t.Text.Length > 0 && NeedsFallbackFont(t.Text[0]))
+                tb.Inlines!.Add(RenderInline(t with { Text = FormattingBoundary + t.Text }, size, baseUrl));
+            else
+                tb.Inlines!.Add(RenderInline(inline, size, baseUrl));
+            if (inline is MdText mt) previous = mt;   // a link (own TextBlock) doesn't reset the chain
+        }
         return tb;
     }
 
-    private static Inline RenderInline(MdInline inline, double size, string? baseUrl)
+    /// <summary>U+200B, prefixed to a run whose formatting differs from the previous one and that starts with a
+    /// fallback-script character (see <see cref="RenderText"/>).</summary>
+    internal const string FormattingBoundary = "\u200B";
+
+    /// <summary>Scripts the UI face (Inter) doesn't cover, so they are shaped with a fallback font: CJK ideographs, kana,
+    /// CJK/fullwidth punctuation, Hangul, Thai.</summary>
+    internal static bool NeedsFallbackFont(char c) =>
+        StellarLauncher.Core.Services.MarkdownParser.IsSpacelessScript(c)
+        || c is >= '\u1100' and <= '\u11FF' or >= '\u3130' and <= '\u318F' or >= '\uAC00' and <= '\uD7AF';   // Hangul
+
+    internal static Inline RenderInline(MdInline inline, double size, string? baseUrl)
     {
         if (inline is MdLink link)
         {

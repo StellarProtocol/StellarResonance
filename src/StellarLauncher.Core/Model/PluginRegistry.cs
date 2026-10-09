@@ -17,7 +17,10 @@ public sealed record PluginVersion(
     [property: JsonPropertyName("changelog")]           Changelog? Changelog,
     [property: JsonPropertyName("sourceRepository")]    string? SourceRepository = null,   // display-only provenance
     [property: JsonPropertyName("sourceTag")]           string? SourceTag = null,
-    [property: JsonPropertyName("dependencies")]        IReadOnlyList<PluginDependency>? Dependencies = null);
+    [property: JsonPropertyName("dependencies")]        IReadOnlyList<PluginDependency>? Dependencies = null,
+    // Launcher i18n: { "<lang>": { added/changed/fixed/removed } } for THIS version. Kept raw and read defensively
+    // (PluginI18n) so a malformed translation can never fail the whole registry parse.
+    [property: JsonPropertyName("changelogI18n")]       JsonElement? ChangelogI18n = null);
 
 // One media item on a plugin's detail page: a screenshot or a YouTube video.
 // "image" → Url is the picture itself; "youtube" → Url is a watch/short/embed link the
@@ -37,7 +40,11 @@ public sealed record PluginEntry(
     [property: JsonPropertyName("homepage")]    string? Homepage = null,
     [property: JsonPropertyName("media")]       IReadOnlyList<PluginMedia>? Media = null,
     [property: JsonPropertyName("guideUrl")]    string? GuideUrl = null,
-    [property: JsonPropertyName("iconUrl")]     string? IconUrl = null);   // badge image; list falls back to the first image media
+    [property: JsonPropertyName("iconUrl")]     string? IconUrl = null,    // badge image; list falls back to the first image media
+    // Launcher i18n (additive; English top-level fields stay the fallback): { "<lang>": "<guide url>" } and
+    // { "<lang>": { name?, description?, captions?: [..|null] } }. Raw + read defensively by PluginI18n.
+    [property: JsonPropertyName("guideUrls")]   JsonElement? GuideUrls = null,
+    [property: JsonPropertyName("i18n")]        JsonElement? I18n = null);
 
 public sealed record PluginRegistry(
     [property: JsonPropertyName("plugins")] IReadOnlyList<PluginEntry> Plugins)

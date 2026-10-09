@@ -13,6 +13,7 @@ public sealed class LauncherOptions
     public string StartOn { get; set; } = "dashboard";        // "dashboard" | "lastClient"
     public bool ShowMatrix { get; set; } = true;
     public bool PluginsGridView { get; set; } = false;        // Plugins tab: false = row list, true = card grid
+    public string Language { get; set; } = "follow";            // launcher UI language: "follow" (OS UI culture) | en/ja/th/id/fil/ko
     public string? LastSelectedClientId { get; set; }
     public List<string> DismissedDetections { get; set; } = new();
 }

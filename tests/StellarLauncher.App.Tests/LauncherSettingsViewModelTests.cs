@@ -25,13 +25,54 @@ public class LauncherSettingsViewModelTests
         public void CleanupStaleUpdate(string installDir, string exeName) { }
     }
 
-    private static (WorkspaceFixture f, LauncherSettingsViewModel vm) Open(string remoteVersion = "0.0.0")
+    private static (WorkspaceFixture f, LauncherSettingsViewModel vm) Open(string remoteVersion = "0.0.0",
+        StellarLauncher.Core.Localization.ILauncherLocalization? loc = null)
     {
         var f = new WorkspaceFixture();
         f.AddClient("c1", "Main", Main);
         f.Start();
-        var svc = new LauncherServices(new Updates(remoteVersion), new NoSelfUpdate(), new Platform(), f.Store, new HttpClient(), f.Fs);
+        var svc = new LauncherServices(new Updates(remoteVersion), new NoSelfUpdate(), new Platform(), f.Store, new HttpClient(), f.Fs,
+            loc ?? new StellarLauncher.Core.Localization.LauncherLocalization("follow", () => "en"));
         return (f, new LauncherSettingsViewModel(f.Shell, svc));
+    }
+
+    [Fact]
+    public void Language_dropdown_lists_follow_then_the_six_native_names()
+    {
+        // A Tagalog OS: follow resolves to Filipino, so the follow entry itself reads in Filipino.
+        var (_, vm) = Open(loc: new StellarLauncher.Core.Localization.LauncherLocalization("follow", () => "tl"));
+        Assert.Equal(new[] { "follow", "en", "ja", "th", "id", "fil", "ko" }, vm.Languages.Select(o => o.Code));
+        Assert.Equal(new[] { "Sundan ang wika ng system (Filipino)", "English", "日本語", "ไทย", "Bahasa Indonesia", "Filipino", "한국어" },
+            vm.Languages.Select(o => o.Label));
+        Assert.Equal("follow", vm.SelectedLanguage!.Code);   // a fresh config defaults to follow
+    }
+
+    [Fact]
+    public void Picking_a_language_persists_it_and_switches_live()
+    {
+        var loc = new StellarLauncher.Core.Localization.LauncherLocalization("follow", () => "en");
+        var (f, vm) = Open(loc: loc);
+        var changed = 0;
+        loc.LanguageChanged += () => changed++;
+
+        vm.SelectedLanguage = vm.Languages.Single(o => o.Code == "ko");
+
+        Assert.Equal("ko", f.Store.Load().Launcher.Language);
+        Assert.Equal("ko", loc.ActiveLanguage);
+        Assert.Equal(1, changed);
+        Assert.Equal("시스템 설정 따르기 (English)", vm.Languages[0].Label);   // the follow entry re-labels in the new language
+        Assert.Equal("한국어", vm.Languages[6].Label);                        // native names never translate
+    }
+
+    [Fact]
+    public void Reopening_settings_selects_the_persisted_language()
+    {
+        var (f, vm) = Open();
+        vm.SelectedLanguage = vm.Languages.Single(o => o.Code == "th");
+        var svc = new LauncherServices(new Updates("0.0.0"), new NoSelfUpdate(), new Platform(), f.Store, new HttpClient(), f.Fs,
+            new StellarLauncher.Core.Localization.LauncherLocalization("th", () => "en"));
+        var again = new LauncherSettingsViewModel(f.Shell, svc);
+        Assert.Equal("th", again.SelectedLanguage!.Code);
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Launch;
 using StellarLauncher.Core.Services;
@@ -36,15 +37,16 @@ public sealed partial class ClientSettingsViewModel : ObservableObject
             var tag = ClientNaming.LayoutTag(ClientNaming.DetectLayout(GameMiniDir));
             var release = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(GameMiniDir.TrimEnd('/', '\\')) ?? "");
             var exe = System.IO.Path.GetFileName(GameExeResolver.StarLauncherExe(_ws.Services.Fs, GameMiniDir));
-            return $"Detected layout: {(tag.Length > 0 ? tag : "unknown")} · {release} · {exe}";
+            return Loc.TFormat("cs.layout", tag.Length > 0 ? tag : Loc.T("cs.layout.unknown"), release, exe);
         }
     }
-    public string UmuLine => _ws.Services.Detector.DetectUmu() is { } u ? $"umu-run found at {u} — Proton launches through it." : "umu-run not found — Proton falls back to its run verb.";
+    public string UmuLine => _ws.Services.Detector.DetectUmu() is { } u ? Loc.TFormat("cs.umu.found", u) : Loc.T("cs.umu.missing");
 
     public ClientSettingsViewModel(ClientWorkspaceViewModel ws)
     {
         _ws = ws;
         Load();
+        Loc.Subscribe(this, vm => { vm.OnPropertyChanged(nameof(LayoutLine)); vm.OnPropertyChanged(nameof(UmuLine)); });
     }
 
     private void Load()
@@ -77,8 +79,8 @@ public sealed partial class ClientSettingsViewModel : ObservableObject
     {
         if (_loading) return;
         var trimmed = value.Trim();
-        if (trimmed.Length == 0) { Status = "name cannot be empty"; return; }
-        if (_ws.Shell.Config.NameTaken(trimmed, exceptId: C.Id)) { Status = $"'{trimmed}' is already a client name"; return; }
+        if (trimmed.Length == 0) { Status = Loc.T("cs.name.empty"); return; }
+        if (_ws.Shell.Config.NameTaken(trimmed, exceptId: C.Id)) { Status = Loc.TFormat("cs.name.taken", trimmed); return; }
         C.Name = trimmed; Status = ""; PersistIdentity();
     }
 
@@ -123,12 +125,12 @@ public sealed partial class ClientSettingsViewModel : ObservableObject
     private void Detect()
     {
         var found = _ws.Services.Detector.Detect();
-        if (found.Count == 0) { Status = "No game install found automatically — use Browse."; return; }
+        if (found.Count == 0) { Status = Loc.T("cs.detect.none"); return; }
         var pick = found.FirstOrDefault(p => ClientCandidates.SamePath(p, GameMiniDir, _ws.Services.Platform.IsWindows)) ?? found[0];
         GameMiniDir = pick;
         if (IsLinux && string.IsNullOrWhiteSpace(WinePrefix)) WinePrefix = GameDetector.WinePrefixFor(pick);
         if (IsLinux && string.IsNullOrWhiteSpace(Runner)) Runner = _ws.Services.Detector.DetectRunner();
-        Status = found.Count == 1 ? "✓ detected" : $"found {found.Count} installs — picked {pick}";
+        Status = found.Count == 1 ? Loc.T("cs.detect.one") : Loc.TFormat("cs.detect.many", found.Count, pick);
     }
 
     public void SetGameFromPicked(string path) => GameMiniDir = _ws.Services.Locator.FindGameMini(path) ?? path;
@@ -136,7 +138,7 @@ public sealed partial class ClientSettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task RemoveClientAsync()
     {
-        if (!await _ws.Services.Confirm.AskAsync($"Remove {C.Name} from the launcher?", "Only the launcher entry is forgotten. Nothing under the game folder is deleted; re-adding the folder restores it.", "Remove")) return;
+        if (!await _ws.Services.Confirm.AskAsync(Loc.TFormat("cs.remove.title", C.Name), Loc.T("cs.remove.body"), Loc.T("common.remove"))) return;
         _ws.Shell.ClientRemoved(C.Id);
     }
 }

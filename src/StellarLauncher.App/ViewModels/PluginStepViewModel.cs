@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 
 namespace StellarLauncher.App.ViewModels;
@@ -17,7 +18,7 @@ public sealed partial class InstallOptionViewModel : ObservableObject
     public InstallOptionViewModel(InstallStepOption option, string pluginName)
     {
         Option = option;
-        NoticeText = string.IsNullOrWhiteSpace(option.Notice) ? null : $"Notice from {pluginName}: {option.Notice.Trim()}";
+        NoticeText = string.IsNullOrWhiteSpace(option.Notice) ? null : Loc.TFormat("deps.notice", pluginName, option.Notice.Trim());
         Use = !option.InitiallyUnticked;
     }
 
@@ -79,30 +80,29 @@ public sealed partial class PluginStepViewModel : ObservableObject
 
     public static PluginStepViewModel ForInstall(InstallStep s)
     {
-        var vm = new PluginStepViewModel(PluginStepKind.Install, $"Install {s.PluginName} {s.Version}",
-            $"{s.PluginName} works on its own. These optional extras add more; you can change them later on its page.", "Install");
+        var vm = new PluginStepViewModel(PluginStepKind.Install, Loc.TFormat("step.install.title", s.PluginName, s.Version),
+            Loc.TFormat("step.install.body", s.PluginName), Loc.T("common.install"));
         foreach (var o in s.Options) vm.Options.Add(new InstallOptionViewModel(o, s.PluginName));
         return vm;
     }
 
     public static PluginStepViewModel ForReinstall(ReinstallStep s) =>
-        new(PluginStepKind.Reinstall, $"Reinstall {s.PluginName} {s.Version}",
-            $"Downloads {s.PluginName} again and checks it. Your settings and saved data are kept.", "Reinstall")
+        new(PluginStepKind.Reinstall, Loc.TFormat("step.reinstall.title", s.PluginName, s.Version),
+            Loc.TFormat("step.reinstall.body", s.PluginName), Loc.T("step.reinstall.ok"))
         {
-            ReinstallDetail = $"Downloads {PluginStepText.JoinNames(s.DependencyNames)} again and checks them. A file you put there yourself is never overwritten.",
+            ReinstallDetail = Loc.TFormat("step.reinstall.detail", PluginStepText.JoinNames(s.DependencyNames)),
         };
 
     public static PluginStepViewModel ForRemove(RemoveStep s)
     {
         var names = PluginStepText.JoinNames(s.DependencyNames);
-        var (verb, them) = s.Plural ? ("stay", "them") : ("stays", "it");
-        var aside = s.AnyModdedOnly ? " (moved aside for Vanilla launches)" : "";
-        return new(PluginStepKind.Remove, $"Remove {s.PluginName}?", "Your settings and saved data stay on disk either way.", "Remove")
+        var aside = s.AnyModdedOnly ? Loc.T("step.remove.aside") : "";
+        return new(PluginStepKind.Remove, Loc.TFormat("step.remove.title", s.PluginName), Loc.T("step.remove.body"), Loc.T("common.remove"))
         {
-            RemoveAllTitle = $"Remove {s.PluginName} and its dependencies",
-            RemoveAllDetail = $"Also removes {names} that the launcher installed for it.",
-            RemoveOnlyTitle = $"Remove {s.PluginName} only",
-            RemoveOnlyDetail = $"{PluginStepText.Sentence(names)} {verb}. The launcher keeps managing {them}{aside} and you can remove {them} later from this page.",
+            RemoveAllTitle = Loc.TFormat("step.remove.allTitle", s.PluginName),
+            RemoveAllDetail = Loc.TFormat("step.remove.allDetail", names),
+            RemoveOnlyTitle = Loc.TFormat("step.remove.onlyTitle", s.PluginName),
+            RemoveOnlyDetail = Loc.TFormat(s.Plural ? "step.remove.onlyDetail.other" : "step.remove.onlyDetail.one", PluginStepText.Sentence(names), aside),
         };
     }
 }

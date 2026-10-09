@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using StellarLauncher.Core.Localization;
 
 namespace StellarLauncher.Core.Services;
 
@@ -17,7 +18,7 @@ public sealed class LauncherSelfUpdater : ILauncherSelfUpdater
 
     public async Task StageAsync(Stream zip, string expectedSha256, string stagingDir, IProgress<string>? status = null, CancellationToken ct = default)
     {
-        status?.Report("verifying download…");
+        status?.Report(L.T("selfUpdate.verifying"));
         using var buffer = new MemoryStream();
         await zip.CopyToAsync(buffer, ct);
         buffer.Position = 0;
@@ -44,7 +45,7 @@ public sealed class LauncherSelfUpdater : ILauncherSelfUpdater
             using (var src = entry.Open())
             using (var outStream = _fs.File.Create(dest))
                 await src.CopyToAsync(outStream, ct);
-            status?.Report($"installing update… ({++done}/{files})");
+            status?.Report(L.TFormat("selfUpdate.installing", ++done, files));
         }
     }
 

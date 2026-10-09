@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Launch;
@@ -64,7 +65,7 @@ public sealed partial class ClientPluginsViewModel
         if (dep is not { Optional: true }) return;   // Task 6 (e): a required dependency can't be skipped
         if (_ws.Session.IsBusy)                       // fix round M3: files are in use while the game runs
         {
-            Status = $"{item.Name}: close the game to change its dependencies";
+            Status = Loc.TFormat("deps.closeGame", item.Name);
             DependencyWork = item.RefreshDependenciesAsync();
             return;
         }
@@ -97,9 +98,9 @@ public sealed partial class ClientPluginsViewModel
         try
         {
             foreach (var id in gone) await svc.RemoveAsync(gameMini, item.Entry.Id, id);
-            Status = $"{item.Name}: {dep.Name} skipped";
+            Status = Loc.TFormat("deps.skipped", item.Name, dep.Name);
         }
-        catch (Exception ex) { Status = $"{item.Name}: {dep.Name} could not be removed — {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("deps.removeFailed", item.Name, dep.Name, ex.Message); }
         await item.RefreshDependenciesAsync();
     }
 
@@ -119,16 +120,16 @@ public sealed partial class ClientPluginsViewModel
         var install = _ws.Services.Core.Install;
         var (gameMini, pluginId, deps) = (client.GameMiniDir, item.Entry.Id, item.ShownDependencies);
         var skippedIds = DependencyRunner.Skipped(client, pluginId, deps);   // snapshot on the UI thread
-        Status = $"Preparing {item.Name}: {dep.Name}…";
+        Status = Loc.TFormat("deps.preparing", item.Name, dep.Name);
         try
         {
             // Final review M-g: the same restore-then-ensure as a launch and an install (off the UI thread).
             var results = await Task.Run(() => DependencyRunner.EnsurePluginAsync(install, gameMini, pluginId, deps, skippedIds));
             var problems = results.Where(s => s.State is DependencyState.Blocked or DependencyState.Failed)
                 .Select(s => DependencyRunner.Line(item.Entry.Id, s)).ToList();
-            Status = problems.Count == 0 ? $"{item.Name}: {dep.Name} installed" : $"{item.Name}: {string.Join("; ", problems)}";
+            Status = problems.Count == 0 ? Loc.TFormat("deps.installed", item.Name, dep.Name) : Loc.TFormat("plugins.status", item.Name, string.Join("; ", problems));
         }
-        catch (Exception ex) { Status = $"{item.Name}: {dep.Name} failed — {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("deps.failed", item.Name, dep.Name, ex.Message); }
         await item.RefreshDependenciesAsync();
     }
 }

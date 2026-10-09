@@ -100,7 +100,7 @@ public class DashboardViewModelTests
         Assert.Equal("Vanilla", asia.ModeTag);
 
         Assert.Equal(2, dash.Columns.Count);
-        Assert.Equal("fw 2.7.4 · stable", dash.Columns[0].Subtitle);
+        Assert.Equal("fw 2.7.4 · Stable", dash.Columns[0].Subtitle);   // channel shown as its UI label (i18n Task 3)
         Assert.Equal("no framework", dash.Columns[1].Subtitle);
         var row = Assert.Single(dash.Rows);
         Assert.Equal("CombatMeter", row.Name);

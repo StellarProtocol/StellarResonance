@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Clients;
 
@@ -28,7 +29,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public LauncherConfig Config { get; private set; } = new();
     public ObservableCollection<RailClientItem> Clients { get; } = new();
     public ClientSessions Sessions => _sessions;
-    public string LauncherVersionLabel => AppInfo.LauncherVersionLabel;
+    public string LauncherVersionLabel => Loc.TFormat("shell.version", AppInfo.LauncherVersion);
 
     /// <summary>The rail's quick ▶. Wired by the composition root (Task 11) to the ONE launch path
     /// (<see cref="ClientSessions.LaunchAsync"/>) so it works from the first frame, even when no Dashboard was ever shown.</summary>
@@ -39,7 +40,11 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] private RailClientItem? _selectedClient;
     [ObservableProperty] private int _candidateCount;
     [ObservableProperty] private bool _launcherUpdateAvailable;
-    [ObservableProperty] private string _launcherUpdateText = "";
+    [ObservableProperty] private string? _launcherUpdateVersion;   // newer launcher version on offer, or null
+
+    /// <summary>The rail's update banner, rendered in the active language.</summary>
+    public string LauncherUpdateText => LauncherUpdateVersion is { } v ? Loc.TFormat("shell.update.available", v) : "";
+    partial void OnLauncherUpdateVersionChanged(string? value) => OnPropertyChanged(nameof(LauncherUpdateText));
 
     public bool HasCandidates => CandidateCount > 0;
     partial void OnCandidateCountChanged(int value) => OnPropertyChanged(nameof(HasCandidates));
@@ -51,6 +56,12 @@ public sealed partial class ShellViewModel : ObservableObject
     {
         _store = store; _sessions = sessions; _pages = pages;
         _sessions.SessionChanged += s => Clients.FirstOrDefault(i => i.Client.Id == s.ClientId)?.Refresh();
+        // The shell outlives every page: its own labels and every rail row re-render on a language switch.
+        Loc.Subscribe(this, vm =>
+        {
+            vm.OnPropertyChanged(nameof(LauncherVersionLabel)); vm.OnPropertyChanged(nameof(LauncherUpdateText));
+            foreach (var c in vm.Clients) c.Refresh();
+        });
     }
 
     public void Start()

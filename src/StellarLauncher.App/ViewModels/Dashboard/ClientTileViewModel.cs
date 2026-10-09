@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Inventory;
@@ -28,6 +29,7 @@ public sealed partial class ClientTileViewModel : ObservableObject
         Func<ClientProfile, Task> launch, Action<ClientProfile> stop, Action<ClientProfile> open)
     {
         Client = client; Session = session; _launch = launch; _stop = stop; _open = open;
+        Loc.Subscribe(this, vm => vm.OnPropertyChanged(string.Empty));   // every computed label re-renders on a language switch
     }
 
     public string Name => Client.Name;
@@ -35,9 +37,9 @@ public sealed partial class ClientTileViewModel : ObservableObject
     public IBrush AccentBrush => AccentBrushes.Solid(Client.Accent);
     public IBrush AccentSoftBrush => AccentBrushes.Soft(Client.Accent);
     public IBrush AccentLineBrush => AccentBrushes.Line(Client.Accent);
-    public string ChannelTag => Client.Channel == "testing" ? "Testing" : "Stable";
+    public string ChannelTag => SessionPresenter.ChannelLabel(Client.Channel);
     public bool IsTesting => Client.Channel == "testing";
-    public string ModeTag => Client.Modded ? "Modded" : "Vanilla";
+    public string ModeTag => Client.Modded ? Loc.T("mode.modded") : Loc.T("mode.vanilla");
     public string RunnerTag => Client.Linux?.Runner is { } r
         ? System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(r) ?? r)
         : "Windows";
@@ -46,18 +48,18 @@ public sealed partial class ClientTileViewModel : ObservableObject
     public bool HasRegion => _inv.Region.Length > 0;
     public bool HasEdition => _inv.Edition.Length > 0;
 
-    public string FrameworkLine => _inv.FrameworkVersion is null ? "fw not installed"
-        : _latest is not null && Core.Services.VersionService.IsNewer(_latest, _inv.FrameworkVersion) ? $"fw {_inv.FrameworkVersion} · {_latest} available"
-        : $"fw {_inv.FrameworkVersion} · latest";
+    public string FrameworkLine => _inv.FrameworkVersion is null ? Loc.T("tile.fw.none")
+        : _latest is not null && Core.Services.VersionService.IsNewer(_latest, _inv.FrameworkVersion) ? Loc.TFormat("tile.fw.update", _inv.FrameworkVersion, _latest)
+        : Loc.TFormat("tile.fw.latest", _inv.FrameworkVersion);
     public bool FrameworkNeedsAttention => _inv.FrameworkVersion is null || (_latest is not null && Core.Services.VersionService.IsNewer(_latest, _inv.FrameworkVersion));
     public bool ShowInstallFramework => _inv.FolderExists && _inv.FrameworkVersion is null;
     public string PluginsLine
     {
         get
         {
-            var n = _inv.InstalledCount;
-            var noun = n == 1 ? "plugin" : "plugins";
-            return _updates > 0 ? $"{n} {noun} · {_updates} update{(_updates == 1 ? "" : "s")}" : $"{n} {noun} · up to date";
+            var plugins = Loc.Plural("tile.plugins", _inv.InstalledCount);
+            return _updates > 0 ? Loc.TFormat("tile.pluginsLine", plugins, Loc.Plural("tile.updates", _updates))
+                                : Loc.TFormat("tile.pluginsLine", plugins, Loc.T("tile.upToDate"));
         }
     }
 
