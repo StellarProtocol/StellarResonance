@@ -1,5 +1,6 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Clients;
 
@@ -27,8 +28,8 @@ public sealed partial class CandidateRowViewModel : ObservableObject
     public bool HasLayoutTag => LayoutTag.Length > 0;
     public bool IsWinePrefix => Candidate.IsWinePrefix;
     public bool IsAvailable => AlreadyAddedAs is null;
-    public string RunnerLine => Candidate.Runner is { } r ? $"runner {System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(r) ?? r)}" : "";
-    public string PrefixLine => Candidate.WinePrefix is { } p ? $"prefix {p}" : "";
-    public string AlreadyLine => AlreadyAddedAs is { } n ? $"already added as {n}" : "";
+    public string RunnerLine => Candidate.Runner is { } r ? Loc.TFormat("add.row.runner", System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(r) ?? r)) : "";
+    public string PrefixLine => Candidate.WinePrefix is { } p ? Loc.TFormat("add.row.prefix", p) : "";
+    public string AlreadyLine => AlreadyAddedAs is { } n ? Loc.TFormat("add.row.already", n) : "";
     public IBrush AccentBrush { get; }
 }

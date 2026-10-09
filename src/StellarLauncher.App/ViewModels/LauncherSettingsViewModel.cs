@@ -39,6 +39,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     private readonly LauncherServices _svc;
     private readonly ILauncherLocalization _loc;
     private LauncherManifest? _remote;
+    private string? _availableKey = "settings.notChecked";   // AvailableLabel's catalog key while it is a fixed phrase
     private bool _loading;
 
     /// <summary>Language dropdown: Follow system first, then <see cref="LauncherLanguages.Codes"/> in order.</summary>
@@ -48,7 +49,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     public ObservableCollection<string> Sources { get; } = new();
     [ObservableProperty] private bool _testingChannel, _keepOpen, _startOnLastClient, _showMatrix, _isDownloading;
     [ObservableProperty] private string? _newSource;
-    [ObservableProperty] private string _status = "", _availableLabel = "not checked yet";
+    [ObservableProperty] private string _status = "", _availableLabel = Loc.T("settings.notChecked");
     [ObservableProperty] private double _downloadPercent;
 
     public string InstalledLabel => $"v{AppInfo.LauncherVersion}";
@@ -58,8 +59,8 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         get
         {
             var n = _shell.Config.Clients.Count;
-            var backup = _svc.Fs.File.Exists(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(SettingsPath)!, "settings.v1.json")) ? "settings.v1.json backup present" : "no v1 backup";
-            return $"v2 · {n} client{(n == 1 ? "" : "s")} · {backup}";
+            var backup = _svc.Fs.File.Exists(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(SettingsPath)!, "settings.v1.json")) ? Loc.T("settings.v1.present") : Loc.T("settings.v1.none");
+            return Loc.TFormat("settings.format", Loc.Plural("dash.clients", n), backup);
         }
     }
 
@@ -88,6 +89,8 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         _shell.Config.Launcher.Language = value.Code; Persist();
         _loc.SetLanguage(value.Code);
         Languages[0].Label = FollowLabel();   // the only translated entry; native names never change
+        OnPropertyChanged(nameof(FormatLine));
+        if (_availableKey is { } k) AvailableLabel = Loc.T(k);
     }
 
     private List<LanguageOption> BuildLanguageOptions()
@@ -103,7 +106,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     [RelayCommand]
     private void AddSource()
     {
-        if (!Uri.TryCreate(NewSource, UriKind.Absolute, out _)) { Status = "enter a valid registry URL"; return; }
+        if (!Uri.TryCreate(NewSource, UriKind.Absolute, out _)) { Status = Loc.T("settings.sources.invalid"); return; }
         if (!Sources.Contains(NewSource!)) { Sources.Add(NewSource!); _shell.Config.Launcher.PluginSources.Add(NewSource!); Persist(); }
         NewSource = ""; Status = "";
     }
@@ -128,7 +131,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
                 catch (Exception) { /* stable manifest unavailable — the testing one stands */ }
             }
             shell.LauncherUpdateAvailable = VersionService.IsNewer(m.Version, AppInfo.LauncherVersion);
-            shell.LauncherUpdateText = shell.LauncherUpdateAvailable ? $"↑ Launcher v{m.Version} available" : "";
+            shell.LauncherUpdateVersion = shell.LauncherUpdateAvailable ? m.Version : null;
         }
         catch (Exception) { /* offline — no banner */ }
     }
@@ -137,8 +140,8 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     private async Task CheckUpdatesAsync()
     {
         await CheckUpdatesAsync(_shell, _svc);
-        try { _remote = await _svc.Updates.FetchAsync(ChannelManifests.LauncherManifest(_shell.Config.Launcher.Channel)); AvailableLabel = $"v{_remote.Version} · {_remote.Date}"; }
-        catch (Exception ex) { AvailableLabel = $"offline — {ex.Message}"; }
+        try { _remote = await _svc.Updates.FetchAsync(ChannelManifests.LauncherManifest(_shell.Config.Launcher.Channel)); _availableKey = null; AvailableLabel = $"v{_remote.Version} · {_remote.Date}"; }
+        catch (Exception ex) { _availableKey = null; AvailableLabel = Loc.TFormat("ws.offline", ex.Message); }
     }
 
     [RelayCommand]
@@ -148,27 +151,27 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         try
         {
             var sha = _remote.ShaFor(_svc.Platform.IsWindows);
-            if (string.IsNullOrEmpty(sha)) { Status = "update unavailable (no checksum)"; return; }
+            if (string.IsNullOrEmpty(sha)) { Status = Loc.T("settings.update.noChecksum"); return; }
             using var buffered = new MemoryStream();
             long lastTick = -1;
             var progress = new Progress<DownloadProgress>(p =>
             {
                 if (p.Fraction is { } f) DownloadPercent = f * 100;
                 long tick = p.Fraction is { } g ? (long)(g * 100) : p.BytesRead >> 20;
-                if (tick != lastTick) { lastTick = tick; Status = DownloadStatus.Line("downloading launcher…", p); }
+                if (tick != lastTick) { lastTick = tick; Status = DownloadStatus.Line(Loc.T("settings.update.downloading"), p); }
             });
             IsDownloading = true;
             try { await _svc.Http.DownloadToAsync(new Uri(_remote.DownloadUrlFor(_svc.Platform.IsWindows)), buffered, progress); }
             finally { IsDownloading = false; }
-            Status = "verifying update…";   // replace the frozen-looking "downloading 100%" the moment the download returns
+            Status = Loc.T("settings.update.verifying");   // replace the frozen-looking "downloading 100%" the moment the download returns
             buffered.Position = 0;
             var staging = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "stellar-launcher-update");
             await _svc.SelfUpdater.StageAsync(buffered, sha, staging, new Progress<string>(s => Status = s));
             var exePath = Environment.ProcessPath ?? throw new InvalidOperationException("cannot resolve launcher path");
-            Status = "applying update — restarting…";
+            Status = Loc.T("settings.update.applying");
             _svc.SelfUpdater.ApplyAndRestart(staging, System.IO.Path.GetDirectoryName(exePath)!, System.IO.Path.GetFileName(exePath), _svc.Platform.IsWindows);
         }
-        catch (Exception ex) { Status = $"update failed: {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("settings.update.failed", ex.Message); }
     }
 
     // ---- data ----
@@ -177,9 +180,9 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
         try
         {
             _svc.Fs.File.WriteAllText(path, JsonSerializer.Serialize(_shell.Config.Clients, ConfigStore.Json));
-            Status = $"exported {_shell.Config.Clients.Count} client(s) to {path}";
+            Status = Loc.TFormat("settings.export.done", _shell.Config.Clients.Count, path);
         }
-        catch (Exception ex) { Status = $"export failed: {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("settings.export.failed", ex.Message); }
     }
 
     /// <summary>Import a clients list: folders re-validated, names uniqued, ids and accents reassigned.</summary>
@@ -187,8 +190,8 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     {
         List<ClientProfile>? imported;
         try { imported = JsonSerializer.Deserialize<List<ClientProfile>>(_svc.Fs.File.ReadAllText(path), ConfigStore.Json); }
-        catch (Exception ex) { Status = $"import failed: {ex.Message}"; return; }
-        if (imported is null) { Status = "import failed: not a clients file"; return; }
+        catch (Exception ex) { Status = Loc.TFormat("settings.import.failed", ex.Message); return; }
+        if (imported is null) { Status = Loc.TFormat("settings.import.failed", Loc.T("settings.import.notClients")); return; }
         var cfg = _shell.Config; var added = 0; var skipped = 0;
         foreach (var c in imported)
         {
@@ -201,7 +204,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
             c.Name = name; cfg.Clients.Add(c); added++;
         }
         _shell.SaveConfig(); _shell.Reload();
-        Status = $"imported {added}, skipped {skipped} (missing folder or already a client)";
+        Status = Loc.TFormat("settings.import.done", added, skipped);
         OnPropertyChanged(nameof(FormatLine));
     }
 }

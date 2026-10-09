@@ -25,7 +25,7 @@ public partial class MediaItemViewModel : ObservableObject
     public bool IsImage { get; }
     public string? Caption => Media.Caption;
     public bool HasCaption => !string.IsNullOrWhiteSpace(Media.Caption);
-    public string PlaceholderLabel => IsImage ? "image" : "▶  video";
+    public string PlaceholderLabel => IsImage ? StellarLauncher.App.Localization.Loc.T("media.image") : StellarLauncher.App.Localization.Loc.T("media.video");
 
     [ObservableProperty] private Bitmap? _thumbnail;
     public bool ShowPlaceholder => Thumbnail is null;

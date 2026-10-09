@@ -1,5 +1,6 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Launch;
@@ -28,13 +29,13 @@ public sealed partial class RailClientItem : ObservableObject
 
     public string StateLabel => Session.State switch
     {
-        SessionState.Launching => "launching",
-        SessionState.Preparing => "preparing",
-        SessionState.Running => "running",
-        SessionState.SteamHandoff => "via Steam",
-        SessionState.Failed => Session.ExitCode is { } c ? $"exited ({c})" : "failed",
-        SessionState.Exited => "exited",
-        _ => "idle",
+        SessionState.Launching => Loc.T("state.launching"),
+        SessionState.Preparing => Loc.T("state.preparing"),
+        SessionState.Running => Loc.T("state.running"),
+        SessionState.SteamHandoff => Loc.T("state.viaSteam"),
+        SessionState.Failed => Session.ExitCode is { } c ? Loc.TFormat("state.exitedCode", c) : Loc.T("state.failed"),
+        SessionState.Exited => Loc.T("state.exited"),
+        _ => Loc.T("state.idle"),
     };
 
     public IBrush DotBrush => Session.State switch
@@ -45,7 +46,10 @@ public sealed partial class RailClientItem : ObservableObject
         _ => new SolidColorBrush(Color.Parse("#2a3050")),
     };
 
-    public string Summary => $"{Client.Channel} · fw {_framework ?? "none"} · {StateLabel}";
+    public string Summary => Loc.TFormat("rail.summary", ChannelLabel(Client.Channel), _framework ?? Loc.T("rail.fwNone"), StateLabel);
+
+    /// <summary>"Stable" / "Testing" in the active language (the stored channel value stays the identifier).</summary>
+    public static string ChannelLabel(string? channel) => channel == "testing" ? Loc.T("channel.testing") : Loc.T("channel.stable");
     public string? SummaryFramework => _framework;
 
     public void SetFramework(string? version) { _framework = version; OnPropertyChanged(nameof(Summary)); }

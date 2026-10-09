@@ -1,14 +1,14 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:StellarLauncher.App.ViewModels.Dashboard"
+             xmlns:vm="using:StellarLauncher.App.ViewModels.Dashboard" xmlns:loc="using:StellarLauncher.App.Localization"
              x:Class="StellarLauncher.App.Views.Dashboard.DashboardView" x:DataType="vm:DashboardViewModel">
   <DockPanel Margin="24,18,24,0">
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
       <StackPanel>
-        <TextBlock Text="Dashboard" Foreground="White" FontSize="22" FontWeight="ExtraBold"/>
+        <TextBlock Text="{loc:T shell.dashboard}" Foreground="White" FontSize="22" FontWeight="ExtraBold"/>
         <TextBlock Text="{Binding SummaryLine}" Classes="sub" Margin="0,4,0,0"/>
         <TextBlock Text="{Binding Status}" Foreground="#ffcf6b" FontSize="11.5" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
       </StackPanel>
-      <Button Grid.Column="1" Classes="ghost" Content="＋ Add client" Command="{Binding AddClientCommand}" VerticalAlignment="Top"/>
+      <Button Grid.Column="1" Classes="ghost" Content="{loc:T common.addClient}" Command="{Binding AddClientCommand}" VerticalAlignment="Top"/>
     </Grid>
     <ScrollViewer>
       <StackPanel Spacing="12">
@@ -27,23 +27,23 @@
                     <Border Classes="tag" Margin="0,2,6,0" IsVisible="{Binding HasEdition}"><TextBlock Text="{Binding EditionTag}"/></Border>
                     <Border Classes="tag" Margin="0,2,6,0"><TextBlock Text="{Binding ModeTag}"/></Border>
                     <Border Classes="tag" Margin="0,2,6,0"><TextBlock Text="{Binding RunnerTag}"/></Border>
-                    <Border Classes="tag tag-mint" Margin="0,2,0,0" IsVisible="{Binding IsRunningVisible}"><TextBlock Text="● RUNNING"/></Border>
-                    <Border Classes="tag tag-blue" Margin="0,2,0,0" IsVisible="{Binding IsPrepVisible}"><TextBlock Text="● PREPARING"/></Border>
+                    <Border Classes="tag tag-mint" Margin="0,2,0,0" IsVisible="{Binding IsRunningVisible}"><TextBlock Text="{loc:T tag.running}"/></Border>
+                    <Border Classes="tag tag-blue" Margin="0,2,0,0" IsVisible="{Binding IsPrepVisible}"><TextBlock Text="{loc:T tag.preparing}"/></Border>
                   </WrapPanel>
                   <StackPanel Grid.Row="0" Grid.Column="1" Spacing="6" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button Classes="primary sm" Command="{Binding LaunchCommand}" IsVisible="{Binding IsLaunchVisible}">
                       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Path Data="M0,0 L8,4.5 L0,9 Z" Fill="White" Stretch="None" VerticalAlignment="Center"/>
-                        <TextBlock Text="LAUNCH" VerticalAlignment="Center"/>
+                        <TextBlock Text="{loc:T common.launch}" VerticalAlignment="Center"/>
                       </StackPanel>
                     </Button>
                     <Button Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" HorizontalAlignment="Right">
                       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Rectangle Width="9" Height="9" Fill="White" VerticalAlignment="Center"/>
-                        <TextBlock Text="STOP" VerticalAlignment="Center"/>
+                        <TextBlock Text="{loc:T common.stop}" VerticalAlignment="Center"/>
                       </StackPanel>
                     </Button>
-                    <Button Classes="link" Content="Install framework" Command="{Binding OpenCommand}" IsVisible="{Binding ShowInstallFramework}" HorizontalAlignment="Right"/>
+                    <Button Classes="link" Content="{loc:T dash.installFramework}" Command="{Binding OpenCommand}" IsVisible="{Binding ShowInstallFramework}" HorizontalAlignment="Right"/>
                   </StackPanel>
                   <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Spacing="4" Margin="0,6,0,0">
                     <TextBlock Text="{Binding Path}" Classes="sub mono" TextTrimming="CharacterEllipsis"/>
@@ -57,7 +57,7 @@
                       <TextBlock Text="{Binding StateLine}" Foreground="{Binding StateBrush}" FontSize="11.5" TextWrapping="Wrap"/>
                       <!-- R-2: "until it's dismissed" — a small link next to the sticky dependency notice, same
                            Classes="link" style already used elsewhere on this tile (no new widget). -->
-                      <Button Classes="link" Content="dismiss" FontSize="10.5" Padding="0" Command="{Binding DismissDependencyNoticeCommand}"
+                      <Button Classes="link" Content="{loc:T dash.dismiss}" FontSize="10.5" Padding="0" Command="{Binding DismissDependencyNoticeCommand}"
                               IsVisible="{Binding HasDependencyNotice}"/>
                     </StackPanel>
                     <ProgressBar IsVisible="{Binding ShowProgress}" Value="{Binding Progress}" IsIndeterminate="{Binding ProgressIndeterminate}"
@@ -72,8 +72,8 @@
         <Border Classes="card" IsVisible="{Binding ShowMatrix}">
           <StackPanel Spacing="6">
             <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Classes="h4" Text="PLUGINS ACROSS CLIENTS"/>
-              <Button Grid.Column="1" Classes="link" Content="show all / present only" Command="{Binding ToggleAllRowsCommand}"/>
+              <TextBlock Classes="h4" Text="{loc:T dash.matrix.title}"/>
+              <Button Grid.Column="1" Classes="link" Content="{loc:T dash.matrix.toggle}" Command="{Binding ToggleAllRowsCommand}"/>
             </Grid>
             <ItemsControl ItemsSource="{Binding Columns}" Margin="170,0,0,4">
               <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>

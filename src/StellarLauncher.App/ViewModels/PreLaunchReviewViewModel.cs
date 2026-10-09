@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Model;
 using StellarLauncher.Core.Services;
 
@@ -37,7 +38,7 @@ public partial class PreLaunchReviewViewModel : ObservableObject
     [ObservableProperty] private string _frameworkLabel = "";
     [ObservableProperty] private bool _frameworkBlockedByLauncher;
     [ObservableProperty] private bool _isApplying;
-    [ObservableProperty] private string _title = "Before launching";
+    [ObservableProperty] private string _title = Loc.T("review.windowTitle");
     [ObservableProperty] private string _statusLine = "";
 
     // The launch button is enabled only when every blocking plugin is resolved (updated or disabled).
@@ -61,7 +62,7 @@ public partial class PreLaunchReviewViewModel : ObservableObject
         // framework state; OnApplyFrameworkChanged re-runs Rebuild() for every later user toggle.
         var initialPlan = PreLaunchPlanner.Build(_installedFramework, _frameworkTarget, _launcherVersion, _installed, autoUpdate);
         _applyFramework = autoUpdate && initialPlan.FrameworkAction == FrameworkPlanAction.UpdateAvailable;
-        Title = autoUpdate ? "Updates are ready before you launch" : "Choose what to update";
+        Title = autoUpdate ? Loc.T("review.title.auto") : Loc.T("review.title.choose");
         Rebuild();
     }
 
@@ -75,7 +76,7 @@ public partial class PreLaunchReviewViewModel : ObservableObject
 
         HasFrameworkRow = plan.FrameworkAction != FrameworkPlanAction.None;
         FrameworkBlockedByLauncher = plan.FrameworkAction == FrameworkPlanAction.UpdateBlockedByLauncher;
-        FrameworkLabel = plan.FrameworkTarget is { } t ? $"Mod framework  v{InstalledOr("?")} → v{t}" : "";
+        FrameworkLabel = plan.FrameworkTarget is { } t ? Loc.TFormat("review.framework", InstalledOr("?"), t) : "";
 
         Rows.Clear();
         foreach (var item in plan.Items.Where(i => i.Status != PluginPlanStatus.UpToDate))
@@ -122,7 +123,7 @@ public partial class PreLaunchReviewViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusLine = $"launch failed: {ex.Message}";
+            StatusLine = Loc.TFormat("review.launchFailed", ex.Message);
         }
     }
 
@@ -135,9 +136,9 @@ public partial class PreLaunchReviewViewModel : ObservableObject
         {
             if (ApplyFramework && _frameworkTarget is not null)
             {
-                StatusLine = $"Updating framework to v{_frameworkTarget.Version}…";
+                StatusLine = Loc.TFormat("review.updatingFramework", _frameworkTarget.Version);
                 using var buf = new MemoryStream();
-                await _http.DownloadToAsync(new Uri(_frameworkTarget.BundleUrl), buf, ProgressFor(p => StatusLine = DownloadStatus.Line("framework…", p)));
+                await _http.DownloadToAsync(new Uri(_frameworkTarget.BundleUrl), buf, ProgressFor(p => StatusLine = DownloadStatus.Line(Loc.T("review.frameworkDownload"), p)));
                 buf.Position = 0;
                 await _installer.InstallAsync(buf, _frameworkTarget.Sha256, _gameMini, _frameworkTarget.Version);
             }
@@ -146,14 +147,14 @@ public partial class PreLaunchReviewViewModel : ObservableObject
             for (int i = 0; i < selected.Count; i++)
             {
                 var row = selected[i];
-                row.StatusText = $"Updating… ({i + 1} of {selected.Count})";
+                row.StatusText = Loc.TFormat("review.updatingRow", i + 1, selected.Count);
                 using var buf = new MemoryStream();
                 var v = row.Target!;
                 await _http.DownloadToAsync(new Uri(v.DllUrl), buf, ProgressFor(p => row.Percent = (p.Fraction ?? 0) * 100));
                 buf.Position = 0;
                 var dll = v.Dll ?? Path.GetFileName(new Uri(v.DllUrl).LocalPath);
                 await _plugins.InstallAsync(buf, v.Sha256, _gameMini, row.Entry.Id, dll, v.Version);
-                row.Percent = 100; row.StatusText = "Done";
+                row.Percent = 100; row.StatusText = Loc.T("review.done");
             }
 
             await ApplyDisablesAsync();
@@ -161,7 +162,7 @@ public partial class PreLaunchReviewViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusLine = $"update failed: {ex.Message}";
+            StatusLine = Loc.TFormat("settings.update.failed", ex.Message);
             IsApplying = false; OnPropertyChanged(nameof(CanLaunch));
         }
     }

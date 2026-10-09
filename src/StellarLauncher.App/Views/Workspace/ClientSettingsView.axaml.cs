@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.ViewModels.Workspace;
 
 namespace StellarLauncher.App.Views.Workspace;
@@ -17,31 +18,31 @@ public partial class ClientSettingsView : UserControl
     // Every handler is async void ⇒ each body is guarded (an unobserved exception here would crash the app).
     private async void BrowseGame(object? sender, RoutedEventArgs e)
     {
-        try { var folder = await PickFolderAsync("Select the game_mini folder (or the StarLauncher\\game folder)"); if (folder is not null) Vm?.SetGameFromPicked(folder); }
+        try { var folder = await PickFolderAsync(Loc.T("cs.pick.gameMini")); if (folder is not null) Vm?.SetGameFromPicked(folder); }
         catch (Exception) { /* picker unavailable — the text box still accepts a typed path */ }
     }
 
     private async void BrowsePrefix(object? sender, RoutedEventArgs e)
     {
-        try { var folder = await PickFolderAsync("Select the WINEPREFIX folder"); if (folder is not null && Vm is not null) Vm.WinePrefix = folder; }
+        try { var folder = await PickFolderAsync(Loc.T("cs.pick.prefix")); if (folder is not null && Vm is not null) Vm.WinePrefix = folder; }
         catch (Exception) { }
     }
 
     private async void BrowseRunner(object? sender, RoutedEventArgs e)
     {
-        try { var path = await PickFileAsync("Select the Proton / Wine executable"); if (path is not null && Vm is not null) Vm.Runner = path; }
+        try { var path = await PickFileAsync(Loc.T("cs.pick.runner")); if (path is not null && Vm is not null) Vm.Runner = path; }
         catch (Exception) { }
     }
 
     private async void BrowsePre(object? sender, RoutedEventArgs e)
     {
-        try { var path = await PickFileAsync("Select the pre-launch script"); if (path is not null && Vm is not null) Vm.PreLaunch = path; }
+        try { var path = await PickFileAsync(Loc.T("cs.pick.preLaunch")); if (path is not null && Vm is not null) Vm.PreLaunch = path; }
         catch (Exception) { }
     }
 
     private async void BrowsePost(object? sender, RoutedEventArgs e)
     {
-        try { var path = await PickFileAsync("Select the post-exit script"); if (path is not null && Vm is not null) Vm.PostExit = path; }
+        try { var path = await PickFileAsync(Loc.T("cs.pick.postExit")); if (path is not null && Vm is not null) Vm.PostExit = path; }
         catch (Exception) { }
     }
 

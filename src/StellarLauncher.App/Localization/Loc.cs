@@ -12,26 +12,25 @@ namespace StellarLauncher.App.Localization;
 /// </summary>
 public static class Loc
 {
-    private static ILauncherLocalization _service = DefaultService();
     private static readonly WeakLanguageHub Hub = new();
 
-    /// <summary>The active localization service.</summary>
-    public static ILauncherLocalization Service => _service;
+    /// <summary>The active localization service (shared with Core's <see cref="L"/>).</summary>
+    public static ILauncherLocalization Service => L.Current;
 
     /// <summary>Install the app's service (composition root only). <paramref name="toUiThread"/> marshals the live-change
     /// fan-out onto the UI thread (bound labels must only be touched there); omitted = run inline on the raising thread.</summary>
     public static void Initialize(ILauncherLocalization service, Action<Action>? toUiThread = null)
     {
-        _service.LanguageChanged -= OnServiceLanguageChanged;
-        _service = service;
+        L.Current.LanguageChanged -= OnServiceLanguageChanged;
+        L.Current = service;
         _toUiThread = toUiThread;
-        _service.LanguageChanged += OnServiceLanguageChanged;
+        service.LanguageChanged += OnServiceLanguageChanged;
     }
 
     /// <summary>Tests only: back to the fixed-English default with no subscribers and inline raising.</summary>
     internal static void ResetForTests()
     {
-        Initialize(DefaultService());
+        Initialize(L.English());
         Hub.Clear();
     }
 
@@ -39,10 +38,13 @@ public static class Loc
     internal static int SubscriberCount => Hub.Count;
 
     /// <summary>Resolve a key through the active service.</summary>
-    public static string T(string key) => _service.T(key);
+    public static string T(string key) => L.T(key);
 
     /// <summary>Resolve and format a key through the active service.</summary>
-    public static string TFormat(string key, params object?[] args) => _service.TFormat(key, args);
+    public static string TFormat(string key, params object?[] args) => L.TFormat(key, args);
+
+    /// <summary>Count-dependent text (<c>keyBase.one</c> / <c>keyBase.other</c>, count = {0}); see <see cref="L.Plural"/>.</summary>
+    public static string Plural(string keyBase, long count, params object?[] args) => L.Plural(keyBase, count, args);
 
     /// <summary>Call <paramref name="onChanged"/>(owner) on every language change for as long as <paramref name="owner"/>
     /// is alive. The owner is held WEAKLY, so a label or page view-model rebuilt on every navigation is never kept alive by
@@ -63,8 +65,6 @@ public static class Loc
         if (_toUiThread is { } post) post(Hub.Raise);
         else Hub.Raise();
     }
-
-    private static ILauncherLocalization DefaultService() => new LauncherLocalization(LauncherLanguages.English, () => LauncherLanguages.English);
 
     // Weak subscriber list: the service lives for the whole app, bound labels and page VMs do not.
     private sealed class WeakLanguageHub

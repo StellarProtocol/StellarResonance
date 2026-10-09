@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using StellarLauncher.Core.Services;
+using StellarLauncher.Core.Localization;
 
 namespace StellarLauncher.Core.Launch;
 
@@ -41,7 +42,7 @@ public sealed class InteropMonitor
                 if (snap.NewestWriteUtc is { } w && _env.Now - w >= Settle)
                 {
                     events.Report(new ProgressEvent(1.0));
-                    events.Report(new StatusEvent("interop ready — game window opening…"));
+                    events.Report(new StatusEvent(L.T("launch.interopReady")));
                     return snap.Count;
                 }
             }
@@ -53,12 +54,12 @@ public sealed class InteropMonitor
     private static void ReportPhase1(IProgress<LaunchEvent> events, TimeSpan waited)
     {
         events.Report(new ProgressEvent(null));
-        events.Report(new StatusEvent($"First launch/update — preparing game interop (can take a few minutes)…  ({waited:m\\:ss})"));
+        events.Report(new StatusEvent(L.TFormat("launch.interopPreparing", waited.ToString(@"m\:ss"))));
     }
 
     private static void ReportPhase2(IProgress<LaunchEvent> events, int count, int target, TimeSpan elapsed)
     {
         events.Report(new ProgressEvent(Math.Min(0.99, count / (double)target)));
-        events.Report(new StatusEvent($"First launch/update — generating game interop: {count}/~{target}  ({elapsed:m\\:ss})"));
+        events.Report(new StatusEvent(L.TFormat("launch.interopGenerating", count, target, elapsed.ToString(@"m\:ss"))));
     }
 }

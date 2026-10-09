@@ -9,6 +9,7 @@
         xmlns:addv="using:StellarLauncher.App.Views.AddClient"
         xmlns:vm="using:StellarLauncher.App.ViewModels"
         xmlns:views="using:StellarLauncher.App.Views"
+        xmlns:loc="using:StellarLauncher.App.Localization"
         x:Class="StellarLauncher.App.Views.MainWindow"
         x:DataType="shell:ShellViewModel"
         Width="1000" Height="700" MinWidth="900" MinHeight="600" Title="Stellar Launcher"
@@ -38,12 +39,12 @@
               <Border Classes="railItem">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Path Width="14" Height="14" Fill="#cfd3ea" Stretch="Uniform" Data="M3,13H11V3H3M3,21H11V15H3M13,21H21V11H13M13,3V9H21V3"/>
-                  <TextBlock Text="Dashboard" Foreground="#e6e9f5" FontWeight="SemiBold" FontSize="12.5"/>
+                  <TextBlock Text="{loc:T shell.dashboard}" Foreground="#e6e9f5" FontWeight="SemiBold" FontSize="12.5"/>
                 </StackPanel>
               </Border>
             </Button>
 
-            <TextBlock Text="CLIENTS" Foreground="#6f6a9a" FontSize="10" FontWeight="Bold" Margin="8,12,8,6"/>
+            <TextBlock Text="{loc:T shell.clients}" Foreground="#6f6a9a" FontSize="10" FontWeight="Bold" Margin="8,12,8,6"/>
             <ItemsControl ItemsSource="{Binding Clients}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="shell:RailClientItem">
@@ -56,7 +57,7 @@
                           <TextBlock Text="{Binding Summary}" Foreground="#697297" FontSize="10.5" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
                         <Button Grid.Column="2" Classes="quickLaunch" IsVisible="{Binding ShowQuickLaunch}"
-                                ToolTip.Tip="Launch this client"
+                                ToolTip.Tip="{loc:T shell.quickLaunch.tip}"
                                 Command="{Binding $parent[Window].((shell:ShellViewModel)DataContext).QuickLaunchCommand}" CommandParameter="{Binding}">
                           <!-- vector triangle centres deterministically; its mass tapers right, so +2px x lands the
                                optical centre (a bare ▶ glyph sits low-left) -->
@@ -73,7 +74,7 @@
             <Button Classes="railBtn" Command="{Binding ShowAddClientCommand}">
               <Border Classes="railItem">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Text="＋ Add client" Foreground="#b7a8ff" FontWeight="SemiBold" FontSize="12.5"/>
+                  <TextBlock Text="{loc:T common.addClient}" Foreground="#b7a8ff" FontWeight="SemiBold" FontSize="12.5"/>
                   <Border Background="#427c5cff" CornerRadius="10" Padding="6,0" IsVisible="{Binding HasCandidates}">
                     <TextBlock Text="{Binding CandidateCount}" Foreground="#e9e3ff" FontSize="10" FontWeight="Bold"/>
                   </Border>
@@ -87,7 +88,7 @@
               <Border Classes="railItem">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Path Width="14" Height="14" Fill="#9aa3bf" Stretch="Uniform" Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97L21.54,9.37L19.66,5.27L16.56,6.05L14.5,2.42H9.5L7.44,6.05L4.34,5.27L2.46,9.37L4.57,11V12.97L2.46,14.63L4.34,18.73L7.44,17.94L9.5,21.58H14.5L16.56,17.94L19.66,18.73L21.54,14.63L19.43,12.97Z"/>
-                  <TextBlock Text="Launcher settings" Foreground="#cfd3ea" FontSize="12.5"/>
+                  <TextBlock Text="{loc:T shell.launcherSettings}" Foreground="#cfd3ea" FontSize="12.5"/>
                 </StackPanel>
               </Border>
             </Button>

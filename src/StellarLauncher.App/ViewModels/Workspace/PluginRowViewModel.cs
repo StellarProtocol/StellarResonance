@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Matrix;
 
 namespace StellarLauncher.App.ViewModels.Workspace;
@@ -39,6 +40,7 @@ public sealed partial class PluginRowViewModel : ObservableObject
             StartPoint = new Avalonia.RelativePoint(0, 0, Avalonia.RelativeUnit.Relative), EndPoint = new Avalonia.RelativePoint(1, 1, Avalonia.RelativeUnit.Relative),
             GradientStops = { new GradientStop(Color.Parse(g[0]), 0), new GradientStop(Color.Parse(g[1]), 1) },
         };
+        Loc.Subscribe(this, vm => vm.OnPropertyChanged(nameof(VersionLine)));
     }
 
     public string Name => Item.Entry.Name;
@@ -55,11 +57,11 @@ public sealed partial class PluginRowViewModel : ObservableObject
     {
         MatrixCellKind.UpdateAvailable => $"{Cell.InstalledVersion} ↑ {Cell.TargetVersion}",
         MatrixCellKind.Installed => $"{Cell.InstalledVersion ?? "?"} ✓",
-        MatrixCellKind.Incompatible => $"{Cell.InstalledVersion} ✗ needs another framework",
-        MatrixCellKind.Disabled => $"{Cell.InstalledVersion ?? "?"} · disabled",
-        MatrixCellKind.NotInstalled => $"{Cell.TargetVersion} · not installed",
-        MatrixCellKind.NoCompatibleVersion => "no version for this framework",
-        MatrixCellKind.NeedsFramework => "needs framework",
+        MatrixCellKind.Incompatible => Loc.TFormat("row.incompatible", Cell.InstalledVersion),
+        MatrixCellKind.Disabled => Loc.TFormat("matrix.disabled", Cell.InstalledVersion ?? "?"),
+        MatrixCellKind.NotInstalled => Loc.TFormat("row.notInstalled", Cell.TargetVersion),
+        MatrixCellKind.NoCompatibleVersion => Loc.T("row.noVersion"),
+        MatrixCellKind.NeedsFramework => Loc.T("matrix.needsFramework"),
         _ => "—",
     };
 

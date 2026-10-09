@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Dependencies;
 
@@ -34,7 +35,7 @@ public sealed partial class ClientPluginsViewModel
             {
                 if (await TryDependencyWorkAsync(svc => svc.SetKeptAsync(_ws.Client.GameMiniDir, item.Entry.Id, true)) is { } keepFailure)
                 {
-                    Status = $"{item.Name}: its dependencies could not be kept — nothing was removed ({keepFailure})";
+                    Status = Loc.TFormat("remove.keepFailed", item.Name, keepFailure);
                     return;
                 }
                 depFailure = null;
@@ -58,11 +59,11 @@ public sealed partial class ClientPluginsViewModel
                 _ws.SaveProfile();
             }
             item.MarkRemoved();
-            Status = choice == RemoveChoice.PluginOnly ? $"{item.Name}: removed — its dependencies were kept"
-                : depFailure is null ? $"{item.Name}: removed"
-                : $"{item.Name}: removed (dependency cleanup failed — {depFailure})";
+            Status = choice == RemoveChoice.PluginOnly ? Loc.TFormat("remove.keptDeps", item.Name)
+                : depFailure is null ? Loc.TFormat("remove.done", item.Name)
+                : Loc.TFormat("remove.cleanupFailed", item.Name, depFailure);
         }
-        catch (Exception ex) { Status = $"{item.Name} failed: {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("plugins.failed", item.Name, ex.Message); }
         await _ws.RefreshAsync();
     }
 
@@ -108,10 +109,10 @@ public sealed partial class ClientPluginsViewModel
 
     public async Task RemoveKeptDependenciesAsync(PluginItemViewModel item)
     {
-        if (_ws.Session.IsBusy) { Status = $"{item.Name}: close the game to change its dependencies"; return; }   // files in use
+        if (_ws.Session.IsBusy) { Status = Loc.TFormat("deps.closeGame", item.Name); return; }   // files in use
         Status = await TryDependencyWorkAsync(svc => svc.RemoveAllAsync(_ws.Client.GameMiniDir, item.Entry.Id)) is { } failure
-            ? $"{item.Name}: kept dependencies could not be removed — {failure}"
-            : $"{item.Name}: kept dependencies removed";
+            ? Loc.TFormat("remove.keptRemoveFailed", item.Name, failure)
+            : Loc.TFormat("remove.keptRemoved", item.Name);
         await item.RefreshDependenciesAsync();
     }
 }

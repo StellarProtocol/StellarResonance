@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Model;
 using StellarLauncher.Core.Services;
@@ -20,7 +21,8 @@ public sealed partial class OverviewViewModel : ObservableObject
 
     public ObservableCollection<VersionManifest> Versions { get; } = new();
     [ObservableProperty] private VersionManifest? _selectedVersion;
-    [ObservableProperty] private string _actionLabel = "Install";
+    [ObservableProperty] private string _actionLabel = "";
+    private (string Key, string? Version) _action = ("ov.action.install", null);   // label source; re-rendered on a language switch
     [ObservableProperty] private bool _canChangeFramework;
     [ObservableProperty] private bool _isInstall, _isUpdate, _isReinstall, _isDowngrade, _confirmVisible;
     [ObservableProperty] private bool _modded, _autoUpdate, _debugLogging;
@@ -30,24 +32,29 @@ public sealed partial class OverviewViewModel : ObservableObject
     public OverviewViewModel(ClientWorkspaceViewModel ws)
     {
         _ws = ws;
+        RenderActionLabel();
         _ws.Refreshed += Load;
         Load();
+        Loc.Subscribe(this, vm => { vm.RenderActionLabel(); vm.RaiseLabels(); });
     }
 
-    public string InstalledLabel => _ws.Inventory.FrameworkVersion is { } v ? $"v{v}" : "not installed";
-    public string ChannelLabel => _ws.IsTesting ? "testing (stable releases included)" : "stable";
-    public string LatestLabel => _ws.Manifest is { } m ? $"v{m.Latest} · {m.Versions.FirstOrDefault(v => v.Version == m.Latest)?.Date}" : "offline";
-    public string LastLaunchLabel => _ws.Session.StartedAt is { } t ? t.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "never this session";
-    public string PreviousExitLabel => _ws.Session.ExitCode switch { null => "—", 0 => "clean", var c => $"code {c}" };
-    public string InteropLabel => _ws.Client.LastInteropCount > 0 ? $"{_ws.Client.LastInteropCount} assemblies" : "not generated yet";
+    private void SetAction(string key, string? version = null) { _action = (key, version); RenderActionLabel(); }
+    private void RenderActionLabel() => ActionLabel = _action.Version is { } v ? Loc.TFormat(_action.Key, v) : Loc.T(_action.Key);
+
+    public string InstalledLabel => _ws.Inventory.FrameworkVersion is { } v ? $"v{v}" : Loc.T("ov.notInstalled");
+    public string ChannelLabel => _ws.IsTesting ? Loc.T("ov.channel.testing") : Loc.T("channel.stable");
+    public string LatestLabel => _ws.Manifest is { } m ? $"v{m.Latest} · {m.Versions.FirstOrDefault(v => v.Version == m.Latest)?.Date}" : Loc.T("common.offline");
+    public string LastLaunchLabel => _ws.Session.StartedAt is { } t ? t.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : Loc.T("ov.neverThisSession");
+    public string PreviousExitLabel => _ws.Session.ExitCode switch { null => "—", 0 => Loc.T("ov.exit.clean"), var c => Loc.TFormat("ov.exit.code", c) };
+    public string InteropLabel => _ws.Client.LastInteropCount > 0 ? Loc.TFormat("ov.interop.count", _ws.Client.LastInteropCount) : Loc.T("ov.interop.none");
     public int InstalledCount => _ws.Inventory.InstalledCount;
-    public string UpdatesLine => _ws.UpdatesBadge > 0 ? $"{_ws.UpdatesBadge} available" : "none";
+    public string UpdatesLine => _ws.UpdatesBadge > 0 ? Loc.TFormat("ov.updates.available", _ws.UpdatesBadge) : Loc.T("common.none");
     public int DisabledCount => _ws.Inventory.DisabledCount;
-    public string MarkerLine => _ws.Inventory.FrameworkVersion is { } v ? $"{v} ✓" : "not installed";
-    public string DuplicateLine => _ws.Inventory.DuplicateSlots.Count == 0 ? "none"
+    public string MarkerLine => _ws.Inventory.FrameworkVersion is { } v ? $"{v} ✓" : Loc.T("ov.notInstalled");
+    public string DuplicateLine => _ws.Inventory.DuplicateSlots.Count == 0 ? Loc.T("common.none")
         : "⚠ " + string.Join("; ", _ws.Inventory.DuplicateSlots.Select(d => string.Join(" + ", d.Dirs.Select(System.IO.Path.GetFileName))));
     public bool HasDuplicates => _ws.Inventory.DuplicateSlots.Count > 0;
-    public string LogSizeLine => _ws.Inventory.LogBytes > 0 ? $"{_ws.Inventory.LogBytes / 1024.0 / 1024.0:0.0} MB" : "no log yet";
+    public string LogSizeLine => _ws.Inventory.LogBytes > 0 ? $"{_ws.Inventory.LogBytes / 1024.0 / 1024.0:0.0} MB" : Loc.T("ov.noLog");
 
     private void Load()
     {
@@ -58,6 +65,11 @@ public sealed partial class OverviewViewModel : ObservableObject
         SelectedVersion = Versions.FirstOrDefault(v => v.Version == _ws.Manifest?.Latest) ?? Versions.FirstOrDefault();
         _loading = false;
         _ = LoadOnOthersAsync();
+        RaiseLabels();
+    }
+
+    private void RaiseLabels()
+    {
         foreach (var p in new[] { nameof(InstalledLabel), nameof(ChannelLabel), nameof(LatestLabel), nameof(LastLaunchLabel), nameof(PreviousExitLabel),
                      nameof(InteropLabel), nameof(InstalledCount), nameof(UpdatesLine), nameof(DisabledCount), nameof(MarkerLine), nameof(DuplicateLine),
                      nameof(HasDuplicates), nameof(LogSizeLine) })
@@ -77,9 +89,9 @@ public sealed partial class OverviewViewModel : ObservableObject
                 foreach (var p in _ws.Services.Core.Inventory.Read(other, reg).Plugins.Where(p => p.Present && !here.Contains(p.Entry.Id)))
                     names.Add(p.Entry.Name);
             }
-            OnOthersLine = names.Count == 0 ? "nothing" : string.Join(", ", names);
+            OnOthersLine = names.Count == 0 ? Loc.T("ov.onOthers.nothing") : string.Join(", ", names);
         }
-        catch (Exception) { OnOthersLine = "unavailable"; }   // fire-and-forget from Load(): never leave an unobserved fault
+        catch (Exception) { OnOthersLine = Loc.T("ov.onOthers.unavailable"); }   // fire-and-forget from Load(): never leave an unobserved fault
     }
 
     partial void OnSelectedVersionChanged(VersionManifest? value)
@@ -87,14 +99,14 @@ public sealed partial class OverviewViewModel : ObservableObject
         ConfirmVisible = false;
         var installed = _ws.Inventory.FrameworkVersion;
         (IsInstall, IsUpdate, IsReinstall, IsDowngrade) = (false, false, false, false);
-        if (value is null) { CanChangeFramework = false; ActionLabel = "Install"; return; }
+        if (value is null) { CanChangeFramework = false; SetAction("ov.action.install"); return; }
         CanChangeFramework = VersionService.LauncherSupported(value.MinLauncherVersion, AppInfo.LauncherVersion);
         // Too-old launcher: keep ONE (disabled) button visible so the label explains why nothing can be installed.
-        if (!CanChangeFramework) { ActionLabel = "Update launcher first"; IsReinstall = true; return; }
-        if (installed is null) { ActionLabel = $"Install v{value.Version}"; IsInstall = true; }
-        else if (VersionService.IsNewer(value.Version, installed)) { ActionLabel = $"Update to v{value.Version}"; IsUpdate = true; }
-        else if (VersionService.IsNewer(installed, value.Version)) { ActionLabel = $"Downgrade to v{value.Version}"; IsReinstall = true; IsDowngrade = true; }
-        else { ActionLabel = $"Reinstall v{value.Version}"; IsReinstall = true; }
+        if (!CanChangeFramework) { SetAction("ov.action.updateLauncherFirst"); IsReinstall = true; return; }
+        if (installed is null) { SetAction("ov.action.installV", value.Version); IsInstall = true; }
+        else if (VersionService.IsNewer(value.Version, installed)) { SetAction("ov.action.updateTo", value.Version); IsUpdate = true; }
+        else if (VersionService.IsNewer(installed, value.Version)) { SetAction("ov.action.downgradeTo", value.Version); IsReinstall = true; IsDowngrade = true; }
+        else { SetAction("ov.action.reinstall", value.Version); IsReinstall = true; }
     }
 
     [RelayCommand] private void RequestChange() { if (CanChangeFramework) ConfirmVisible = true; }
@@ -112,16 +124,16 @@ public sealed partial class OverviewViewModel : ObservableObject
             var progress = new Progress<DownloadProgress>(p =>
             {
                 long tick = p.Fraction is { } f ? (long)(f * 100) : p.BytesRead >> 20;
-                if (tick != lastTick) { lastTick = tick; Status = DownloadStatus.Line($"downloading v{target.Version}…", p); }
+                if (tick != lastTick) { lastTick = tick; Status = DownloadStatus.Line(Loc.TFormat("ov.downloading", target.Version), p); }
             });
             await _ws.Services.Core.Install.Http.DownloadToAsync(new Uri(target.BundleUrl), buffered, progress);
             buffered.Position = 0;
-            Status = $"installing v{target.Version}…";
+            Status = Loc.TFormat("ov.installing", target.Version);
             await _ws.Services.Core.Install.Installer.InstallAsync(buffered, target.Sha256, _ws.Client.GameMiniDir, target.Version);
-            Status = $"installed v{target.Version}";
+            Status = Loc.TFormat("ov.installedV", target.Version);
             await _ws.RefreshAsync();
         }
-        catch (Exception ex) { Status = $"install failed: {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("ov.installFailed", ex.Message); }
     }
 
     partial void OnModdedChanged(bool value)

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Model;
 
@@ -18,11 +19,11 @@ public partial class PluginItemViewModel
     public ObservableCollection<DependencyItemViewModel> Dependencies { get; } = new();
     public bool HasDependencies => Dependencies.Count > 0;
     public IEnumerable<string> DependencyNotices =>
-        Dependencies.Where(d => d.HasNotice).Select(d => $"Notice from {Name}: {d.Notice!.Trim()}").Distinct();
+        Dependencies.Where(d => d.HasNotice).Select(d => Loc.TFormat("deps.notice", Name, d.Notice!.Trim())).Distinct();
     public bool HasOptionalDependency => Dependencies.Any(d => d.IsOptional);
     public string DependencyFootnote => HasOptionalDependency
-        ? $"Untick an optional dependency to skip it; {Name} works without it. Removing {Name} asks whether to remove these too."
-        : $"Removing {Name} asks whether to remove these too.";
+        ? Loc.TFormat("deps.footnote.optional", Name)
+        : Loc.TFormat("deps.footnote", Name);
 
     /// <summary>v3 V3: this plugin's dependencies were kept when it was removed — still launcher-managed.</summary>
     [ObservableProperty] private bool _dependenciesKept;
@@ -42,8 +43,8 @@ public partial class PluginItemViewModel
 
     /// <summary>Mockup v3 "removed, dependency kept" wording; the Vanilla clause only when something kept is moddedOnly.</summary>
     public string KeptNote => Dependencies.Any(d => d.Dependency.ModdedOnly)
-        ? $"Kept after {Name} was removed. Still moved aside for Vanilla launches; reinstalling {Name} uses it again."
-        : $"Kept after {Name} was removed. Reinstalling {Name} uses it again.";
+        ? Loc.TFormat("deps.kept.vanilla", Name)
+        : Loc.TFormat("deps.kept", Name);
 
     [RelayCommand] private Task RemoveKeptDependencies() => _parent.RemoveKeptDependenciesAsync(this);
 
@@ -71,7 +72,7 @@ public partial class PluginItemViewModel
     /// <summary>Compact pill for the plugin list row — "Extras N/M". Deliberately count-based rather than
     /// naming a specific extra: robust to any dependency name length (never crowds the row) and to any
     /// count, where naming one declared dependency by name wouldn't scale or stay safe at narrow widths.</summary>
-    public string ExtrasPillText => $"Extras {OptionalExtrasUsed}/{OptionalExtrasTotal}";
+    public string ExtrasPillText => Loc.TFormat("deps.extrasPill", OptionalExtrasUsed, OptionalExtrasTotal);
     public bool ShowExtrasPill => Installed && HasOptionalExtras;
 
     /// <summary>Raised after <see cref="Core.Clients.ClientProfile.SkippedDependencies"/> changes
@@ -223,6 +224,6 @@ public partial class PluginItemViewModel
     /// <summary>Fix round M4: "with &lt;prerequisite names&gt;" (the mockup's chip), or null without <c>requires</c>.</summary>
     private static string? RequiresLabel(PluginDependency d, IReadOnlyList<PluginDependency> all) =>
         d.Requires is { Count: > 0 } req
-            ? "with " + string.Join(", ", req.Select(id => all.FirstOrDefault(x => x.Id == id)?.Name ?? id))
+            ? Loc.TFormat("deps.with", string.Join(", ", req.Select(id => all.FirstOrDefault(x => x.Id == id)?.Name ?? id)))
             : null;
 }

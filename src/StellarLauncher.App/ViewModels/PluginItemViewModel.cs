@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Model;
 using StellarLauncher.Core.Services;
 
@@ -24,7 +25,7 @@ public partial class PluginItemViewModel : ObservableObject
     [ObservableProperty] private PluginVersion? _selectedVersion;   // bound to the per-row ComboBox
     [ObservableProperty] private bool _compatible;
     [ObservableProperty] private string _compatNote = "";
-    [ObservableProperty] private string _installLabel = "Install";
+    [ObservableProperty] private string _installLabel = Loc.T("common.install");
     [ObservableProperty] private bool _confirmVisible;
     [ObservableProperty] private bool _isDowngrade;
     [ObservableProperty] private bool _isUpdate;
@@ -42,6 +43,17 @@ public partial class PluginItemViewModel : ObservableObject
         _installedVersion = installedVersion;
         foreach (var v in entry.Versions) Versions.Add(v);
         SelectedVersion = Versions.FirstOrDefault();   // newest first
+        // Labels/notes are rendered at selection time: re-render them in the new language, keeping an open confirm.
+        Loc.Subscribe(this, vm =>
+        {
+            var confirm = vm.ConfirmVisible;
+            vm.OnSelectedVersionChanged(vm.SelectedVersion);
+            vm.ConfirmVisible = confirm;
+            if (vm._guideStatusKey is { } k) vm.GuideStatus = Loc.T(k);
+            foreach (var p in new[] { nameof(InstalledBadge), nameof(DependencyNotices), nameof(DependencyFootnote), nameof(KeptNote) })
+                vm.OnPropertyChanged(p);
+            vm.NotifyExtrasChanged();
+        });
     }
 
     public string Name => Entry.Name;
@@ -94,6 +106,8 @@ public partial class PluginItemViewModel : ObservableObject
     }
     [ObservableProperty] private string? _guideMarkdown;
     [ObservableProperty] private string _guideStatus = "";
+    private string? _guideStatusKey;
+    private void SetGuideStatus(string? key) { _guideStatusKey = key; GuideStatus = key is null ? "" : Loc.T(key); }
     public bool HasGuideStatus => GuideStatus.Length > 0;
     partial void OnGuideStatusChanged(string value) => OnPropertyChanged(nameof(HasGuideStatus));
 
@@ -114,13 +128,13 @@ public partial class PluginItemViewModel : ObservableObject
         }
         if (Entry.GuideUrl is { } guideUrl)
         {
-            GuideStatus = "loading guide…";
+            SetGuideStatus("detail.guide.loading");
             try
             {
                 GuideMarkdown = await http.GetStringAsync(guideUrl);
-                GuideStatus = "";
+                SetGuideStatus(null);
             }
-            catch { GuideStatus = "guide unavailable (couldn't download it — check your connection)"; }
+            catch { SetGuideStatus("detail.guide.unavailable"); }
         }
     }
 
@@ -132,7 +146,7 @@ public partial class PluginItemViewModel : ObservableObject
         ? (v.Dll ?? System.IO.Path.GetFileName(new System.Uri(v.DllUrl).LocalPath))
         : null;
 
-    public string InstalledBadge => InstalledVersion is { } iv ? $"INSTALLED v{iv}" : "INSTALLED";
+    public string InstalledBadge => InstalledVersion is { } iv ? Loc.TFormat("detail.installedV", iv) : Loc.T("detail.installed");
 
     // True when the newest registry version is strictly newer than what's installed.
     public bool HasUpdate => Installed && InstalledVersion is { } iv
@@ -175,13 +189,13 @@ public partial class PluginItemViewModel : ObservableObject
         IsDowngrade = false;
         OnPropertyChanged(nameof(SelectedChangelog));
 
-        if (value is null) { Compatible = false; CompatNote = ""; InstallLabel = "Install"; IsUpdate = false; IsReinstall = false; IsPlainInstall = false; return; }
+        if (value is null) { Compatible = false; CompatNote = ""; InstallLabel = Loc.T("common.install"); IsUpdate = false; IsReinstall = false; IsPlainInstall = false; return; }
 
         if (IsDisabled) { IsPlainInstall = false; IsUpdate = false; IsReinstall = false; CompatNote = ""; return; }
 
         if (_framework is null)
         {
-            Compatible = false; CompatNote = "install the framework first"; InstallLabel = "Install"; IsUpdate = false; IsReinstall = false; IsPlainInstall = false;
+            Compatible = false; CompatNote = Loc.T("detail.compat.noFramework"); InstallLabel = Loc.T("common.install"); IsUpdate = false; IsReinstall = false; IsPlainInstall = false;
             return;
         }
 
@@ -189,23 +203,23 @@ public partial class PluginItemViewModel : ObservableObject
         if (!Compatible)
         {
             CompatNote = VersionService.IsNewer(value.MinModSystemVersion, _framework)
-                ? $"requires StellarResonance ≥ {value.MinModSystemVersion}"
-                : $"needs StellarResonance ≤ {value.MaxModSystemVersion}";
-            InstallLabel = "Incompatible"; IsUpdate = false; IsReinstall = false; IsPlainInstall = false;
+                ? Loc.TFormat("detail.compat.min", value.MinModSystemVersion)
+                : Loc.TFormat("detail.compat.max", value.MaxModSystemVersion);
+            InstallLabel = Loc.T("detail.incompatible"); IsUpdate = false; IsReinstall = false; IsPlainInstall = false;
             return;
         }
 
         CompatNote = "";
         if (!Installed)
-            { InstallLabel = $"Install v{value.Version}"; IsUpdate = false; IsReinstall = false; IsPlainInstall = true; }
+            { InstallLabel = Loc.TFormat("ov.action.installV", value.Version); IsUpdate = false; IsReinstall = false; IsPlainInstall = true; }
         else if (InstalledVersion is null)
-            { InstallLabel = $"Reinstall v{value.Version}"; IsUpdate = false; IsReinstall = true; IsPlainInstall = false; }   // present but unmanaged (no version marker) → adopt
+            { InstallLabel = Loc.TFormat("ov.action.reinstall", value.Version); IsUpdate = false; IsReinstall = true; IsPlainInstall = false; }   // present but unmanaged (no version marker) → adopt
         else if (VersionService.IsNewer(value.Version, InstalledVersion))
-            { InstallLabel = $"Update to v{value.Version}"; IsUpdate = true; IsReinstall = false; IsPlainInstall = false; }
+            { InstallLabel = Loc.TFormat("ov.action.updateTo", value.Version); IsUpdate = true; IsReinstall = false; IsPlainInstall = false; }
         else if (VersionService.IsNewer(InstalledVersion, value.Version))
-            { InstallLabel = $"Downgrade to v{value.Version}"; IsDowngrade = true; IsUpdate = false; IsReinstall = false; IsPlainInstall = false; }
+            { InstallLabel = Loc.TFormat("ov.action.downgradeTo", value.Version); IsDowngrade = true; IsUpdate = false; IsReinstall = false; IsPlainInstall = false; }
         else
-            { InstallLabel = $"Reinstall v{value.Version}"; IsUpdate = false; IsReinstall = true; IsPlainInstall = false; }
+            { InstallLabel = Loc.TFormat("ov.action.reinstall", value.Version); IsUpdate = false; IsReinstall = true; IsPlainInstall = false; }
     }
 
     // Called by the parent after a successful install to refresh installed state + label.

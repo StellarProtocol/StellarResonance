@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StellarLauncher.App.ViewModels" xmlns:wsvm="using:StellarLauncher.App.ViewModels.Workspace"
              xmlns:model="using:StellarLauncher.Core.Model" xmlns:views="using:StellarLauncher.App.Views" xmlns:sys="using:System"
+             xmlns:loc="using:StellarLauncher.App.Localization"
              x:Class="StellarLauncher.App.Views.Workspace.PluginDetailView" x:DataType="wsvm:ClientPluginsViewModel">
   <UserControl.Styles>
     <!-- section labels on the detail page -->
@@ -49,7 +50,7 @@
   <Panel>
     <!-- ======================= DETAIL PAGE (moved verbatim from PluginsView.axaml) ======================= -->
     <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsDetailOpen}">
-      <Button Grid.Row="0" Content="←  All plugins" Command="{Binding CloseDetailCommand}"
+      <Button Grid.Row="0" Content="{loc:T detail.back}" Command="{Binding CloseDetailCommand}"
               Margin="0,0,0,10" Padding="10,6" CornerRadius="8" FontSize="12"
               Foreground="#cfd6f0" Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"/>
       <ContentControl Grid.Row="1" Content="{Binding SelectedPlugin}">
@@ -82,7 +83,7 @@
                         </Border>
                         <Border Background="#40cc8800" CornerRadius="5" Padding="6,1" IsVisible="{Binding HasUpdate}"
                                 BorderBrush="#ffb740" BorderThickness="1" VerticalAlignment="Center">
-                          <TextBlock Text="UPDATE AVAILABLE" Foreground="#ffb740" FontSize="9" FontWeight="Bold"/>
+                          <TextBlock Text="{loc:T detail.updateAvailable}" Foreground="#ffb740" FontSize="9" FontWeight="Bold"/>
                         </Border>
                       </StackPanel>
                       <TextBlock Text="{Binding Description}" Foreground="#c5cce0" FontSize="12.5"
@@ -100,10 +101,10 @@
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <Button Classes="link" Content="Homepage ↗" IsVisible="{Binding HasHomepage}"
+                        <Button Classes="link" Content="{loc:T detail.homepage}" IsVisible="{Binding HasHomepage}"
                                 Command="{Binding $parent[UserControl].((wsvm:ClientPluginsViewModel)DataContext).OpenLinkCommand}"
                                 CommandParameter="{Binding Homepage}"/>
-                        <Button Classes="link" Content="Source ↗" IsVisible="{Binding HasSource}"
+                        <Button Classes="link" Content="{loc:T detail.source}" IsVisible="{Binding HasSource}"
                                 Command="{Binding $parent[UserControl].((wsvm:ClientPluginsViewModel)DataContext).OpenLinkCommand}"
                                 CommandParameter="{Binding SourceUrl}"/>
                       </StackPanel>
@@ -137,17 +138,17 @@
                                 IsEnabled="{Binding Compatible}" IsVisible="{Binding IsReinstall}"
                                 Foreground="#9aa3bf" Background="#1a2035" BorderBrush="#2f3a5a" BorderThickness="1"
                                 Padding="14,6" CornerRadius="8"/>
-                        <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding ShowRemove}"
+                        <Button Content="{loc:T common.remove}" Command="{Binding RemoveCommand}" IsVisible="{Binding ShowRemove}"
                                 Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
                                 Padding="12,6" CornerRadius="8"/>
                       </StackPanel>
                       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6"
                                   IsVisible="{Binding ConfirmVisible}">
                         <TextBlock Text="⚠" Foreground="#ffcf6b" VerticalAlignment="Center" IsVisible="{Binding IsDowngrade}"/>
-                        <Button Content="Cancel" Command="{Binding CancelInstallCommand}"
+                        <Button Content="{loc:T common.cancel}" Command="{Binding CancelInstallCommand}"
                                 Foreground="#cfd6f0" Background="Transparent" BorderBrush="#2f4570" BorderThickness="1"
                                 Padding="12,6" CornerRadius="8"/>
-                        <Button Content="Confirm" Command="{Binding ConfirmInstallCommand}"
+                        <Button Content="{loc:T common.confirm}" Command="{Binding ConfirmInstallCommand}"
                                 Foreground="#0b0e16" Background="#54e3a0" FontWeight="Bold" Padding="12,6" CornerRadius="8"/>
                       </StackPanel>
                     </StackPanel>
@@ -156,7 +157,7 @@
 
                 <!-- media gallery -->
                 <StackPanel Spacing="7" IsVisible="{Binding HasMedia}">
-                  <TextBlock Classes="section" Text="SCREENSHOTS &amp; VIDEOS"/>
+                  <TextBlock Classes="section" Text="{loc:T detail.media}"/>
                   <!-- vertical bar Hidden (not Disabled): Disabled forces content into the viewport
                        height and clips the second caption line under the tiles -->
                   <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Hidden">
@@ -198,13 +199,13 @@
 
                 <!-- guide -->
                 <StackPanel Spacing="7">
-                  <TextBlock Classes="section" Text="GUIDE"/>
+                  <TextBlock Classes="section" Text="{loc:T detail.guide}"/>
                   <Border Background="#10141f" BorderBrush="#222a44" BorderThickness="1"
                           CornerRadius="12" Padding="18,14">
                     <StackPanel Spacing="8">
                       <TextBlock Text="{Binding GuideStatus}" IsVisible="{Binding HasGuideStatus}"
                                  Foreground="#8a93b2" FontSize="12"/>
-                      <TextBlock Text="This plugin hasn't published a guide yet — the description above covers the basics."
+                      <TextBlock Text="{loc:T detail.noGuide}"
                                  IsVisible="{Binding !HasGuideUrl}" Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
                       <views:MarkdownView Markdown="{Binding GuideMarkdown}" BaseUrl="{Binding Entry.GuideUrl}"/>
                     </StackPanel>
@@ -214,8 +215,8 @@
                 <!-- dependencies: declared by the shown version's manifest, installed by the launcher -->
                 <StackPanel Spacing="7" IsVisible="{Binding ShowDependencySection}">
                   <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Classes="section" Text="DEPENDENCIES"/>
-                    <TextBlock Text="— declared by this plugin, installed by the launcher before the game starts"
+                    <TextBlock Classes="section" Name="DependenciesHeader" Text="{loc:T detail.dependencies}"/>
+                    <TextBlock Text="{loc:T detail.dependencies.sub}"
                                Foreground="#566083" FontSize="10" VerticalAlignment="Center"/>
                   </StackPanel>
                   <Border Background="#10141f" BorderBrush="#222a44" BorderThickness="1"
@@ -234,7 +235,7 @@
                                     <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" FontSize="12.5"/>
                                     <TextBlock Text="{Binding Version}" Foreground="#8a93b2" FontSize="12.5"/>
                                     <Border Classes="pill" IsVisible="{Binding IsOptional}">
-                                      <TextBlock Text="optional"/>
+                                      <TextBlock Text="{loc:T detail.optional}"/>
                                     </Border>
                                     <Border Classes="pill" IsVisible="{Binding HasRequires}">
                                       <TextBlock Text="{Binding RequiresLabel}"/>
@@ -245,10 +246,10 @@
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                   <TextBlock Text="{Binding License}" FontFamily="{StaticResource MonoFont}" FontSize="11"
                                              Foreground="#697297" VerticalAlignment="Center"/>
-                                  <Button Classes="link" Content="licence ↗" IsVisible="{Binding HasLicenseUrl}"
+                                  <Button Classes="link" Content="{loc:T detail.licence}" IsVisible="{Binding HasLicenseUrl}"
                                           Command="{Binding $parent[UserControl].((wsvm:ClientPluginsViewModel)DataContext).OpenLinkCommand}"
                                           CommandParameter="{Binding LicenseUrl}"/>
-                                  <Button Classes="link" Content="source ↗" IsVisible="{Binding HasSourceUrl}"
+                                  <Button Classes="link" Content="{loc:T detail.sourceLower}" IsVisible="{Binding HasSourceUrl}"
                                           Command="{Binding $parent[UserControl].((wsvm:ClientPluginsViewModel)DataContext).OpenLinkCommand}"
                                           CommandParameter="{Binding SourceUrl}"/>
                                 </StackPanel>
@@ -264,7 +265,7 @@
                       <!-- 2.1.2 (owner feedback): the tick boxes going grey with no explanation read as broken —
                            one plain line, muted style, only when an optional dependency would otherwise be
                            changeable right now (a kept-mode lock explains itself via KeptNote instead). -->
-                      <TextBlock Text="Close the game to change these." IsVisible="{Binding ShowLockedHint}"
+                      <TextBlock Text="{loc:T detail.lockedHint}" IsVisible="{Binding ShowLockedHint}"
                                  Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
                       <ItemsControl ItemsSource="{Binding DependencyNotices}">
                         <ItemsControl.ItemTemplate>
@@ -281,7 +282,7 @@
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                           <TextBlock Grid.Column="0" Text="{Binding KeptNote}" Foreground="#8a93b2" FontSize="12"
                                      TextWrapping="Wrap" VerticalAlignment="Center"/>
-                          <Button Grid.Column="1" Content="Remove kept dependencies" Command="{Binding RemoveKeptDependenciesCommand}"
+                          <Button Grid.Column="1" Content="{loc:T detail.removeKept}" Command="{Binding RemoveKeptDependenciesCommand}"
                                   IsEnabled="{Binding !DependenciesLocked}"
                                   Foreground="#cfd6f0" Background="#2a1c2f" BorderBrush="#5b2f45" BorderThickness="1"
                                   Padding="12,6" CornerRadius="8"/>
@@ -297,7 +298,7 @@
 
                 <!-- changelog -->
                 <StackPanel Spacing="7">
-                  <TextBlock Classes="section" Text="CHANGELOG"/>
+                  <TextBlock Classes="section" Text="{loc:T detail.changelog}"/>
                   <ItemsControl ItemsSource="{Binding Versions}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="model:PluginVersion">
@@ -316,7 +317,7 @@
                                   <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,0,0,3">
                                     <Border Grid.Column="0" Background="#2354e3a0" CornerRadius="5" Padding="6,1"
                                             VerticalAlignment="Top" Margin="0,2,0,0">
-                                      <TextBlock Text="ADDED" Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
+                                      <TextBlock Text="{loc:T changelog.added}" Foreground="#9affd0" FontSize="9" FontWeight="Bold"/>
                                     </Border>
                                     <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#c5cce0" FontSize="12"
                                                TextWrapping="Wrap" LineHeight="17"/>
@@ -330,7 +331,7 @@
                                   <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,0,0,3">
                                     <Border Grid.Column="0" Background="#23ffcf6b" CornerRadius="5" Padding="6,1"
                                             VerticalAlignment="Top" Margin="0,2,0,0">
-                                      <TextBlock Text="CHANGED" Foreground="#ffcf6b" FontSize="9" FontWeight="Bold"/>
+                                      <TextBlock Text="{loc:T changelog.changed}" Foreground="#ffcf6b" FontSize="9" FontWeight="Bold"/>
                                     </Border>
                                     <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#c5cce0" FontSize="12"
                                                TextWrapping="Wrap" LineHeight="17"/>
@@ -344,7 +345,7 @@
                                   <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,0,0,3">
                                     <Border Grid.Column="0" Background="#235b8cff" CornerRadius="5" Padding="6,1"
                                             VerticalAlignment="Top" Margin="0,2,0,0">
-                                      <TextBlock Text="FIXED" Foreground="#9ec2ff" FontSize="9" FontWeight="Bold"/>
+                                      <TextBlock Text="{loc:T changelog.fixed}" Foreground="#9ec2ff" FontSize="9" FontWeight="Bold"/>
                                     </Border>
                                     <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#c5cce0" FontSize="12"
                                                TextWrapping="Wrap" LineHeight="17"/>
@@ -358,7 +359,7 @@
                                   <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,0,0,3">
                                     <Border Grid.Column="0" Background="#23ff6b6b" CornerRadius="5" Padding="6,1"
                                             VerticalAlignment="Top" Margin="0,2,0,0">
-                                      <TextBlock Text="REMOVED" Foreground="#ff9a9a" FontSize="9" FontWeight="Bold"/>
+                                      <TextBlock Text="{loc:T changelog.removed}" Foreground="#ff9a9a" FontSize="9" FontWeight="Bold"/>
                                     </Border>
                                     <TextBlock Grid.Column="1" Text="{Binding}" Foreground="#c5cce0" FontSize="12"
                                                TextWrapping="Wrap" LineHeight="17"/>

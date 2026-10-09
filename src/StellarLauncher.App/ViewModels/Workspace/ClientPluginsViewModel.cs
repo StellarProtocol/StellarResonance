@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Matrix;
@@ -36,7 +37,11 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
     public int DisabledCount => _all.Count(r => r.IsDisabled);
     public bool IsDetailOpen => SelectedPlugin is not null;
     public bool IsLightboxOpen => LightboxImage is not null;
-    public string TargetLine => $"installing to {System.IO.Path.Combine(_ws.Client.GameMiniDir, "stellar", "plugins")} · framework {_ws.Inventory.FrameworkVersion ?? "none"} · registry: {(_ws.IsTesting ? "testing over stable" : "stable")}";
+    public string InstalledFilterLabel => Loc.TFormat("plugins.filter.installed", InstalledCount);
+    public string UpdatesFilterLabel => Loc.TFormat("plugins.filter.updates", UpdateCount);
+    public string DisabledFilterLabel => Loc.TFormat("plugins.filter.disabled", DisabledCount);
+    public string TargetLine => Loc.TFormat("plugins.target", System.IO.Path.Combine(_ws.Client.GameMiniDir, "stellar", "plugins"),
+        _ws.Inventory.FrameworkVersion ?? Loc.T("common.none"), _ws.IsTesting ? Loc.T("plugins.registry.testing") : Loc.T("channel.stable"));
     public bool IsAll => Filter == PluginFilter.All; public bool IsInstalledFilter => Filter == PluginFilter.Installed;
     public bool IsUpdatesFilter => Filter == PluginFilter.Updates; public bool IsDisabledFilter => Filter == PluginFilter.Disabled;
     public bool IsListView => !GridView;
@@ -49,6 +54,7 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         _onSession = _ => { if (SelectedPlugin is { } p) p.DependenciesLocked = _ws.Session.IsBusy; };
         _ws.Session.Changed += _onSession;          // released by Dispose (the workspace disposes its tab VMs)
         _ = ReloadAsync();
+        Loc.Subscribe(this, vm => vm.OnPropertyChanged(string.Empty));
     }
 
     partial void OnGridViewChanged(bool value)
@@ -92,7 +98,7 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
             OnPropertyChanged(nameof(TargetLine));
             // NOTE: don't clear Status on success — a reload is triggered after install/copy, whose result message must survive.
         }
-        catch (Exception ex) { Status = $"offline — {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("ws.offline", ex.Message); }
     }
 
     private IEnumerable<AlsoOnChip> AlsoOnFor(string pluginId)
@@ -101,7 +107,7 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         {
             var p = col.Inventory.Plugins.FirstOrDefault(x => x.Entry.Id == pluginId);
             return p is { Present: true }
-                ? new AlsoOnChip($"{col.Client.Name} {p.Version ?? "?"}{(p.Disabled ? " · off" : "")}", true)
+                ? new AlsoOnChip(p.Disabled ? Loc.TFormat("plugins.alsoOn.off", col.Client.Name, p.Version ?? "?") : $"{col.Client.Name} {p.Version ?? "?"}", true)
                 : new AlsoOnChip($"{col.Client.Name} –", false);
         }).ToList();
         return chips.Count <= 4 ? chips : chips.Take(3).Append(new AlsoOnChip($"+{chips.Count - 3}", false));
@@ -119,7 +125,8 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
                      _ => true,
                  }).Where(r => q.Length == 0 || r.Name.Contains(q, StringComparison.OrdinalIgnoreCase)))
             Rows.Add(r);
-        foreach (var p in new[] { nameof(InstalledCount), nameof(UpdateCount), nameof(DisabledCount), nameof(IsAll), nameof(IsInstalledFilter), nameof(IsUpdatesFilter), nameof(IsDisabledFilter) })
+        foreach (var p in new[] { nameof(InstalledCount), nameof(UpdateCount), nameof(DisabledCount),
+                     nameof(InstalledFilterLabel), nameof(UpdatesFilterLabel), nameof(DisabledFilterLabel), nameof(IsAll), nameof(IsInstalledFilter), nameof(IsUpdatesFilter), nameof(IsDisabledFilter) })
             OnPropertyChanged(p);
     }
 
@@ -136,9 +143,9 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         {
             // v3: Cancel in the step changes nothing — no refresh either.
             if (!await PluginInstallFlow.RunAsync(_ws.Services.Core.Install, _ws.Services.Core.Steps, request, _ws.SaveProfile,
-                    s => Status = $"{row.Name}: {s}")) return;
+                    s => Status = Loc.TFormat("plugins.status", row.Name, s))) return;
         }
-        catch (Exception ex) { Status = $"{row.Name} failed: {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("plugins.failed", row.Name, ex.Message); }
         await _ws.RefreshAsync();
     }
 
@@ -151,9 +158,9 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         {
             if (enabled) _ws.Services.Core.Install.Plugins.Enable(_ws.Client.GameMiniDir, row.Item.Entry.Id);
             else _ws.Services.Core.Install.Plugins.Disable(_ws.Client.GameMiniDir, row.Item.Entry.Id);
-            Status = $"{row.Name}: {(enabled ? "enabled" : "disabled")} — applies on the next launch";
+            Status = Loc.TFormat(enabled ? "plugins.enabledNextLaunch" : "plugins.disabledNextLaunch", row.Name);
         }
-        catch (Exception ex) { Status = $"{row.Name} failed: {ex.Message}"; }   // fire-and-forget from the toggle
+        catch (Exception ex) { Status = Loc.TFormat("plugins.failed", row.Name, ex.Message); }   // fire-and-forget from the toggle
         await _ws.RefreshAsync();
     }
 
@@ -168,19 +175,29 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         if (src is null) return;
         var plan = CopySetPlanner.Plan(src, new ClientColumn(_ws.Client, _ws.Inventory, _ws.Registry));
         var installs = plan.Where(i => i.Status == CopyStatus.Install).ToList();
-        if (installs.Count == 0) { Status = $"nothing to copy from {source.Name}"; return; }
-        var body = string.Join("\n", plan.Select(i => $"{i.Entry.Name}: {(i.Status == CopyStatus.Install ? $"install v{i.TargetVersion}" : i.Status.ToString())}"));
-        if (!await _ws.Services.Confirm.AskAsync($"Copy plugin set from {source.Name} to {_ws.Client.Name}?", body, $"Install {installs.Count}")) return;
+        if (installs.Count == 0) { Status = Loc.TFormat("copy.nothing", source.Name); return; }
+        var body = string.Join("\n", plan.Select(i => $"{i.Entry.Name}: {CopyStatusText(i)}"));
+        if (!await _ws.Services.Confirm.AskAsync(Loc.TFormat("copy.title", source.Name, _ws.Client.Name), body, Loc.TFormat("copy.ok", installs.Count))) return;
         var ok = 0;
         foreach (var i in installs)
         {
             var v = i.Entry.Versions.First(x => x.Version == i.TargetVersion);
             try { await PluginDownloads.InstallAsync(_ws.Services.Core.Install, _ws.Client, i.Entry, v, null); ok++; }
-            catch (Exception ex) { Status = $"{i.Entry.Name} failed: {ex.Message}"; }
+            catch (Exception ex) { Status = Loc.TFormat("plugins.failed", i.Entry.Name, ex.Message); }
         }
-        Status = $"copied from {source.Name}: {ok} installed, {plan.Count - installs.Count} skipped";
+        Status = Loc.TFormat("copy.done", source.Name, ok, plan.Count - installs.Count);
         await _ws.RefreshAsync();
     }
+
+    private static string CopyStatusText(CopyItem i) => i.Status switch
+    {
+        CopyStatus.Install => Loc.TFormat("copy.status.install", i.TargetVersion),
+        CopyStatus.AlreadyInstalled => Loc.T("copy.status.alreadyInstalled"),
+        CopyStatus.SkippedDisabledOnSource => Loc.T("copy.status.disabledOnSource"),
+        CopyStatus.NoCompatibleVersion => Loc.T("copy.status.noCompatible"),
+        CopyStatus.NoFramework => Loc.T("copy.status.noFramework"),
+        _ => i.Status.ToString(),
+    };
 
     // ---- detail page + lightbox (same member names as the old PluginsViewModel so the XAML moves verbatim) ----
     partial void OnSelectedPluginChanged(PluginItemViewModel? value) => OnPropertyChanged(nameof(IsDetailOpen));

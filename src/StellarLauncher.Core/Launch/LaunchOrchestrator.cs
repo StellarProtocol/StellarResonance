@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Services;
+using StellarLauncher.Core.Localization;
 
 namespace StellarLauncher.Core.Launch;
 
@@ -59,8 +60,8 @@ public sealed class LaunchOrchestrator : ILaunchOrchestrator
 
             // An alongside pre-launch script can't be tied to a Steam-handoff game (tracking stops here) or to a
             // launch that never started — close it now so it can't leak (it's no longer Linux-only).
-            if (steam is not null) { parallel?.Kill(); parallel?.Dispose(); parallel = null; events.Report(new SteamHandoffEvent()); events.Report(new StatusEvent("launching via Steam…")); return new LaunchOutcome(LaunchOutcomeKind.SteamHandoff, null); }
-            if (proc is null) { parallel?.Kill(); parallel?.Dispose(); parallel = null; events.Report(new FailedEvent("launch failed: process did not start")); return new LaunchOutcome(LaunchOutcomeKind.Failed, null); }
+            if (steam is not null) { parallel?.Kill(); parallel?.Dispose(); parallel = null; events.Report(new SteamHandoffEvent()); events.Report(new StatusEvent(L.T("launch.viaSteam"))); return new LaunchOutcome(LaunchOutcomeKind.SteamHandoff, null); }
+            if (proc is null) { parallel?.Kill(); parallel?.Dispose(); parallel = null; events.Report(new FailedEvent(L.TFormat("launch.failed", L.T("launch.noProcess")))); return new LaunchOutcome(LaunchOutcomeKind.Failed, null); }
 
             events.Report(new StartedEvent(proc));
             _ = ReportExitAsync(c, proc, psi, parallel, events);
@@ -71,7 +72,7 @@ public sealed class LaunchOrchestrator : ILaunchOrchestrator
         catch (Exception ex)
         {
             parallel?.Kill(); parallel?.Dispose();
-            events.Report(new FailedEvent($"launch failed: {ex.Message}"));
+            events.Report(new FailedEvent(L.TFormat("launch.failed", ex.Message)));
             return new LaunchOutcome(LaunchOutcomeKind.Failed, null);
         }
     }
@@ -79,10 +80,10 @@ public sealed class LaunchOrchestrator : ILaunchOrchestrator
     private async Task EnsureDxvkAsync(ClientProfile c, IProgress<LaunchEvent> events, CancellationToken ct)
     {
         if (_env.IsWindows || c.Linux is not { DxvkNvapi: true, WinePrefix: { } prefix } || string.IsNullOrWhiteSpace(prefix)) return;
-        events.Report(new StatusEvent("checking DXVK-NVAPI…"));
+        events.Report(new StatusEvent(L.T("launch.checkingNvapi")));
         try { events.Report(new StatusEvent(await _dxvk.EnsureAsync(prefix, ct))); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception ex) { events.Report(new StatusEvent($"DXVK-NVAPI skipped: {ex.Message}")); }
+        catch (Exception ex) { events.Report(new StatusEvent(L.TFormat("launch.nvapiSkipped", ex.Message))); }
     }
 
     // Runs the user's pre-launch script (Linux AND Windows). The script env comes from ScriptEnv, NOT
@@ -92,20 +93,20 @@ public sealed class LaunchOrchestrator : ILaunchOrchestrator
     private async Task<(string status, IScriptHandle? parallel)> RunPreScriptAsync(ClientProfile c, ProcessStartInfo psi, IProgress<LaunchEvent> events, CancellationToken ct)
     {
         var script = c.Advanced.PreLaunch;
-        if (string.IsNullOrWhiteSpace(script) || !_env.Fs.File.Exists(script)) return ("launching…", null);
+        if (string.IsNullOrWhiteSpace(script) || !_env.Fs.File.Exists(script)) return (L.T("launch.launching"), null);
         var env = ScriptEnv(c, psi);
         if (!c.Advanced.PreLaunchWait)
         {
-            events.Report(new StatusEvent("starting pre-launch script alongside the game…"));
-            return ("launching…", _env.Scripts.Start(script, env));   // closed in ReportExitAsync when the game ends
+            events.Report(new StatusEvent(L.T("launch.preScriptParallel")));
+            return (L.T("launch.launching"), _env.Scripts.Start(script, env));   // closed in ReportExitAsync when the game ends
         }
-        events.Report(new StatusEvent("running pre-launch script…"));
+        events.Report(new StatusEvent(L.T("launch.preScriptRunning")));
         var code = await _env.Scripts.RunAsync(script, env, ScriptTimeout, ct);
         return (code switch
         {
-            null => "pre-launch script timed out — launching anyway",
-            0 => "launching…",
-            _ => $"pre-launch script exited {code} — launching anyway",
+            null => L.T("launch.preScriptTimeout"),
+            0 => L.T("launch.launching"),
+            _ => L.TFormat("launch.preScriptExited", code),
         }, null);
     }
 
@@ -134,7 +135,7 @@ public sealed class LaunchOrchestrator : ILaunchOrchestrator
         }
         if (proc.HasExited) return new LaunchOutcome(proc.ExitCode == 0 ? LaunchOutcomeKind.Started : LaunchOutcomeKind.Failed, count);
         events.Report(new RunningEvent());
-        events.Report(new StatusEvent("game running"));
+        events.Report(new StatusEvent(L.T("launch.gameRunning")));
         return new LaunchOutcome(LaunchOutcomeKind.Started, count);
     }
 
@@ -151,9 +152,9 @@ public sealed class LaunchOrchestrator : ILaunchOrchestrator
             if (!string.IsNullOrWhiteSpace(post) && _env.Fs.File.Exists(post))
                 await _env.Scripts.RunAsync(post, ScriptEnv(c, psi), ScriptTimeout);
         }
-        catch (Exception ex) { events.Report(new StatusEvent($"post-exit script failed: {ex.Message}")); }
+        catch (Exception ex) { events.Report(new StatusEvent(L.TFormat("launch.postScriptFailed", ex.Message))); }
         // Always report the exit so the session leaves Running even if the post-exit script (or kill) threw.
         events.Report(new ExitedEvent(exitCode));
-        if (exitCode != 0) events.Report(new StatusEvent($"exited with code {exitCode} — check Runner / WINEPREFIX in Settings"));
+        if (exitCode != 0) events.Report(new StatusEvent(L.TFormat("launch.exitedCode", exitCode)));
     }
 }

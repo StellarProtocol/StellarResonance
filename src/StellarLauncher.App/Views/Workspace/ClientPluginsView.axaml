@@ -1,23 +1,23 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StellarLauncher.App.ViewModels.Workspace" xmlns:v="using:StellarLauncher.App.Views.Workspace"
-             xmlns:clients="using:StellarLauncher.Core.Clients"
+             xmlns:clients="using:StellarLauncher.Core.Clients" xmlns:loc="using:StellarLauncher.App.Localization"
              x:Class="StellarLauncher.App.Views.Workspace.ClientPluginsView" x:DataType="vm:ClientPluginsViewModel">
   <Panel>
     <DockPanel IsVisible="{Binding !IsDetailOpen}">
       <TextBlock DockPanel.Dock="Top" Text="{Binding TargetLine}" Classes="sub mono" Margin="0,0,0,8"/>
       <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" Margin="0,0,0,10">
-        <TextBox Text="{Binding Search}" PlaceholderText="🔍 Search plugins"/>
+        <TextBox Text="{Binding Search}" PlaceholderText="{loc:T plugins.search}"/>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsAll}" Content="All" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.All}"/>
-          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsInstalledFilter}" Content="{Binding InstalledCount, StringFormat='Installed {0}'}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Installed}"/>
-          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsUpdatesFilter}" Content="{Binding UpdateCount, StringFormat='Updates {0}'}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Updates}"/>
-          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsDisabledFilter}" Content="{Binding DisabledCount, StringFormat='Disabled {0}'}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Disabled}"/>
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsAll}" Content="{loc:T plugins.filter.all}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.All}"/>
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsInstalledFilter}" Content="{Binding InstalledFilterLabel}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Installed}"/>
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsUpdatesFilter}" Content="{Binding UpdatesFilterLabel}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Updates}"/>
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsDisabledFilter}" Content="{Binding DisabledFilterLabel}" Command="{Binding SetFilterCommand}" CommandParameter="{x:Static vm:PluginFilter.Disabled}"/>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
           <!-- view mode: rows vs a grid of plugin cards -->
-          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsListView}" Content="☰ List" Command="{Binding ShowListCommand}" ToolTip.Tip="List view"/>
-          <Button Classes="tiny ghost2" Classes.ghost="{Binding GridView}" Content="▦ Grid" Command="{Binding ShowGridCommand}" ToolTip.Tip="Card grid"/>
-          <ComboBox ItemsSource="{Binding CopySources}" PlaceholderText="Copy set from…" SelectionChanged="OnCopySourcePicked" MinWidth="160">
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding IsListView}" Content="{loc:T plugins.view.list}" Command="{Binding ShowListCommand}" ToolTip.Tip="{loc:T plugins.view.list.tip}"/>
+          <Button Classes="tiny ghost2" Classes.ghost="{Binding GridView}" Content="{loc:T plugins.view.grid}" Command="{Binding ShowGridCommand}" ToolTip.Tip="{loc:T plugins.view.grid.tip}"/>
+          <ComboBox ItemsSource="{Binding CopySources}" PlaceholderText="{loc:T plugins.copyFrom}" SelectionChanged="OnCopySourcePicked" MinWidth="160">
             <ComboBox.ItemTemplate><DataTemplate x:DataType="clients:ClientProfile"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
           </ComboBox>
         </StackPanel>
@@ -45,7 +45,7 @@
                            length, so it can never crowd the row even at the launcher's minimum width. -->
                       <Button Classes="tag" Content="{Binding Item.ExtrasPillText}" Command="{Binding OpenDependenciesCommand}"
                               IsVisible="{Binding Item.ShowExtrasPill}" Margin="0,0,0,2"
-                              ToolTip.Tip="Optional extras — click to review them"/>
+                              ToolTip.Tip="{loc:T plugins.extras.tip}"/>
                     </WrapPanel>
                     <TextBlock Classes="sub" TextTrimming="CharacterEllipsis"><Run Text="{Binding Author}"/><Run Text=" · "/><Run Text="{Binding Description}"/></TextBlock>
                   </StackPanel>
@@ -57,9 +57,9 @@
                     </DataTemplate></ItemsControl.ItemTemplate>
                   </ItemsControl>
                   <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <Button Classes="amber tiny" Content="Update" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"/>
-                    <Button Classes="ghost tiny" Content="Install" Command="{Binding InstallCommand}" IsVisible="{Binding !IsPresent}"/>
-                    <ToggleSwitch IsChecked="{Binding Enabled}" OnContent="Enabled" OffContent="Disabled" IsVisible="{Binding IsPresent}" FontSize="11"/>
+                    <Button Classes="amber tiny" Content="{loc:T common.update}" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"/>
+                    <Button Classes="ghost tiny" Content="{loc:T common.install}" Command="{Binding InstallCommand}" IsVisible="{Binding !IsPresent}"/>
+                    <ToggleSwitch IsChecked="{Binding Enabled}" OnContent="{loc:T common.enabled}" OffContent="{loc:T common.disabled}" IsVisible="{Binding IsPresent}" FontSize="11"/>
                   </StackPanel>
                 </Grid>
               </Border>
@@ -85,7 +85,7 @@
                       <Button Classes="link" Content="{Binding Name}" Command="{Binding OpenCommand}" Foreground="White" FontSize="13" FontWeight="Bold" Padding="0" Margin="0,0,8,2"/>
                       <Button Classes="tag" Content="{Binding Item.ExtrasPillText}" Command="{Binding OpenDependenciesCommand}"
                               IsVisible="{Binding Item.ShowExtrasPill}" Margin="0,0,0,2"
-                              ToolTip.Tip="Optional extras — click to review them"/>
+                              ToolTip.Tip="{loc:T plugins.extras.tip}"/>
                     </WrapPanel>
                     <TextBlock Text="{Binding Description}" Classes="sub" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" Height="30"/>
                     <TextBlock Text="{Binding VersionLine}" Classes="mono body" FontSize="11.5" Classes.amber="{Binding HasUpdate}"/>
@@ -96,9 +96,9 @@
                       </DataTemplate></ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
-                      <Button Classes="amber tiny" Content="Update" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"/>
-                      <Button Classes="ghost tiny" Content="Install" Command="{Binding InstallCommand}" IsVisible="{Binding !IsPresent}"/>
-                      <ToggleSwitch IsChecked="{Binding Enabled}" OnContent="Enabled" OffContent="Disabled" IsVisible="{Binding IsPresent}" FontSize="11"/>
+                      <Button Classes="amber tiny" Content="{loc:T common.update}" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"/>
+                      <Button Classes="ghost tiny" Content="{loc:T common.install}" Command="{Binding InstallCommand}" IsVisible="{Binding !IsPresent}"/>
+                      <ToggleSwitch IsChecked="{Binding Enabled}" OnContent="{loc:T common.enabled}" OffContent="{loc:T common.disabled}" IsVisible="{Binding IsPresent}" FontSize="11"/>
                     </StackPanel>
                   </StackPanel>
                 </StackPanel>

@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.ViewModels.Shell;
 using StellarLauncher.App.ViewModels.Workspace;
 using StellarLauncher.Core.Clients;
@@ -22,18 +23,20 @@ public sealed partial class AddClientViewModel : ObservableObject
 
     public bool IsFirstRun => _shell.Config.Clients.Count == 0;
     public bool IsWindows => _svc.Platform.IsWindows;
-    public string AddLabel { get { var n = Rows.Count(r => r.Selected && r.IsAvailable); return n == 1 ? "Add 1 client" : $"Add {n} clients"; } }
+    public string AddLabel => Loc.Plural("add.button", Rows.Count(r => r.Selected && r.IsAvailable));
+    public string HiddenLabel => Loc.TFormat("add.hidden", HiddenCount);
     public bool CanAdd => Rows.Any(r => r.Selected && r.IsAvailable);
     public bool HasHidden => HiddenCount > 0;
-    public string FoundLine => $"Detected installs — {Rows.Count} found";
+    public string FoundLine => Loc.TFormat("add.found", Rows.Count);
 
     public AddClientViewModel(ShellViewModel shell, WorkspaceServices svc)
     {
         _shell = shell; _svc = svc;
         Refresh();
+        Loc.Subscribe(this, vm => vm.OnPropertyChanged(string.Empty));
     }
 
-    partial void OnHiddenCountChanged(int value) => OnPropertyChanged(nameof(HasHidden));
+    partial void OnHiddenCountChanged(int value) { OnPropertyChanged(nameof(HasHidden)); OnPropertyChanged(nameof(HiddenLabel)); }
 
     [RelayCommand]
     public void Refresh()
@@ -65,7 +68,7 @@ public sealed partial class AddClientViewModel : ObservableObject
     public void AddFromPath(string picked)
     {
         var path = _svc.Locator.FindGameMini(picked) ?? picked;
-        if (_svc.Core.Candidates.ConfiguredFor(_shell.Config, path) is { } existing) { Status = $"{path} is already added as {existing.Name}"; return; }
+        if (_svc.Core.Candidates.ConfiguredFor(_shell.Config, path) is { } existing) { Status = Loc.TFormat("add.alreadyAdded", path, existing.Name); return; }
         if (Rows.FirstOrDefault(r => ClientCandidates.SamePath(r.Path, path, IsWindows)) is { } dup) { dup.Selected = true; return; }
         var wine = IsWindows ? null : GameDetector.WinePrefixFor(path);
         var cand = new ClientCandidate(path, ClientNaming.ProposeName(path), ClientNaming.DetectLayout(path), wine is not null, wine, wine is not null ? _svc.Detector.DetectRunner() : null);

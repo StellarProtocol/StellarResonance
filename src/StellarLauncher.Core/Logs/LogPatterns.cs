@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using StellarLauncher.Core.Inventory;
+using StellarLauncher.Core.Localization;
 
 namespace StellarLauncher.Core.Logs;
 
@@ -18,20 +19,20 @@ public static class LogPatterns
         var result = new List<LogCallout>();
         foreach (var slot in inv.DuplicateSlots)
             result.Add(new LogCallout(CalloutKind.DuplicatePluginSlot,
-                $"Two copies of '{slot.Key}' in stellar/plugins",
-                $"{string.Join(" and ", slot.Dirs)} — the framework loads one of them arbitrarily, so a fix you install can end up not running. Collapsing keeps the newer build and moves the other to stellar-backups/; plugin data is untouched (keyed by GUID).",
+                L.TFormat("callout.dupSlot.title", slot.Key),
+                L.TFormat("callout.dupSlot.detail", string.Join(L.T("callout.and"), slot.Dirs)),
                 FixAvailable: true, Slot: slot));
 
         if (frameworkShadowDirs.Count > 0)
             result.Add(new LogCallout(CalloutKind.FrameworkShadowCopy,
-                "A second framework copy is shadowing the deployed one",
-                $"{string.Join(", ", frameworkShadowDirs)} also carries a .stellar-version marker under BepInEx/plugins; BepInEx keeps one per version arbitrarily (log shows 'Skipping [...] newer version exists'). Evacuate moves it to stellar-backups/.",
+                L.T("callout.shadow.title"),
+                L.TFormat("callout.shadow.detail", string.Join(", ", frameworkShadowDirs)),
                 FixAvailable: true));
 
         if (newerGameMini is not null)
             result.Add(new LogCallout(CalloutKind.GamePatchedNewerRelease,
-                "The game patched to a newer release folder",
-                $"Detected {newerGameMini}; this client still points at an older release_<ver>. Re-point the client to launch the patched game.",
+                L.T("callout.newerRelease.title"),
+                L.TFormat("callout.newerRelease.detail", newerGameMini),
                 FixAvailable: true, Path: newerGameMini));
         return result;
     }

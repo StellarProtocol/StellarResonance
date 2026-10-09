@@ -1,3 +1,4 @@
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Services;
 
 namespace StellarLauncher.App;
@@ -8,8 +9,8 @@ internal static class DownloadStatus
 {
     public static string Line(string verb, DownloadProgress p) =>
         p.Fraction is { } f
-            ? $"{verb} {f * 100:0}%  ({Mb(p.BytesRead)} / {Mb(p.TotalBytes!.Value)} MB)"
-            : $"{verb} {Mb(p.BytesRead)} MB";
+            ? Loc.TFormat("download.percent", verb, (f * 100).ToString("0"), Mb(p.BytesRead), Mb(p.TotalBytes!.Value))
+            : Loc.TFormat("download.bytes", verb, Mb(p.BytesRead));
 
     private static string Mb(long bytes) => (bytes / 1_048_576.0).ToString("0.0");
 }

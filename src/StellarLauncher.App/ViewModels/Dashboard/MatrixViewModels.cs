@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Matrix;
 
@@ -14,7 +15,8 @@ public sealed class MatrixColumnViewModel
     public MatrixColumnViewModel(ClientColumn col)
     {
         Name = col.Client.Name;
-        Subtitle = col.Inventory.FrameworkVersion is null ? "no framework" : $"fw {col.Inventory.FrameworkVersion} · {col.Client.Channel}";
+        Subtitle = col.Inventory.FrameworkVersion is null ? Loc.T("matrix.noFramework")
+            : Loc.TFormat("matrix.subtitle", col.Inventory.FrameworkVersion, Shell.RailClientItem.ChannelLabel(col.Client.Channel));
         AccentBrush = AccentBrushes.Solid(col.Client.Accent);
     }
     public string Name { get; }
@@ -34,12 +36,12 @@ public sealed partial class MatrixCellViewModel
         {
             MatrixCellKind.Installed => ($"{cell.InstalledVersion ?? "?"} ✓", "#9affd0", "#1F54e3a0", false),
             MatrixCellKind.UpdateAvailable => ($"{cell.InstalledVersion} ↑ {cell.TargetVersion}", "#ffcf6b", "#24ffcf6b", false),
-            MatrixCellKind.Incompatible => ($"{cell.InstalledVersion} ✗ incompatible", "#ff9a9a", "#1Fff6b6b", false),
-            MatrixCellKind.Disabled => ($"{cell.InstalledVersion ?? "?"} · disabled", "#ff9a9a", "#1Fff6b6b", false),
-            MatrixCellKind.NotInstalled => ("＋ install", "#b7a8ff", "#00000000", true),
+            MatrixCellKind.Incompatible => (Loc.TFormat("matrix.incompatible", cell.InstalledVersion), "#ff9a9a", "#1Fff6b6b", false),
+            MatrixCellKind.Disabled => (Loc.TFormat("matrix.disabled", cell.InstalledVersion ?? "?"), "#ff9a9a", "#1Fff6b6b", false),
+            MatrixCellKind.NotInstalled => (Loc.T("matrix.install"), "#b7a8ff", "#00000000", true),
             // Muted, but still legible on the dark ground (owner 2026-09-11: the matrix text was hard to read).
-            MatrixCellKind.NoCompatibleVersion => ("no compatible version", "#8a93b2", "#00000000", false),
-            MatrixCellKind.NeedsFramework => ("needs framework", "#8a93b2", "#00000000", false),
+            MatrixCellKind.NoCompatibleVersion => (Loc.T("matrix.noCompatible"), "#8a93b2", "#00000000", false),
+            MatrixCellKind.NeedsFramework => (Loc.T("matrix.needsFramework"), "#8a93b2", "#00000000", false),
             _ => ("—", "#8a93b2", "#00000000", false),
         };
     }

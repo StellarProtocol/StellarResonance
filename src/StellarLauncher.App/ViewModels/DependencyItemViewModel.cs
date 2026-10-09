@@ -1,5 +1,6 @@
 using System;
 using CommunityToolkit.Mvvm.ComponentModel;
+using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Model;
 
@@ -25,7 +26,16 @@ public sealed partial class DependencyItemViewModel : ObservableObject
         RequiresLabel = requiresLabel;
         _use = use || !d.Optional;   // a required dependency is always used
         ApplyStatus(s);
+        // The state pill is rendered from the last status: render it again in the new language.
+        Loc.Subscribe(this, vm =>
+        {
+            if (vm._keptState is { } k) vm.ApplyKeptDiskState(k); else if (vm._status is { } st) vm.ApplyStatus(st);
+            vm.OnPropertyChanged(nameof(Where));
+        });
     }
+
+    private DependencyStatus? _status;
+    private KeptDependencyDiskState? _keptState;
 
     public PluginDependency Dependency { get; }
     public string Id => Dependency.Id;
@@ -56,8 +66,8 @@ public sealed partial class DependencyItemViewModel : ObservableObject
     public bool CanChange => IsOptional && !Locked && !KeptLocked;
 
     public string Where => string.Equals(Dependency.Target, "game", StringComparison.OrdinalIgnoreCase)
-        ? (Dependency.ModdedOnly ? "game folder · Modded launches only" : "game folder")
-        : "plugin folder";
+        ? (Dependency.ModdedOnly ? Loc.T("deps.where.gameModded") : Loc.T("deps.where.game"))
+        : Loc.T("deps.where.plugin");
 
     /// <summary>Ticked = install it. Toggling an optional dependency asks the host to record the choice;
     /// a required one — or any while <see cref="Locked"/> — ignores toggles (the checkbox is disabled then too).</summary>
@@ -87,16 +97,17 @@ public sealed partial class DependencyItemViewModel : ObservableObject
 
     private void ApplyStatus(DependencyStatus s)
     {
+        _status = s; _keptState = null;
         StateText = s.State switch
         {
-            DependencyState.Installed => "Installed",
-            DependencyState.NotInstalled => "Not installed — installs at next Modded launch",
+            DependencyState.Installed => Loc.T("deps.state.installed"),
+            DependencyState.NotInstalled => Loc.T("deps.state.notInstalled"),
             // M-d: Detail is the prerequisite's NAME here (PluginItemViewModel resolves it from the id).
-            DependencyState.Skipped when s.Reason == DependencyReason.WaitingForPrerequisite => $"Waiting for {s.Detail}",
-            DependencyState.Skipped => "Skipped",
-            DependencyState.Blocked when s.Reason == DependencyReason.OtherOwner => $"Blocked — another plugin's file is in the way: {s.Detail}",
-            DependencyState.Blocked => $"Blocked — a file you installed is in the way: {s.Detail}",
-            _ => $"Failed: {s.Detail}",
+            DependencyState.Skipped when s.Reason == DependencyReason.WaitingForPrerequisite => Loc.TFormat("deps.state.waiting", s.Detail),
+            DependencyState.Skipped => Loc.T("deps.state.skipped"),
+            DependencyState.Blocked when s.Reason == DependencyReason.OtherOwner => Loc.TFormat("deps.state.blockedOther", s.Detail),
+            DependencyState.Blocked => Loc.TFormat("deps.state.blockedUser", s.Detail),
+            _ => Loc.TFormat("deps.state.failed", s.Detail),
         };
         StateClass = s.State switch
         {
@@ -111,11 +122,12 @@ public sealed partial class DependencyItemViewModel : ObservableObject
     /// what's actually on disk right now.</summary>
     public void ApplyKeptDiskState(KeptDependencyDiskState state)
     {
+        _keptState = state;
         StateText = state switch
         {
-            KeptDependencyDiskState.Kept => "Kept",
-            KeptDependencyDiskState.Parked => "Kept · moved aside",
-            _ => "Missing",
+            KeptDependencyDiskState.Kept => Loc.T("deps.state.kept"),
+            KeptDependencyDiskState.Parked => Loc.T("deps.state.keptParked"),
+            _ => Loc.T("deps.state.missing"),
         };
         StateClass = state switch
         {

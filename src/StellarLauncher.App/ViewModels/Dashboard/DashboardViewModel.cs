@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.App.ViewModels.Shell;
 using StellarLauncher.Core.Clients;
@@ -47,6 +48,8 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
         foreach (var c in _shell.Config.Clients)
             Tiles.Add(new ClientTileViewModel(c, _shell.Sessions.For(c), LaunchClientAsync, x => _shell.Sessions.Stop(x), x => _shell.ShowClientById(x.Id)));
         _ = RefreshAsync();
+        // The matrix cells/columns render their labels at build time: rebuild them (and the summary) in the new language.
+        Loc.Subscribe(this, vm => { vm.RebuildMatrix(); vm.UpdateSummary(); });
     }
 
     public void Dispose() => _shell.Sessions.SessionChanged -= _onSession;
@@ -75,7 +78,7 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
             UpdateSummary();
             Status = "";
         }
-        catch (Exception ex) { Status = $"refresh failed — {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("dash.refreshFailed", ex.Message); }
     }
 
     private static int CountUpdates(ClientColumn col) =>
@@ -104,9 +107,9 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
             try
             {
                 if (!await PluginInstallFlow.RunAsync(_svc.Install, _svc.Steps, request, _shell.SaveConfig,
-                        s => Status = $"{col.Client.Name}: {entry.Name} — {s}")) return;
+                        s => Status = Loc.TFormat("dash.pluginStatus", col.Client.Name, entry.Name, s))) return;
             }
-            catch (Exception ex) { Status = $"{col.Client.Name}: {entry.Name} failed — {ex.Message}"; }
+            catch (Exception ex) { Status = Loc.TFormat("dash.pluginFailed", col.Client.Name, entry.Name, ex.Message); }
             await RefreshAsync();
         };
     }
@@ -122,8 +125,8 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
         var sessions = Tiles.Select(t => t.Session).ToList();
         var running = sessions.Count(s => s.State is SessionState.Running or SessionState.SteamHandoff);
         var preparing = sessions.Count(s => s.State is SessionState.Launching or SessionState.Preparing);
-        var fw = _latestStable is null ? "framework manifest offline" : $"framework {_latestStable} is the latest stable";
-        SummaryLine = $"{Tiles.Count} client{(Tiles.Count == 1 ? "" : "s")} · {running} running · {preparing} preparing · {fw} · refreshed {DateTime.Now:HH:mm:ss}";
+        var fw = _latestStable is null ? Loc.T("dash.fwOffline") : Loc.TFormat("dash.fwLatest", _latestStable);
+        SummaryLine = Loc.TFormat("dash.summary", Loc.Plural("dash.clients", Tiles.Count), running, preparing, fw, DateTime.Now.ToString("HH:mm:ss"));
     }
 
     [RelayCommand] private void AddClient() => _shell.ShowAddClientCommand.Execute(null);

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Logs;
 
@@ -26,10 +27,10 @@ public sealed partial class CalloutViewModel : ObservableObject
     public bool FixAvailable => Callout.FixAvailable;
     public string FixLabel => Callout.Kind switch
     {
-        CalloutKind.DuplicatePluginSlot => "Collapse to one",
-        CalloutKind.FrameworkShadowCopy => "Evacuate copy",
-        CalloutKind.GamePatchedNewerRelease => "Re-point client",
-        _ => "Fix",
+        CalloutKind.DuplicatePluginSlot => Loc.T("logs.fix.collapse"),
+        CalloutKind.FrameworkShadowCopy => Loc.T("logs.fix.evacuate"),
+        CalloutKind.GamePatchedNewerRelease => Loc.T("logs.fix.repoint"),
+        _ => Loc.T("logs.fix"),
     };
     [RelayCommand] private Task Fix() => _fix();
 }
@@ -119,7 +120,7 @@ public sealed partial class LogsViewModel : ObservableObject, IDisposable
 
     private async Task ApplyFixAsync(LogCallout c)
     {
-        if (_ws.Session.IsBusy) { Status = "close the client first — files are in use while the game runs"; return; }
+        if (_ws.Session.IsBusy) { Status = Loc.T("logs.closeFirst"); return; }
         var fs = _ws.Services.Fs; var dir = _ws.Client.GameMiniDir; var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
         try
         {
@@ -127,16 +128,16 @@ public sealed partial class LogsViewModel : ObservableObject, IDisposable
             {
                 case CalloutKind.DuplicatePluginSlot when c.Slot is { } slot:
                     var r = DuplicateSlotFix.Collapse(fs, dir, slot, stamp);
-                    Status = $"kept {System.IO.Path.GetFileName(r.KeptDir)}; moved {r.MovedDirs.Count} to {r.BackupDir}"
-                           + (r.FailedDirs.Count > 0 ? $"; {r.FailedDirs.Count} could not be moved — close the client and retry" : ""); break;
+                    Status = Loc.TFormat("logs.collapsed", System.IO.Path.GetFileName(r.KeptDir), r.MovedDirs.Count, r.BackupDir)
+                           + (r.FailedDirs.Count > 0 ? Loc.TFormat("logs.collapsed.failed", r.FailedDirs.Count) : ""); break;
                 case CalloutKind.FrameworkShadowCopy:
                     var moved = ShadowCopyFix.Evacuate(fs, dir, stamp);
-                    Status = $"evacuated {moved.Count} framework cop{(moved.Count == 1 ? "y" : "ies")} to stellar-backups/"; break;
+                    Status = Loc.Plural("logs.evacuated", moved.Count); break;
                 case CalloutKind.GamePatchedNewerRelease when c.Path is { } p:
-                    _ws.Client.GameMiniDir = p; _ws.SaveProfile(); Status = $"client now points at {p}"; break;
+                    _ws.Client.GameMiniDir = p; _ws.SaveProfile(); Status = Loc.TFormat("logs.repointed", p); break;
             }
         }
-        catch (Exception ex) { Status = $"fix failed: {ex.Message}"; }
+        catch (Exception ex) { Status = Loc.TFormat("logs.fixFailed", ex.Message); }
         await _ws.RefreshAsync();
         Reload();
     }

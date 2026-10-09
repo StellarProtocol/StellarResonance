@@ -1,4 +1,5 @@
 using System;
+using StellarLauncher.Core.Localization;
 
 namespace StellarLauncher.Core.Launch;
 
@@ -40,7 +41,7 @@ public sealed class LaunchSession
     {
         if (!CanLaunch) throw new InvalidOperationException($"cannot launch while {State}");
         State = SessionState.Launching; StartedAt = now; ExitCode = null; Process = null;
-        Progress = null; ProgressIndeterminate = false; StatusText = "launching…"; ReviewText = null;
+        Progress = null; ProgressIndeterminate = false; StatusText = L.T("launch.launching"); ReviewText = null;
         Raise();
     }
 
@@ -101,7 +102,7 @@ public sealed class LaunchSession
     public void AttachRunning(IGameProcess process, DateTimeOffset now)
     {
         Process = process; State = SessionState.Running; StartedAt = now; ExitCode = null;
-        StatusText = "game running (re-attached)";
+        StatusText = L.T("launch.reattached");
         Raise();
     }
 

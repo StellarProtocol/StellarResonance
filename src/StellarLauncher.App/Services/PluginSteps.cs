@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
+using StellarLauncher.App.Localization;
+
 namespace StellarLauncher.App.Services;
 
 /// <summary>v3 (spec § 12): the install / reinstall / remove step a plugin with dependencies goes through — a modal
@@ -36,7 +38,7 @@ public static class PluginStepText
     {
         0 => "",
         1 => names[0],
-        _ => string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1],
+        _ => string.Join(Loc.T("list.comma"), names.Take(names.Count - 1)) + Loc.T("list.and") + names[^1],
     };
 
     /// <summary>Upper-cases the first character (a list of names starting a sentence).</summary>
