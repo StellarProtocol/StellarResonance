@@ -9,9 +9,11 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.App.ViewModels.Shell;
 using StellarLauncher.Core.Clients;
+using StellarLauncher.Core.Localization;
 using StellarLauncher.Core.Model;
 using StellarLauncher.Core.Platform;
 using StellarLauncher.Core.Services;
@@ -19,16 +21,29 @@ using StellarLauncher.Core.Services;
 namespace StellarLauncher.App.ViewModels;
 
 // A parameter-object bundle (records are exempt from the ≤ 6 ctor-deps guardrail, which targets classes).
+// Localization defaults to the app-wide service (Loc.Service); tests pass their own instance.
 public sealed record LauncherServices(ILauncherUpdateService Updates, ILauncherSelfUpdater SelfUpdater, IPlatformInfo Platform,
-    IConfigStore Store, HttpClient Http, IFileSystem Fs);
+    IConfigStore Store, HttpClient Http, IFileSystem Fs, ILauncherLocalization? Localization = null);
+
+/// <summary>One Language dropdown entry: "Follow system (…)" or a language's native name (never translated).</summary>
+public sealed partial class LanguageOption(string code, string label) : ObservableObject
+{
+    public string Code { get; } = code;
+    [ObservableProperty] private string _label = label;
+}
 
 /// <summary>Only what belongs to the launcher itself (mockup #launcher, spec § 5.8).</summary>
 public sealed partial class LauncherSettingsViewModel : ObservableObject
 {
     private readonly ShellViewModel _shell;
     private readonly LauncherServices _svc;
+    private readonly ILauncherLocalization _loc;
     private LauncherManifest? _remote;
     private bool _loading;
+
+    /// <summary>Language dropdown: Follow system first, then <see cref="LauncherLanguages.Codes"/> in order.</summary>
+    public IReadOnlyList<LanguageOption> Languages { get; }
+    [ObservableProperty] private LanguageOption? _selectedLanguage;
 
     public ObservableCollection<string> Sources { get; } = new();
     [ObservableProperty] private bool _testingChannel, _keepOpen, _startOnLastClient, _showMatrix, _isDownloading;
@@ -50,9 +65,11 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
 
     public LauncherSettingsViewModel(ShellViewModel shell, LauncherServices svc)
     {
-        _shell = shell; _svc = svc;
+        _shell = shell; _svc = svc; _loc = svc.Localization ?? Loc.Service;
         _loading = true;
         var l = shell.Config.Launcher;
+        Languages = BuildLanguageOptions();
+        SelectedLanguage = Languages.FirstOrDefault(o => o.Code == l.Language) ?? Languages[0];
         TestingChannel = ChannelManifests.IsTesting(l.Channel); KeepOpen = l.KeepOpen; StartOnLastClient = l.StartOn == "lastClient"; ShowMatrix = l.ShowMatrix;
         foreach (var s in l.PluginSources) Sources.Add(s);
         _loading = false;
@@ -63,6 +80,25 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     partial void OnKeepOpenChanged(bool value) { if (_loading) return; _shell.Config.Launcher.KeepOpen = value; Persist(); }
     partial void OnStartOnLastClientChanged(bool value) { if (_loading) return; _shell.Config.Launcher.StartOn = value ? "lastClient" : "dashboard"; Persist(); }
     partial void OnShowMatrixChanged(bool value) { if (_loading) return; _shell.Config.Launcher.ShowMatrix = value; Persist(); }
+
+    // Persist first, then switch: every {loc:T} label re-resolves live on LanguageChanged (no restart).
+    partial void OnSelectedLanguageChanged(LanguageOption? value)
+    {
+        if (_loading || value is null) return;
+        _shell.Config.Launcher.Language = value.Code; Persist();
+        _loc.SetLanguage(value.Code);
+        Languages[0].Label = FollowLabel();   // the only translated entry; native names never change
+    }
+
+    private List<LanguageOption> BuildLanguageOptions()
+    {
+        var list = new List<LanguageOption> { new(LauncherLanguages.Follow, FollowLabel()) };
+        for (var i = 0; i < LauncherLanguages.Codes.Count; i++)
+            list.Add(new LanguageOption(LauncherLanguages.Codes[i], LauncherLanguages.NativeNames[i]));
+        return list;
+    }
+
+    private string FollowLabel() => _loc.TFormat("settings.language.follow", LauncherLanguages.NativeName(_loc.FollowLanguage));
 
     [RelayCommand]
     private void AddSource()

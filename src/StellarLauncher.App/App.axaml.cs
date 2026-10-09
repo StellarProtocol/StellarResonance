@@ -9,6 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.App.ViewModels;
 using StellarLauncher.App.ViewModels.AddClient;
@@ -20,6 +21,7 @@ using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Dependencies;
 using StellarLauncher.Core.Inventory;
 using StellarLauncher.Core.Launch;
+using StellarLauncher.Core.Localization;
 using StellarLauncher.Core.Platform;
 using StellarLauncher.Core.Services;
 
@@ -38,6 +40,8 @@ public partial class App : Application
         Views.MarkdownView.Http = http;   // guide images share the app-wide client
 
         var store = new ConfigStore(fs, platform);
+        // Before ANY view loads: every {loc:T key} resolves through this one service (live switch on LanguageChanged).
+        Loc.Initialize(new LauncherLocalization(store.Load().Launcher.Language));
         var locator = new GameLocator(fs);
         var doorstop = new DoorstopToggle(fs);
         var installer = new Installer(fs);

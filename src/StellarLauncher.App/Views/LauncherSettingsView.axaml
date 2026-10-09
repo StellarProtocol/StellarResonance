@@ -1,6 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StellarLauncher.App.ViewModels" xmlns:shell="using:StellarLauncher.App.ViewModels.Shell"
-             xmlns:sys="using:System"
+             xmlns:sys="using:System" xmlns:loc="using:StellarLauncher.App.Localization"
              x:Class="StellarLauncher.App.Views.LauncherSettingsView" x:DataType="vm:LauncherSettingsViewModel">
   <DockPanel Margin="24,18,24,0">
     <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,14">
@@ -73,6 +73,22 @@
             <CheckBox IsChecked="{Binding KeepOpen}" Content="Keep the launcher open while a game runs"/>
             <CheckBox IsChecked="{Binding StartOnLastClient}" Content="Start on the last selected client instead of the Dashboard"/>
             <CheckBox IsChecked="{Binding ShowMatrix}" Content="Show the plugin matrix on the Dashboard"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Language (launcher UI only; switches live) -->
+        <Border Classes="card" Margin="0,0,12,12">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8"><Border Width="8" Height="8" CornerRadius="3" Background="#b46bff"/><TextBlock Classes="h4" Text="{loc:T settings.language.title}" Margin="0"/></StackPanel>
+            <TextBlock Text="{loc:T settings.language.label}" Classes="sub"/>
+            <ComboBox ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage}" MinWidth="240">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:LanguageOption">
+                  <TextBlock Text="{Binding Label}"/>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Text="{loc:T settings.language.hint}" Classes="sub" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
       </UniformGrid>
