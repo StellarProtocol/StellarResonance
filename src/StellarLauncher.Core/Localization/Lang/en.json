@@ -1,0 +1,6 @@
+{
+  "settings.language.title": "LANGUAGE",
+  "settings.language.label": "Launcher language",
+  "settings.language.follow": "Follow system ({0})",
+  "settings.language.hint": "Applies to the launcher only and switches immediately."
+}

@@ -1,0 +1,6 @@
+{
+  "settings.language.title": "ภาษา",
+  "settings.language.label": "ภาษาของลอนเชอร์",
+  "settings.language.follow": "ตามภาษาระบบ ({0})",
+  "settings.language.hint": "ใช้กับลอนเชอร์เท่านั้น และเปลี่ยนทันที"
+}

@@ -1,0 +1,6 @@
+{
+  "settings.language.title": "언어",
+  "settings.language.label": "런처 언어",
+  "settings.language.follow": "시스템 설정 따르기 ({0})",
+  "settings.language.hint": "런처에만 적용되며 바로 전환됩니다."
+}

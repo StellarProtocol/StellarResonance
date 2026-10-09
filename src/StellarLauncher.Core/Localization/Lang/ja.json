@@ -1,0 +1,6 @@
+{
+  "settings.language.title": "言語",
+  "settings.language.label": "ランチャーの表示言語",
+  "settings.language.follow": "システムに合わせる（{0}）",
+  "settings.language.hint": "ランチャーにのみ適用され、すぐに切り替わります。"
+}
