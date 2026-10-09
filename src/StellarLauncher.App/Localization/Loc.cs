@@ -35,7 +35,7 @@ public static class Loc
         Hub.Clear();
     }
 
-    /// <summary>Tests only: live entries currently held by the hub (dead ones included until swept).</summary>
+    /// <summary>Tests only: entries currently held by the hub — live ones plus any dead ones not yet swept.</summary>
     internal static int SubscriberCount => Hub.Count;
 
     /// <summary>Resolve a key through the active service.</summary>
@@ -52,6 +52,11 @@ public static class Loc
         => Hub.Add(owner, o => onChanged((T)o));
 
     private static Action<Action>? _toUiThread;
+
+    /// <summary>The UI-thread marshal for <see cref="Initialize"/> in an Avalonia app: run inline when already on the UI
+    /// thread, else post to the dispatcher. The ONE definition — the composition root and the headless tests both use it.</summary>
+    public static readonly Action<Action> AvaloniaUiThread =
+        a => { if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess()) a(); else Avalonia.Threading.Dispatcher.UIThread.Post(a); };
 
     private static void OnServiceLanguageChanged()
     {

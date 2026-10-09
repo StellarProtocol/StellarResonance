@@ -134,7 +134,7 @@ public sealed class LocalizationTests : IDisposable
         {
             var loc = Fresh("en");
             int? raisedOn = null;
-            Loc.Initialize(loc, a => { if (Dispatcher.UIThread.CheckAccess()) a(); else Dispatcher.UIThread.Post(a); });
+            Loc.Initialize(loc, Loc.AvaloniaUiThread);
             using var probe = Loc.Subscribe(new object(), _ => raisedOn = Environment.CurrentManagedThreadId);
             var uiThread = Environment.CurrentManagedThreadId;
 
