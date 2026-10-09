@@ -207,7 +207,7 @@
                                  Foreground="#8a93b2" FontSize="12"/>
                       <TextBlock Text="{loc:T detail.noGuide}"
                                  IsVisible="{Binding !HasGuideUrl}" Foreground="#8a93b2" FontSize="12" TextWrapping="Wrap"/>
-                      <views:MarkdownView Markdown="{Binding GuideMarkdown}" BaseUrl="{Binding Entry.GuideUrl}"/>
+                      <views:MarkdownView Markdown="{Binding GuideMarkdown}" BaseUrl="{Binding GuideBaseUrl}"/>
                     </StackPanel>
                   </Border>
                 </StackPanel>
@@ -299,9 +299,9 @@
                 <!-- changelog -->
                 <StackPanel Spacing="7">
                   <TextBlock Classes="section" Text="{loc:T detail.changelog}"/>
-                  <ItemsControl ItemsSource="{Binding Versions}">
+                  <ItemsControl ItemsSource="{Binding ChangelogVersions}">
                     <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="model:PluginVersion">
+                      <DataTemplate x:DataType="vm:ChangelogVersionViewModel">
                         <Border Background="#141a2e" BorderBrush="#222a44" BorderThickness="1"
                                 CornerRadius="12" Padding="15,13" Margin="0,0,0,10">
                           <StackPanel Spacing="8">

@@ -53,11 +53,28 @@ public partial class PluginItemViewModel : ObservableObject
             foreach (var p in new[] { nameof(InstalledBadge), nameof(DependencyNotices), nameof(DependencyFootnote), nameof(KeptNote) })
                 vm.OnPropertyChanged(p);
             vm.NotifyExtrasChanged();
+            vm.OnLanguageChanged();
         });
     }
 
-    public string Name => Entry.Name;
-    public string Description => Entry.Description;
+    // Launcher i18n (spec § C): presentation in the active launcher language, per-field English fallback.
+    private static string Lang => Loc.Service.ActiveLanguage;
+    public string Name => Entry.DisplayName(Lang);
+    public string Description => Entry.DisplayDescription(Lang);
+    /// <summary>The guide shown: the active language's when published (<c>guideUrls</c>), else the English one.</summary>
+    public string? GuideUrl => Entry.GuideUrlFor(Lang);
+    /// <summary>The changelog cards: each version's changelog in the active language (section-level fallback).</summary>
+    public IReadOnlyList<ChangelogVersionViewModel> ChangelogVersions =>
+        Versions.Select(v => new ChangelogVersionViewModel(v.Version, v.Date, v.ChangelogFor(Lang))).ToList();
+
+    private void OnLanguageChanged()
+    {
+        foreach (var p in new[] { nameof(Name), nameof(Description), nameof(Monogram), nameof(GuideUrl), nameof(ChangelogVersions), nameof(SelectedChangelog) })
+            OnPropertyChanged(p);
+        foreach (var m in Media) m.RefreshCaption();
+        // The guide is per language: re-fetch when the page has already loaded one and the URL actually changed.
+        if (_guideHttp is not null && GuideUrl != _loadedGuideUrl) _ = LoadGuideAsync(_guideHttp);
+    }
     public string Author => Entry.Author ?? "";
 
     // ---- detail page data (media gallery, guide, links) — loaded lazily on first open ----
@@ -79,7 +96,7 @@ public partial class PluginItemViewModel : ObservableObject
     // List-card badge: the plugin's icon, else its first screenshot, else a monogram tile.
     [ObservableProperty] private Bitmap? _thumbnail;
     public bool ShowMonogram => Thumbnail is null;
-    public string Monogram => Entry.Name.Length > 0 ? Entry.Name[..1].ToUpperInvariant() : "?";
+    public string Monogram => Name.Length > 0 ? Name[..1].ToUpperInvariant() : "?";
     partial void OnThumbnailChanged(Bitmap? value) => OnPropertyChanged(nameof(ShowMonogram));
 
     private bool _thumbnailRequested;
@@ -121,25 +138,50 @@ public partial class PluginItemViewModel : ObservableObject
         _detailLoaded = true;
         if (Entry.Media is { Count: > 0 } media)
         {
-            foreach (var m in media)
-                if (!string.IsNullOrWhiteSpace(m?.Url)) Media.Add(new MediaItemViewModel(m!, http, openLightbox));
+            for (var i = 0; i < media.Count; i++)
+            {
+                var m = media[i];
+                var index = i;   // captions are translated BY INDEX into the manifest's media list
+                if (!string.IsNullOrWhiteSpace(m?.Url))
+                    Media.Add(new MediaItemViewModel(m!, http, openLightbox) { CaptionSource = () => Entry.MediaCaption(index, Lang) });
+            }
             OnPropertyChanged(nameof(HasMedia));
             foreach (var tile in Media) _ = tile.LoadAsync();
         }
-        if (Entry.GuideUrl is { } guideUrl)
-        {
-            SetGuideStatus("detail.guide.loading");
-            try
-            {
-                GuideMarkdown = await http.GetStringAsync(guideUrl);
-                SetGuideStatus(null);
-            }
-            catch { SetGuideStatus("detail.guide.unavailable"); }
-        }
+        _guideHttp = http;
+        await LoadGuideAsync(http);
     }
 
+    private HttpClient? _guideHttp;
+    private string? _loadedGuideUrl;
+    private int _guideGeneration;   // UI thread: only the newest guide request may apply its result
+
+    /// <summary>Fetches <see cref="GuideUrl"/> (the active language's guide, else English). A translated guide that fails
+    /// to download falls back to the English one. Only the newest request may apply its result.</summary>
+    private async Task LoadGuideAsync(HttpClient http)
+    {
+        if (GuideUrl is not { } url) return;
+        _loadedGuideUrl = url;
+        var generation = ++_guideGeneration;
+        SetGuideStatus("detail.guide.loading");
+        try
+        {
+            string md;
+            try { md = await http.GetStringAsync(url); }
+            catch when (url != Entry.GuideUrl && Entry.GuideUrl is not null) { url = Entry.GuideUrl; md = await http.GetStringAsync(url); }
+            if (generation != _guideGeneration) return;   // the language changed again while this was downloading
+            GuideBaseUrl = url;
+            GuideMarkdown = md;
+            SetGuideStatus(null);
+        }
+        catch { if (generation == _guideGeneration) SetGuideStatus("detail.guide.unavailable"); }
+    }
+
+    /// <summary>The URL the shown guide was actually downloaded from — relative image paths resolve against it.</summary>
+    [ObservableProperty] private string? _guideBaseUrl;
+
     // Selected version's changelog (may be null); the view guards visibility.
-    public Changelog? SelectedChangelog => SelectedVersion?.Changelog;
+    public Changelog? SelectedChangelog => SelectedVersion?.ChangelogFor(Lang);
 
     // Canonical on-disk DLL filename for the selected version (for install/detect/remove).
     public string? CanonicalDll => SelectedVersion is { } v
@@ -253,3 +295,6 @@ public partial class PluginItemViewModel : ObservableObject
     [RelayCommand] private Task Remove() => _parent.RemoveAsync(this);
     [RelayCommand] private Task ReEnable() => _parent.EnableAsync(this);
 }
+
+/// <summary>One changelog card on the plugin page: a version with its changelog already picked for the active language.</summary>
+public sealed record ChangelogVersionViewModel(string Version, string? Date, Changelog? Changelog);

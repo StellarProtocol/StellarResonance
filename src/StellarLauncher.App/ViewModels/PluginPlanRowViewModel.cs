@@ -27,7 +27,7 @@ public partial class PluginPlanRowViewModel : ObservableObject
         _isSelected = preselect && item.NeedsUpdate;
     }
 
-    public string Name => Item.Name;
+    public string Name => Entry.DisplayName(StellarLauncher.App.Localization.Loc.Service.ActiveLanguage);   // launcher i18n
     public string VersionLabel => Item.TargetVersion is { } t
         ? $"v{Item.InstalledVersion ?? "?"} → v{t}"
         : $"v{Item.InstalledVersion ?? "?"}";

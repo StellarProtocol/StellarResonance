@@ -90,10 +90,14 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
         Columns.Clear(); foreach (var c in _columns) Columns.Add(new MatrixColumnViewModel(c));
         Rows.Clear();
         foreach (var row in ShowAllRows ? matrix.Rows : matrix.PresentRows)
-            Rows.Add(new MatrixRowViewModel(row.PluginId, row.Name, row.Cells.Select((cell, i) => new MatrixCellViewModel(cell, CellAction(_columns[i], row.PluginId, cell)))));
+            Rows.Add(new MatrixRowViewModel(row.PluginId, DisplayName(row.PluginId, row.Name), row.Cells.Select((cell, i) => new MatrixCellViewModel(cell, CellAction(_columns[i], row.PluginId, cell)))));
     }
 
     partial void OnShowAllRowsChanged(bool value) => RebuildMatrix();
+
+    // Launcher i18n: the plugin's name in the active language (rebuilt on a switch by the Loc subscription).
+    private string DisplayName(string pluginId, string fallback) =>
+        _columns.SelectMany(c => c.Registry).FirstOrDefault(e => e.Id == pluginId)?.DisplayName(Loc.Service.ActiveLanguage) ?? fallback;
 
     private Func<Task>? CellAction(ClientColumn col, string pluginId, MatrixCell cell)
     {

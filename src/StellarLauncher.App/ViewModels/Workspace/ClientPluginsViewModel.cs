@@ -11,6 +11,7 @@ using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Matrix;
+using StellarLauncher.Core.Model;
 
 namespace StellarLauncher.App.ViewModels.Workspace;
 
@@ -124,7 +125,8 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
                      PluginFilter.Updates => r.HasUpdate,
                      PluginFilter.Disabled => r.IsDisabled,
                      _ => true,
-                 }).Where(r => q.Length == 0 || r.Name.Contains(q, StringComparison.OrdinalIgnoreCase)))
+                 }).Where(r => q.Length == 0 || r.Name.Contains(q, StringComparison.OrdinalIgnoreCase)
+                               || r.Item.Entry.Name.Contains(q, StringComparison.OrdinalIgnoreCase)))   // translated OR English name
             Rows.Add(r);
         foreach (var p in new[] { nameof(InstalledCount), nameof(UpdateCount), nameof(DisabledCount),
                      nameof(InstalledFilterLabel), nameof(UpdatesFilterLabel), nameof(DisabledFilterLabel), nameof(IsAll), nameof(IsInstalledFilter), nameof(IsUpdatesFilter), nameof(IsDisabledFilter) })
@@ -177,14 +179,14 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         var plan = CopySetPlanner.Plan(src, new ClientColumn(_ws.Client, _ws.Inventory, _ws.Registry));
         var installs = plan.Where(i => i.Status == CopyStatus.Install).ToList();
         if (installs.Count == 0) { Status = Loc.TFormat("copy.nothing", source.Name); return; }
-        var body = string.Join("\n", plan.Select(i => $"{i.Entry.Name}: {CopyStatusText(i)}"));
+        var body = string.Join("\n", plan.Select(i => $"{i.Entry.DisplayName(Loc.Service.ActiveLanguage)}: {CopyStatusText(i)}"));
         if (!await _ws.Services.Confirm.AskAsync(Loc.TFormat("copy.title", source.Name, _ws.Client.Name), body, Loc.TFormat("copy.ok", installs.Count))) return;
         var ok = 0;
         foreach (var i in installs)
         {
             var v = i.Entry.Versions.First(x => x.Version == i.TargetVersion);
             try { await PluginDownloads.InstallAsync(_ws.Services.Core.Install, _ws.Client, i.Entry, v, null); ok++; }
-            catch (Exception ex) { Status = Loc.TFormat("plugins.failed", i.Entry.Name, ex.Message); }
+            catch (Exception ex) { Status = Loc.TFormat("plugins.failed", i.Entry.DisplayName(Loc.Service.ActiveLanguage), ex.Message); }
         }
         Status = Loc.TFormat("copy.done", source.Name, ok, plan.Count - installs.Count);
         await _ws.RefreshAsync();

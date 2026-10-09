@@ -87,7 +87,7 @@ public sealed partial class OverviewViewModel : ObservableObject
             {
                 var reg = await _ws.Services.Core.Registry.ForChannelAsync(other.Channel, CancellationToken.None);
                 foreach (var p in _ws.Services.Core.Inventory.Read(other, reg).Plugins.Where(p => p.Present && !here.Contains(p.Entry.Id)))
-                    names.Add(p.Entry.Name);
+                    names.Add(p.Entry.DisplayName(Loc.Service.ActiveLanguage));
             }
             OnOthersLine = names.Count == 0 ? Loc.T("ov.onOthers.nothing") : string.Join(", ", names);
         }

@@ -91,6 +91,79 @@ public sealed class LocalizationLiveTests : IDisposable
         public ISet<string> SkippedOptionalIds(PluginItemViewModel item) => new HashSet<string>();
     }
 
+    // ---- Task 4: per-language plugin presentation on the plugin page ----
+
+    private const string I18nEntryJson = """
+    { "id": "photostudio", "name": "Photo Studio", "description": "Take beautiful screenshots.", "author": "StellarProtocol",
+      "guideUrl": "https://cdn/ps/guide.md", "guideUrls": { "ja": "https://cdn/ps/guide.ja.md" },
+      "media": [ { "type": "youtube", "url": "https://www.youtube.com/watch?v=abc", "caption": "Tour" },
+                 { "type": "youtube", "url": "https://www.youtube.com/watch?v=def", "caption": "Poses" } ],
+      "i18n": { "ja": { "name": "フォトスタジオ", "description": "美しい写真を。", "captions": [null, "ポーズ"] } },
+      "versions": [ { "version": "1.7.0", "dllUrl": "https://cdn/ps.dll", "sha256": "x", "minModSystemVersion": "2.0.0",
+                      "changelog": { "added": ["Korean"], "changed": [], "fixed": ["Jitter"], "removed": [] },
+                      "changelogI18n": { "ja": { "added": ["韓国語"] } } } ] }
+    """;
+
+    private sealed class Guides : HttpMessageHandler
+    {
+        public readonly List<string> Requested = new();
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)
+        {
+            var url = r.RequestUri!.ToString();
+            lock (Requested) Requested.Add(url);
+            var body = url.EndsWith("guide.ja.md") ? "# ガイド" : url.EndsWith("guide.md") ? "# Guide" : "";
+            return Task.FromResult(new HttpResponseMessage(body.Length > 0 ? System.Net.HttpStatusCode.OK : System.Net.HttpStatusCode.NotFound)
+                { Content = new StringContent(body) });
+        }
+    }
+
+    [Fact]
+    public async Task Plugin_page_shows_the_launcher_language_and_refetches_the_guide_on_a_switch()
+    {
+        var loc = new LauncherLocalization("en", () => "en");
+        Loc.Initialize(loc);
+        var entry = System.Text.Json.JsonSerializer.Deserialize<PluginEntry>(I18nEntryJson, PluginRegistry.JsonOptions)!;
+        var item = new PluginItemViewModel(entry, installed: false, installedVersion: null, installedFramework: "2.8.0", new NoActions());
+        var guides = new Guides();
+        await item.EnsureDetailLoadedAsync(new HttpClient(guides), _ => { });
+        Assert.Equal("Photo Studio", item.Name);
+        Assert.Equal("# Guide", item.GuideMarkdown);
+        Assert.Equal(new[] { "Tour", "Poses" }, item.Media.Select(m => m.Caption));
+
+        var names = new List<string?>();
+        item.PropertyChanged += (_, e) => names.Add(e.PropertyName);
+        loc.SetLanguage("ja");
+        for (var i = 0; i < 50 && item.GuideMarkdown != "# ガイド"; i++) await Task.Delay(10);
+
+        Assert.Equal("フォトスタジオ", item.Name);
+        Assert.Equal("美しい写真を。", item.Description);
+        Assert.Equal(new[] { "Tour", "ポーズ" }, item.Media.Select(m => m.Caption));   // caption 0 untranslated → English
+        Assert.Equal("# ガイド", item.GuideMarkdown);                                      // re-fetched in the new language
+        Assert.Equal("https://cdn/ps/guide.ja.md", item.GuideBaseUrl);                     // images resolve beside the ja guide
+        var card = Assert.Single(item.ChangelogVersions);
+        Assert.Equal(new[] { "韓国語" }, card.Changelog!.Added);
+        Assert.Equal(new[] { "Jitter" }, card.Changelog.Fixed);
+        Assert.Contains(nameof(PluginItemViewModel.ChangelogVersions), names);
+
+        loc.SetLanguage("ko");   // no ko guide → back to the English one
+        for (var i = 0; i < 50 && item.GuideMarkdown != "# Guide"; i++) await Task.Delay(10);
+        Assert.Equal("# Guide", item.GuideMarkdown);
+        Assert.Equal("Photo Studio", item.Name);
+    }
+
+    [Fact]
+    public async Task A_missing_translated_guide_falls_back_to_the_english_one()
+    {
+        Use("ja");
+        var json = I18nEntryJson.Replace("guide.ja.md", "guide.missing.md");
+        var entry = System.Text.Json.JsonSerializer.Deserialize<PluginEntry>(json, PluginRegistry.JsonOptions)!;
+        var item = new PluginItemViewModel(entry, false, null, "2.8.0", new NoActions());
+        await item.EnsureDetailLoadedAsync(new HttpClient(new Guides()), _ => { });
+        Assert.Equal("# Guide", item.GuideMarkdown);
+        Assert.Equal("https://cdn/ps/guide.md", item.GuideBaseUrl);
+        Assert.False(item.HasGuideStatus);
+    }
+
     [Fact]
     public void Plugin_page_labels_switch_language_and_an_open_confirm_stays_open()
     {

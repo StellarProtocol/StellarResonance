@@ -23,8 +23,11 @@ public partial class MediaItemViewModel : ObservableObject
     public PluginMedia Media { get; }
     public bool IsYouTube { get; }
     public bool IsImage { get; }
-    public string? Caption => Media.Caption;
-    public bool HasCaption => !string.IsNullOrWhiteSpace(Media.Caption);
+    /// <summary>Launcher i18n: the caption in the active language (per-item English fallback); set by the plugin page.</summary>
+    public Func<string?>? CaptionSource { get; init; }
+    public string? Caption => CaptionSource is { } f ? f() : Media.Caption;
+    public bool HasCaption => !string.IsNullOrWhiteSpace(Caption);
+    public void RefreshCaption() { OnPropertyChanged(nameof(Caption)); OnPropertyChanged(nameof(HasCaption)); }
     public string PlaceholderLabel => IsImage ? StellarLauncher.App.Localization.Loc.T("media.image") : StellarLauncher.App.Localization.Loc.T("media.video");
 
     [ObservableProperty] private Bitmap? _thumbnail;
