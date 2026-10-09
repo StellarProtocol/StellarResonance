@@ -1,4 +1,5 @@
 using System.IO.Abstractions.TestingHelpers;
+using System.Globalization;
 using System.Text.Json;
 using StellarLauncher.Core.Clients;
 using StellarLauncher.Core.Localization;
@@ -24,21 +25,27 @@ public class LauncherLocalizationTests
         Assert.Equal(new[] { "English", "日本語", "ไทย", "Bahasa Indonesia", "Filipino", "한국어" }, LauncherLanguages.NativeNames);
     }
 
+    // Real CultureInfo two-letter names (what CurrentUICulture yields), not hand-typed guesses; plus the legacy aliases.
+    public static IEnumerable<object?[]> FollowCases() => new[]
+    {
+        new object?[] { new CultureInfo("ja-JP").TwoLetterISOLanguageName, "ja" },
+        new object?[] { new CultureInfo("ko-KR").TwoLetterISOLanguageName, "ko" },
+        new object?[] { new CultureInfo("th-TH").TwoLetterISOLanguageName, "th" },
+        new object?[] { new CultureInfo("id-ID").TwoLetterISOLanguageName, "id" },
+        new object?[] { new CultureInfo("fil-PH").TwoLetterISOLanguageName, "fil" },
+        new object?[] { new CultureInfo("en-US").TwoLetterISOLanguageName, "en" },
+        new object?[] { new CultureInfo("de-DE").TwoLetterISOLanguageName, "en" },
+        new object?[] { new CultureInfo("zh-CN").TwoLetterISOLanguageName, "en" },
+        new object?[] { CultureInfo.InvariantCulture.TwoLetterISOLanguageName, "en" },   // LANG=C
+        new object?[] { "in", "id" },    // legacy Indonesian code
+        new object?[] { "tl", "fil" },   // Tagalog → Filipino
+        new object?[] { "TL", "fil" },
+        new object?[] { "", "en" },
+        new object?[] { null, "en" },
+    };
+
     [Theory]
-    [InlineData("ja", "ja")]
-    [InlineData("ko", "ko")]
-    [InlineData("th", "th")]
-    [InlineData("id", "id")]
-    [InlineData("in", "id")]    // legacy Indonesian code
-    [InlineData("fil", "fil")]
-    [InlineData("tl", "fil")]   // Tagalog → Filipino
-    [InlineData("TL", "fil")]
-    [InlineData("en", "en")]
-    [InlineData("de", "en")]
-    [InlineData("zh", "en")]
-    [InlineData("iv", "en")]    // invariant culture (LANG=C)
-    [InlineData("", "en")]
-    [InlineData(null, "en")]
+    [MemberData(nameof(FollowCases))]
     public void Follow_maps_the_os_ui_culture(string? os, string expected)
     {
         Assert.Equal(expected, LauncherLanguages.FromCulture(os));

@@ -88,7 +88,11 @@ public sealed class LauncherLocalization : ILauncherLocalization
         foreach (var d in handlers.GetInvocationList())
         {
             try { ((Action)d)(); }
-            catch (Exception) { /* a broken subscriber must not block the rest of the UI from switching */ }
+            catch (Exception ex)
+            {
+                // A broken subscriber must not block the rest of the UI from switching — but it must leave a trace.
+                System.Diagnostics.Trace.WriteLine($"[LauncherLocalization] LanguageChanged handler threw: {ex}");
+            }
         }
     }
 

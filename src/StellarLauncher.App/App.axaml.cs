@@ -41,7 +41,9 @@ public partial class App : Application
 
         var store = new ConfigStore(fs, platform);
         // Before ANY view loads: every {loc:T key} resolves through this one service (live switch on LanguageChanged).
-        Loc.Initialize(new LauncherLocalization(store.Load().Launcher.Language));
+        // Labels are UI objects: the live-change fan-out always runs on the UI thread, whoever calls SetLanguage.
+        Loc.Initialize(new LauncherLocalization(store.Load().Launcher.Language),
+            a => { if (Dispatcher.UIThread.CheckAccess()) a(); else Dispatcher.UIThread.Post(a); });
         var locator = new GameLocator(fs);
         var doorstop = new DoorstopToggle(fs);
         var installer = new Installer(fs);

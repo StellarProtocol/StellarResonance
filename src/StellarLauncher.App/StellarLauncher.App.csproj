@@ -29,6 +29,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="StellarLauncher.App.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\StellarLauncher.Core\StellarLauncher.Core.csproj" />
   </ItemGroup>
 </Project>

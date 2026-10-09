@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using StellarLauncher.Core.Localization;
 
 namespace StellarLauncher.App.Localization;
@@ -11,19 +12,31 @@ namespace StellarLauncher.App.Localization;
 /// </summary>
 public static class Loc
 {
-    private static ILauncherLocalization _service = new LauncherLocalization(LauncherLanguages.English);
+    private static ILauncherLocalization _service = DefaultService();
     private static readonly WeakLanguageHub Hub = new();
 
     /// <summary>The active localization service.</summary>
     public static ILauncherLocalization Service => _service;
 
-    /// <summary>Install the app's service (composition root only).</summary>
-    public static void Initialize(ILauncherLocalization service)
+    /// <summary>Install the app's service (composition root only). <paramref name="toUiThread"/> marshals the live-change
+    /// fan-out onto the UI thread (bound labels must only be touched there); omitted = run inline on the raising thread.</summary>
+    public static void Initialize(ILauncherLocalization service, Action<Action>? toUiThread = null)
     {
-        _service.LanguageChanged -= Hub.Raise;
+        _service.LanguageChanged -= OnServiceLanguageChanged;
         _service = service;
-        _service.LanguageChanged += Hub.Raise;
+        _toUiThread = toUiThread;
+        _service.LanguageChanged += OnServiceLanguageChanged;
     }
+
+    /// <summary>Tests only: back to the fixed-English default with no subscribers and inline raising.</summary>
+    internal static void ResetForTests()
+    {
+        Initialize(DefaultService());
+        Hub.Clear();
+    }
+
+    /// <summary>Tests only: live entries currently held by the hub (dead ones included until swept).</summary>
+    internal static int SubscriberCount => Hub.Count;
 
     /// <summary>Resolve a key through the active service.</summary>
     public static string T(string key) => _service.T(key);
@@ -38,33 +51,62 @@ public static class Loc
     public static IDisposable Subscribe<T>(T owner, Action<T> onChanged) where T : class
         => Hub.Add(owner, o => onChanged((T)o));
 
+    private static Action<Action>? _toUiThread;
+
+    private static void OnServiceLanguageChanged()
+    {
+        if (_toUiThread is { } post) post(Hub.Raise);
+        else Hub.Raise();
+    }
+
+    private static ILauncherLocalization DefaultService() => new LauncherLocalization(LauncherLanguages.English, () => LauncherLanguages.English);
+
     // Weak subscriber list: the service lives for the whole app, bound labels and page VMs do not.
     private sealed class WeakLanguageHub
     {
+        private const int MinSweepThreshold = 16;
         private readonly List<Entry> _subs = new();
+        private int _sweepAt = MinSweepThreshold;
+
+        public int Count { get { lock (_subs) return _subs.Count; } }
 
         public IDisposable Add(object owner, Action<object> onChanged)
         {
             var entry = new Entry(new WeakReference<object>(owner), onChanged);
-            lock (_subs) _subs.Add(entry);
+            lock (_subs)
+            {
+                _subs.Add(entry);
+                // Labels are created far more often than the language changes: without this, entries of dead pages would
+                // only be pruned on a Raise and the list would grow for the whole session. Amortised O(1): sweep when the
+                // list has doubled since the last sweep.
+                if (_subs.Count >= _sweepAt)
+                {
+                    SweepLocked();
+                    _sweepAt = Math.Max(MinSweepThreshold, _subs.Count * 2);
+                }
+            }
             return new Unsubscribe(owner, () => { lock (_subs) _subs.Remove(entry); });
         }
+
+        public void Clear() { lock (_subs) { _subs.Clear(); _sweepAt = MinSweepThreshold; } }
 
         public void Raise()
         {
             List<(object Owner, Action<object> OnChanged)> live = new();
             lock (_subs)
             {
-                _subs.RemoveAll(e => !e.Owner.TryGetTarget(out _));
+                SweepLocked();
                 foreach (var e in _subs)
                     if (e.Owner.TryGetTarget(out var o)) live.Add((o, e.OnChanged));
             }
             foreach (var (o, a) in live)
             {
                 try { a(o); }
-                catch (Exception) { /* one broken label must not stop the rest from switching */ }
+                catch (Exception ex) { Trace.WriteLine($"[Loc] LanguageChanged subscriber threw (others still switch): {ex}"); }
             }
         }
+
+        private void SweepLocked() => _subs.RemoveAll(e => !e.Owner.TryGetTarget(out _));
     }
 
     private sealed record Entry(WeakReference<object> Owner, Action<object> OnChanged);
