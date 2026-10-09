@@ -66,6 +66,28 @@ keeps itself up to date automatically.
 dotnet build StellarLauncher.slnx -c Release
 ```
 
+## Translations
+
+The launcher UI ships in English, 日本語, ไทย, Bahasa Indonesia, Filipino and 한국어 (Launcher settings → Language;
+the default *Follow system* maps the OS UI language, else English).
+
+- **Catalogs:** `src/StellarLauncher.Core/Localization/Lang/<code>.json`. English (`en.json`) is the source and the
+  fallback; every language must carry exactly the English key set with the same `{n}` placeholders —
+  `LauncherLocalizationTests` fails the build otherwise.
+- **Views:** use `{loc:T some.key}` (`xmlns:loc="using:StellarLauncher.App.Localization"`); never hard-code
+  user-visible text in `.axaml` — `AxamlLiteralSweepTests` fails on literal letters outside a small allowlist.
+- **View-models / services:** `Loc.T` / `Loc.TFormat` / `Loc.Plural` (Core code uses `L`). Anything that must
+  re-render on a language switch subscribes with `Loc.Subscribe` (UI-thread marshalled), not the raw service event.
+- **Never use displayed text as an identity** (comparisons, persisted values, scroll targets) — keep ids/English
+  internally and translate at display time.
+- **Adding a language:** add it to `LauncherLanguages` and add a complete `Lang/<code>.json`.
+- **Plugin pages:** names, descriptions, captions, changelogs and guides come from the plugin registry's optional
+  per-language fields (`i18n`, `changelogI18n`, `guideUrls`) with per-field English fallback — see the registry's
+  CONTRIBUTING § Translations.
+- **Guide rendering note:** Avalonia 12.0.4 reuses the previous run's fallback font and drops bold/italic on CJK,
+  Thai and Hangul runs; `MarkdownView` works around it by prefixing such runs with U+200B (`FormattingBoundary`).
+  Remove the workaround once Avalonia fixes the fallback reuse.
+
 ## Releasing (maintainers)
 
 Fully CI/CD — the launcher has no game dependency, so `ci.yml` builds it and `release.yml` ships it:
