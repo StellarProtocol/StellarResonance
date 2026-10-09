@@ -1,3 +1,5 @@
+using Avalonia.Headless;
+using Avalonia;
 using StellarLauncher.App.Localization;
 using StellarLauncher.App.Services;
 using StellarLauncher.App.ViewModels;
@@ -226,8 +228,54 @@ public sealed class LocalizationLiveTests : IDisposable
         const string Z = StellarLauncher.App.Views.MarkdownView.FormattingBoundary;
         Assert.Equal(new[]
         {
-            ("撮影", true), (Z + "タブの", false), (Z + "非表示", true), (Z + "グループ and ", false), (Z + "more", true), (Z + " text", false),
+            ("撮影", true), (Z + "タブの", false), (Z + "非表示", true), (Z + "グループ and ", false), ("more", true), (" text", false),   // Latin: untouched
         }, texts.ToArray());
+    }
+
+    // The per-run font probe as a test: real Skia shaping + system fonts. Every bold CJK/Thai/Hangul run must be shaped
+    // with a BOLD face. Runs only where a CJK face with a Bold weight exists (e.g. Noto Sans CJK); elsewhere (a CI image
+    // without CJK fonts) it returns early — the run-structure test above still pins the workaround.
+    [Fact]
+    public async Task Bold_cjk_thai_and_hangul_runs_are_shaped_with_a_bold_face()
+    {
+        using var session = Avalonia.Headless.HeadlessUnitTestSession.StartNew(typeof(SkiaHeadlessEntry));
+        var failures = await session.Dispatch(() =>
+        {
+            var fm = Avalonia.Media.FontManager.Current;
+            if (!fm.TryMatchCharacter('撮', Avalonia.Media.FontStyle.Normal, Avalonia.Media.FontWeight.Bold, Avalonia.Media.FontStretch.Normal,
+                    null, null, out var cjk) || cjk.GlyphTypeface.Weight < Avalonia.Media.FontWeight.SemiBold)
+                return new List<string>();   // no bold CJK face on this machine: nothing to measure
+            var md = "**撮影**タブの**非表示**グループ、**他の冒険者**、**NPC**、**敵**、**収集物** · **포토** 스튜디오는 **설정** 탭의 **숨기기**에서 · **ปลั๊กอิน**นี้**ช่วย**ถ่าย";
+            var tb = StellarLauncher.App.Views.MarkdownView.RenderText(StellarLauncher.Core.Services.MarkdownParser.ParseInlines(md), 14, Avalonia.Media.Brushes.White, null);
+            var w = new Avalonia.Controls.Window { Content = tb, Width = 4000, Height = 200 };
+            w.Show();
+            tb.Measure(new Avalonia.Size(4000, 200));
+            // Intended weight per character comes from the INLINES (the run properties Avalonia hands the shaper are
+            // exactly what the bug corrupts, so they can't be the oracle).
+            var intended = new List<bool>();
+            foreach (var r in tb.Inlines!.OfType<Avalonia.Controls.Documents.Run>())
+                intended.AddRange(Enumerable.Repeat(r.FontWeight >= Avalonia.Media.FontWeight.Bold, r.Text?.Length ?? 0));
+            var bad = new List<string>();
+            foreach (var line in tb.TextLayout.TextLines)
+            {
+                var offset = line.FirstTextSourceIndex;
+                foreach (var run in line.TextRuns)
+                {
+                    if (run is Avalonia.Media.TextFormatting.ShapedTextRun shaped)
+                    {
+                        var text = shaped.Text.ToString();
+                        var isBold = shaped.GlyphRun.GlyphTypeface.Weight >= Avalonia.Media.FontWeight.SemiBold;
+                        for (var i = 0; i < text.Length; i++)
+                            if (StellarLauncher.App.Views.MarkdownView.NeedsFallbackFont(text[i]) && offset + i < intended.Count && intended[offset + i] != isBold)
+                                bad.Add($"'{text[i]}' wanted {(intended[offset + i] ? "bold" : "regular")}, shaped {shaped.GlyphRun.GlyphTypeface.FamilyName} {shaped.GlyphRun.GlyphTypeface.Weight}");
+                    }
+                    offset += run.Length;
+                }
+            }
+            w.Close();
+            return bad;
+        }, CancellationToken.None);
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
     }
 
     [Fact]
@@ -262,4 +310,13 @@ public sealed class LocalizationLiveTests : IDisposable
         Assert.True(item.ConfirmVisible);   // the switch re-renders text only — it never cancels what the player opened
         Assert.True(item.IsUpdate);
     }
+}
+
+/// <summary>Headless entry with REAL Skia text shaping and system font fallback (for font-selection tests).</summary>
+public sealed class SkiaHeadlessEntry
+{
+    public static Avalonia.AppBuilder BuildAvaloniaApp() => Avalonia.AppBuilder.Configure<HeadlessTestApp>()
+        .UseSkia()
+        .UseHeadless(new Avalonia.Headless.AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
+        .WithInterFont();
 }
