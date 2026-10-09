@@ -46,10 +46,7 @@ public sealed partial class RailClientItem : ObservableObject
         _ => new SolidColorBrush(Color.Parse("#2a3050")),
     };
 
-    public string Summary => Loc.TFormat("rail.summary", ChannelLabel(Client.Channel), _framework ?? Loc.T("rail.fwNone"), StateLabel);
-
-    /// <summary>"Stable" / "Testing" in the active language (the stored channel value stays the identifier).</summary>
-    public static string ChannelLabel(string? channel) => channel == "testing" ? Loc.T("channel.testing") : Loc.T("channel.stable");
+    public string Summary => Loc.TFormat("rail.summary", SessionPresenter.ChannelLabel(Client.Channel), _framework ?? Loc.T("rail.fwNone"), StateLabel);
     public string? SummaryFramework => _framework;
 
     public void SetFramework(string? version) { _framework = version; OnPropertyChanged(nameof(Summary)); }

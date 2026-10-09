@@ -40,6 +40,7 @@ public sealed partial class LauncherSettingsViewModel : ObservableObject
     private readonly ILauncherLocalization _loc;
     private LauncherManifest? _remote;
     private string? _availableKey = "settings.notChecked";   // AvailableLabel's catalog key while it is a fixed phrase
+    // i18n: Status and an "offline — …" AvailableLabel are transient and are NOT re-rendered on a language switch.
     private bool _loading;
 
     /// <summary>Language dropdown: Follow system first, then <see cref="LauncherLanguages.Codes"/> in order.</summary>

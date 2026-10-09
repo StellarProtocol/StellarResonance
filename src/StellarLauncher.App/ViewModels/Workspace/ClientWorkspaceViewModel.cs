@@ -70,7 +70,7 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
     public IBrush AccentBrush => AccentBrushes.Solid(Client.Accent);
     public IBrush AccentSoftBrush => AccentBrushes.Soft(Client.Accent);
     public IBrush AccentGlowBrush => AccentBrushes.Glow(Client.Accent);
-    public string ChannelTag => RailClientItem.ChannelLabel(Client.Channel);
+    public string ChannelTag => SessionPresenter.ChannelLabel(Client.Channel);
     public bool IsTesting => Client.Channel == "testing";
     public string ModeTag => Client.Modded ? Loc.T("mode.modded") : Loc.T("mode.vanilla");
     public string RuntimeTag => Client.Linux?.Runner is { } r
@@ -144,6 +144,8 @@ public sealed partial class ClientWorkspaceViewModel : ObservableObject, IDispos
             var col = new Core.Matrix.ClientColumn(Client, Inventory, Registry);
             UpdatesBadge = Registry.Count(e => Core.Matrix.PluginMatrixBuilder.Classify(col, e.Id).Kind == Core.Matrix.MatrixCellKind.UpdateAvailable);
             NewerGameMini = FindNewerRelease();
+            // i18n: callout text is composed (Core L) at scan time — NOT live on a language switch; this page is rebuilt on
+            // navigation, and the language can only change from Launcher settings.
             Callouts = LogPatterns.Scan(Array.Empty<LogLine>(), Inventory, ShadowCopyFix.Find(Services.Fs, Client.GameMiniDir), NewerGameMini);
             Status = "";
         }

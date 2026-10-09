@@ -37,7 +37,7 @@
   "dash.pluginFailed": "{0}: pumalya ang {1} — {2}",
   "dash.fwOffline": "offline ang framework manifest",
   "dash.fwLatest": "pinakabagong stable: framework {0}",
-  "dash.summary": "{0} · {1} tumatakbo · {2} inihahanda · {3} · {4}",
+  "dash.summary": "{0} · {1} tumatakbo · {2} inihahanda · {3} · na-refresh {4}",
   "dash.clients.one": "{0} client",
   "dash.clients.other": "{0} na client",
   "tile.fw.none": "walang fw",
@@ -129,9 +129,9 @@
   "common.disabled": "Naka-disable",
   "plugins.search": "🔍 Maghanap ng plugin",
   "plugins.filter.all": "Lahat",
-  "plugins.filter.installed": "Installed {0}",
+  "plugins.filter.installed": "Naka-install {0}",
   "plugins.filter.updates": "Update {0}",
-  "plugins.filter.disabled": "Disabled {0}",
+  "plugins.filter.disabled": "Naka-disable {0}",
   "plugins.view.list": "☰ List",
   "plugins.view.list.tip": "Listahan",
   "plugins.view.grid": "▦ Grid",
@@ -396,5 +396,8 @@
   "launch.needsRunner": "Kailangan ng Runner + WINEPREFIX para sa Linux launch (itakda sa Mga Setting)",
   "launch.cancelled": "Kinansela ang pagsimula",
   "selfUpdate.verifying": "bine-verify ang download…",
-  "selfUpdate.installing": "ini-install ang update… ({0}/{1})"
+  "selfUpdate.installing": "ini-install ang update… ({0}/{1})",
+  "nvapi.upToDate": "DXVK-NVAPI {0} (updated na)",
+  "nvapi.installed": "Na-install ang DXVK-NVAPI {0}",
+  "nvapi.installed64": "Na-install ang DXVK-NVAPI {0} (64-bit lang)"
 }

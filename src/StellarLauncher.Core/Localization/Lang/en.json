@@ -396,5 +396,8 @@
   "launch.needsRunner": "Linux launch needs a Runner + WINEPREFIX (set them in Settings)",
   "launch.cancelled": "Launch cancelled",
   "selfUpdate.verifying": "verifying download…",
-  "selfUpdate.installing": "installing update… ({0}/{1})"
+  "selfUpdate.installing": "installing update… ({0}/{1})",
+  "nvapi.upToDate": "DXVK-NVAPI {0} (up to date)",
+  "nvapi.installed": "DXVK-NVAPI {0} installed",
+  "nvapi.installed64": "DXVK-NVAPI {0} installed (64-bit only)"
 }

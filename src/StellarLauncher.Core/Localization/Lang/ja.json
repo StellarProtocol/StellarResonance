@@ -219,7 +219,7 @@
   "common.browse": "参照…",
   "settings.channel.testing": "テスト版（プレリリース）— 安定版リリースを含む",
   "cs.identity": "識別",
-  "cs.name.label": "名前 — レールとダッシュボードに表示",
+  "cs.name.label": "名前 — サイドバーとダッシュボードに表示",
   "cs.name.placeholder": "クライアント名",
   "cs.accent": "アクセント",
   "cs.install": "インストール",
@@ -268,7 +268,7 @@
   "callout.and": "と",
   "callout.dupSlot.title": "stellar/plugins に「{0}」のコピーが 2 つあります",
   "callout.dupSlot.detail": "{0} — フレームワークはどちらか一方を任意に読み込むため、インストールした修正が実行されない場合があります。統合すると新しいビルドを残し、もう一方を stellar-backups/ に移動します。プラグインデータは GUID で管理されるため影響しません。",
-  "callout.shadow.title": "2 つ目のフレームワークのコピーが配置済みのものを上書きしています",
+  "callout.shadow.title": "2 つ目のフレームワークのコピーが、配置済みのものより優先されています",
   "callout.shadow.detail": "{0} も BepInEx/plugins 配下に .stellar-version マーカーを持っています。BepInEx は同一バージョンのうち 1 つを任意に残します（ログに 'Skipping [...] newer version exists' と表示）。退避すると stellar-backups/ に移動します。",
   "callout.newerRelease.title": "ゲームが新しいリリースフォルダーにアップデートされました",
   "callout.newerRelease.detail": "{0} を検出しました。このクライアントはまだ古い release_<ver> を指しています。アップデート後のゲームを起動するには、クライアントの参照先を変更してください。",
@@ -289,7 +289,7 @@
   "logs.fixFailed": "修正に失敗: {0}",
   "add.title": "クライアントを追加",
   "add.intro": "クライアントとは 1 つのゲームインストールのことです。それぞれが独自のフレームワーク、プラグイン、チャンネル、起動設定を持ち、他と同時に実行できます。",
-  "add.welcome": "ようこそ。下のインストールを選ぶとここから管理できます。後からレールで追加することもできます。",
+  "add.welcome": "ようこそ。下のインストールを選ぶとここから管理できます。後からサイドバーで追加することもできます。",
   "add.skip": "今はスキップ",
   "add.linuxPrefix": "Linux プレフィックス",
   "add.hide": "非表示",
@@ -396,5 +396,8 @@
   "launch.needsRunner": "Linux での起動にはランナーと WINEPREFIX が必要です（設定で指定してください）",
   "launch.cancelled": "起動をキャンセルしました",
   "selfUpdate.verifying": "ダウンロードを検証中…",
-  "selfUpdate.installing": "アップデートをインストール中…（{0}/{1}）"
+  "selfUpdate.installing": "アップデートをインストール中…（{0}/{1}）",
+  "nvapi.upToDate": "DXVK-NVAPI {0}（最新）",
+  "nvapi.installed": "DXVK-NVAPI {0} をインストールしました",
+  "nvapi.installed64": "DXVK-NVAPI {0} をインストールしました（64 ビットのみ）"
 }

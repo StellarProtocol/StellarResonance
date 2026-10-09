@@ -37,7 +37,7 @@ public sealed partial class ClientTileViewModel : ObservableObject
     public IBrush AccentBrush => AccentBrushes.Solid(Client.Accent);
     public IBrush AccentSoftBrush => AccentBrushes.Soft(Client.Accent);
     public IBrush AccentLineBrush => AccentBrushes.Line(Client.Accent);
-    public string ChannelTag => Shell.RailClientItem.ChannelLabel(Client.Channel);
+    public string ChannelTag => SessionPresenter.ChannelLabel(Client.Channel);
     public bool IsTesting => Client.Channel == "testing";
     public string ModeTag => Client.Modded ? Loc.T("mode.modded") : Loc.T("mode.vanilla");
     public string RunnerTag => Client.Linux?.Runner is { } r

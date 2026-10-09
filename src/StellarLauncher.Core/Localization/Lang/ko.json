@@ -347,7 +347,7 @@
   "list.comma": ", ",
   "list.and": " 및 ",
   "step.install.title": "{0} {1} 설치",
-  "step.install.body": "{0}: 단독으로 작동합니다. 이 선택 추가 기능으로 기능을 더할 수 있으며, 나중에 해당 페이지에서 변경할 수 있습니다.",
+  "step.install.body": "{0} 플러그인은 단독으로 작동합니다. 이 선택 추가 기능으로 기능을 더할 수 있으며, 나중에 해당 페이지에서 변경할 수 있습니다.",
   "step.reinstall.title": "{0} {1} 재설치",
   "step.reinstall.body": "{0} 항목을 다시 다운로드하고 검사합니다. 설정과 저장된 데이터는 유지됩니다.",
   "step.reinstall.ok": "재설치",
@@ -390,11 +390,14 @@
   "launch.postScriptFailed": "종료 후 스크립트 실패: {0}",
   "launch.exitedCode": "종료 코드 {0} — 설정에서 러너 / WINEPREFIX를 확인하세요",
   "launch.preScriptTimeout": "실행 전 스크립트 시간 초과 — 그대로 실행합니다",
-  "launch.launching": "시작하는 중…",
+  "launch.launching": "시작 중…",
   "launch.preScriptExited": "실행 전 스크립트 종료 (코드 {0}) — 그대로 실행합니다",
   "launch.reattached": "게임 실행 중 (다시 연결됨)",
   "launch.needsRunner": "Linux 실행에는 러너 + WINEPREFIX가 필요합니다 (설정에서 지정)",
   "launch.cancelled": "실행 취소됨",
   "selfUpdate.verifying": "다운로드 검증 중…",
-  "selfUpdate.installing": "업데이트 설치 중… ({0}/{1})"
+  "selfUpdate.installing": "업데이트 설치 중… ({0}/{1})",
+  "nvapi.upToDate": "DXVK-NVAPI {0} (최신 상태)",
+  "nvapi.installed": "DXVK-NVAPI {0} 설치됨",
+  "nvapi.installed64": "DXVK-NVAPI {0} 설치됨 (64비트 전용)"
 }

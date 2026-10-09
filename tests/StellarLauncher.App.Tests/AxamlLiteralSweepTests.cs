@@ -18,6 +18,7 @@ public class AxamlLiteralSweepTests
         "WINEPREFIX",                   // technical identifier (env var name)
         "Esync", "Fsync",               // Wine feature names
         "NAME", "VALUE",                // environment-variable placeholders (identifier columns)
+        "Consolas, DejaVu Sans Mono, Menlo, monospace",   // Theme.axaml MonoFont resource (a font list, not UI text)
     };
 
     private static readonly Regex Attr = new(
@@ -35,16 +36,40 @@ public class AxamlLiteralSweepTests
 
         var offenders = new List<string>();
         foreach (var file in views)
-            foreach (Match m in Attr.Matches(File.ReadAllText(file)))
+        {
+            var xaml = Regex.Replace(File.ReadAllText(file), "<!--.*?-->", "", RegexOptions.Singleline);
+            foreach (Match m in Attr.Matches(xaml))
             {
                 var v = m.Groups["v"].Value;
                 if (v.StartsWith('{') || !v.Any(char.IsLetter) || Allowed.Contains(v)) continue;
                 offenders.Add($"{Path.GetFileName(file)}: {m.Groups[1].Value}=\"{v}\"");
             }
+            foreach (Match m in ElementText.Matches(xaml).Where(m => !Allowed.Contains(m.Groups["v"].Value.Trim())))
+                offenders.Add($"{Path.GetFileName(file)}: element text \"{m.Groups["v"].Value.Trim()}\"");
+            foreach (Match m in LetteredFormat.Matches(xaml))
+                offenders.Add($"{Path.GetFileName(file)}: StringFormat='{m.Groups["v"].Value}'");
+        }
         Assert.True(offenders.Count == 0, "hard-coded UI strings (use {loc:T key}):\n" + string.Join("\n", offenders));
     }
 
     // The sweep must actually see literals: a planted one is reported (guards against a regex that matches nothing).
+    // Text placed as element content (<TextBlock>Hi</TextBlock>, <ToolTip.Tip>Hi</ToolTip.Tip>) — any lettered text node.
+    private static readonly Regex ElementText = new(@">(?<v>[^<>{}]*\p{L}[^<>]*)</", RegexOptions.CultureInvariant);
+
+    // A binding StringFormat carrying words; the version prefix 'v{0}' is the one allowed letter.
+    private static readonly Regex LetteredFormat = new(@"StringFormat='(?<v>(?!v\{0\}')[^']*\p{L}[^']*)'", RegexOptions.CultureInvariant);
+
+    [Fact]
+    public void The_sweep_also_detects_element_text_and_lettered_string_formats()
+    {
+        Assert.True(ElementText.IsMatch("<TextBlock>Hello</TextBlock>"));
+        Assert.True(ElementText.IsMatch("<ToolTip.Tip>Open it</ToolTip.Tip>"));
+        Assert.False(ElementText.IsMatch("<TextBlock Text=\"{loc:T a.b}\"/>"));
+        Assert.True(LetteredFormat.IsMatch("{Binding N, StringFormat='Installed {0}'}"));
+        Assert.False(LetteredFormat.IsMatch("{Binding V, StringFormat='v{0}'}"));
+        Assert.False(LetteredFormat.IsMatch("{Binding U, StringFormat='{}{0}↑'}"));
+    }
+
     [Fact]
     public void The_sweep_detects_a_planted_literal()
     {

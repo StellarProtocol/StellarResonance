@@ -396,5 +396,8 @@
   "launch.needsRunner": "Peluncuran di Linux memerlukan Runner + WINEPREFIX (atur di Pengaturan)",
   "launch.cancelled": "Peluncuran dibatalkan",
   "selfUpdate.verifying": "memverifikasi unduhan…",
-  "selfUpdate.installing": "memasang pembaruan… ({0}/{1})"
+  "selfUpdate.installing": "memasang pembaruan… ({0}/{1})",
+  "nvapi.upToDate": "DXVK-NVAPI {0} (terbaru)",
+  "nvapi.installed": "DXVK-NVAPI {0} terpasang",
+  "nvapi.installed64": "DXVK-NVAPI {0} terpasang (hanya 64-bit)"
 }

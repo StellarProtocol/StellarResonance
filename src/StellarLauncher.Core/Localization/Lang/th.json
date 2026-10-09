@@ -396,5 +396,8 @@
   "launch.needsRunner": "การเริ่มบน Linux ต้องมีตัวรัน + WINEPREFIX (ตั้งได้ในตั้งค่า)",
   "launch.cancelled": "ยกเลิกการเริ่มเกมแล้ว",
   "selfUpdate.verifying": "กำลังตรวจสอบไฟล์ที่ดาวน์โหลด…",
-  "selfUpdate.installing": "กำลังติดตั้งอัปเดต… ({0}/{1})"
+  "selfUpdate.installing": "กำลังติดตั้งอัปเดต… ({0}/{1})",
+  "nvapi.upToDate": "DXVK-NVAPI {0} (ล่าสุดแล้ว)",
+  "nvapi.installed": "ติดตั้ง DXVK-NVAPI {0} แล้ว",
+  "nvapi.installed64": "ติดตั้ง DXVK-NVAPI {0} แล้ว (เฉพาะ 64 บิต)"
 }

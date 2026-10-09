@@ -1,6 +1,5 @@
 using System;
 using Avalonia.Media;
-using System.Text.RegularExpressions;
 using StellarLauncher.App.Localization;
 using StellarLauncher.Core.Inventory;
 using StellarLauncher.Core.Launch;
@@ -39,23 +38,12 @@ public static class SessionPresenter
         _ => inv.FolderExists ? "#697297" : "#ff9a9a",
     }));
 
-    private static readonly Regex Added = new(@"^Added (.+) for (.+)$", RegexOptions.CultureInvariant);
-    private static readonly Regex Preparing = new(@"^Preparing (.+?): (.+)…$", RegexOptions.CultureInvariant);
+    /// <summary>See <see cref="ReviewLines.Localize"/>.</summary>
+    public static string LocalizeReviewText(string text) => ReviewLines.Localize(text);
 
-    /// <summary>The dependency review's progress lines ("Preparing &lt;plugin&gt;: &lt;deps&gt;…", "Added &lt;dep&gt; for
-    /// &lt;plugin&gt;", N-2-joined with " · ") stay ENGLISH end to end: they are the protocol <see cref="ClientSessions"/>
-    /// classifies the sticky notice on and the always-on log line, and the R-2/N-2 pins assert them verbatim. They are
-    /// rendered in the active language only here, at display time; an unrecognised segment passes through unchanged.</summary>
-    public static string LocalizeReviewText(string text)
-    {
-        var parts = text.Split(" · ");
-        for (var i = 0; i < parts.Length; i++)
-        {
-            if (Added.Match(parts[i]) is { Success: true } a) parts[i] = Loc.TFormat("deps.added", a.Groups[1].Value, a.Groups[2].Value);
-            else if (Preparing.Match(parts[i]) is { Success: true } p) parts[i] = Loc.TFormat("deps.preparing", p.Groups[1].Value, p.Groups[2].Value);
-        }
-        return string.Join(" · ", parts);
-    }
+    /// <summary>"Stable" / "Testing" in the active language (the stored channel value stays the identifier). Shared by
+    /// the rail, dashboard tiles, the plugin matrix and the workspace header.</summary>
+    public static string ChannelLabel(string? channel) => channel == "testing" ? Loc.T("channel.testing") : Loc.T("channel.stable");
 
     public static string Elapsed(DateTimeOffset since)
     {

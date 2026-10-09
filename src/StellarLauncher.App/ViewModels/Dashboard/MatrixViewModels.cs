@@ -16,7 +16,7 @@ public sealed class MatrixColumnViewModel
     {
         Name = col.Client.Name;
         Subtitle = col.Inventory.FrameworkVersion is null ? Loc.T("matrix.noFramework")
-            : Loc.TFormat("matrix.subtitle", col.Inventory.FrameworkVersion, Shell.RailClientItem.ChannelLabel(col.Client.Channel));
+            : Loc.TFormat("matrix.subtitle", col.Inventory.FrameworkVersion, SessionPresenter.ChannelLabel(col.Client.Channel));
         AccentBrush = AccentBrushes.Solid(col.Client.Accent);
     }
     public string Name { get; }

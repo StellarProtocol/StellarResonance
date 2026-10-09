@@ -101,6 +101,7 @@ public sealed partial class ClientPluginsViewModel : ObservableObject, IPluginAc
         catch (Exception ex) { Status = Loc.TFormat("ws.offline", ex.Message); }
     }
 
+    // i18n: chip text is built at load time — NOT live on a language switch (page rebuilt on navigation).
     private IEnumerable<AlsoOnChip> AlsoOnFor(string pluginId)
     {
         var chips = _others.Select(col =>
