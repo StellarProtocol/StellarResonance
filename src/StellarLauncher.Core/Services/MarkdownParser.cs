@@ -117,9 +117,25 @@ public static partial class MarkdownParser
     /// nothing (a space there would be a visible gap mid-sentence).</summary>
     public static void AppendWrapped(StringBuilder text, string line)
     {
-        if (text.Length > 0 && line.Length > 0 && !(IsSpacelessScript(text[^1]) && IsSpacelessScript(line[0])))
+        if (text.Length > 0 && line.Length > 0 && !(IsSpacelessScript(LastLetter(text)) && IsSpacelessScript(FirstLetter(line))))
             text.Append(' ');
         text.Append(line);
+    }
+
+    // Markdown markers and closing/opening ASCII punctuation sit between the words a soft wrap joins
+    // ("**撮影**" ⏎ "タブ", "(自分)" ⏎ "次"): look through them to the nearest real character on each side.
+    private const string Transparent = "*_`~)]}\"'([{<>";
+
+    private static char LastLetter(StringBuilder text)
+    {
+        for (var i = text.Length - 1; i >= 0; i--) if (Transparent.IndexOf(text[i]) < 0) return text[i];
+        return text[^1];
+    }
+
+    private static char FirstLetter(string line)
+    {
+        foreach (var c in line) if (Transparent.IndexOf(c) < 0) return c;
+        return line[0];
     }
 
     /// <summary>Scripts written without inter-word spaces: CJK ideographs, kana, CJK/fullwidth punctuation, Thai.

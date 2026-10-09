@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using StellarLauncher.App.Localization;
+using StellarLauncher.Core.Model;
 
 namespace StellarLauncher.App.Services;
 
@@ -20,15 +21,19 @@ public static class ReviewLines
 {
     private const string Join = " · ";
     private const int MaxRemembered = 512;   // a few lines per launch; bounded so a long session can't grow it forever
-    private static readonly ConcurrentDictionary<string, (string Key, string A, string B)> Known = new(StringComparer.Ordinal);
+    private sealed record Line(string Key, string A, string B, PluginEntry? Entry, bool PluginIsA);
+    private static readonly ConcurrentDictionary<string, Line> Known = new(StringComparer.Ordinal);
+    private static readonly ConcurrentQueue<string> Order = new();   // insertion order, for oldest-first eviction
     private static readonly Regex AddedRx = new(@"^Added (.+?) for (.+)$", RegexOptions.CultureInvariant);
     private static readonly Regex PreparingRx = new(@"^Preparing (.+?): (.+)…$", RegexOptions.CultureInvariant);
 
     /// <summary>"Added &lt;dependency&gt; for &lt;plugin&gt;" (English protocol line), remembered for display.</summary>
-    public static string Added(string dependency, string plugin) => Remember("deps.added", $"Added {dependency} for {plugin}", dependency, plugin);
+    public static string Added(string dependency, string plugin, PluginEntry? entry = null) =>
+        Remember($"Added {dependency} for {plugin}", new Line("deps.added", dependency, plugin, entry, PluginIsA: false));
 
     /// <summary>"Preparing &lt;plugin&gt;: &lt;names&gt;…" (English protocol line), remembered for display.</summary>
-    public static string Preparing(string plugin, string names) => Remember("deps.preparing", $"Preparing {plugin}: {names}…", plugin, names);
+    public static string Preparing(string plugin, string names, PluginEntry? entry = null) =>
+        Remember($"Preparing {plugin}: {names}…", new Line("deps.preparing", plugin, names, entry, PluginIsA: true));
 
     /// <summary>The (possibly " · "-joined) protocol text in the active language; unknown text passes through.</summary>
     public static string Localize(string text)
@@ -37,10 +42,9 @@ public static class ReviewLines
         var i = 0;
         while (i < text.Length)
         {
-            if (LongestKnownAt(text, i) is { } k)
+            if (LongestKnownAt(text, i) is { } k && Known.TryGetValue(k, out var line))   // TryGetValue: may be evicted meanwhile
             {
-                var (key, a, b) = Known[k];
-                parts.Add(Loc.TFormat(key, a, b));
+                parts.Add(Render(line));
                 i += k.Length;
             }
             else
@@ -60,6 +64,14 @@ public static class ReviewLines
                     && (i + k.Length == text.Length || string.CompareOrdinal(text, i + k.Length, Join, 0, Join.Length) == 0))
         .OrderByDescending(k => k.Length).FirstOrDefault();
 
+    // The plugin is shown by its display name in the active language (registry i18n); the protocol string keeps English.
+    private static string Render(Line l)
+    {
+        var lang = Loc.Service.ActiveLanguage;
+        var (a, b) = l.Entry is { } e ? (l.PluginIsA ? (e.DisplayName(lang), l.B) : (l.A, e.DisplayName(lang))) : (l.A, l.B);
+        return Loc.TFormat(l.Key, a, b);
+    }
+
     private static string ParseFallback(string seg)
     {
         if (AddedRx.Match(seg) is { Success: true } a) return Loc.TFormat("deps.added", a.Groups[1].Value, a.Groups[2].Value);
@@ -67,10 +79,11 @@ public static class ReviewLines
         return seg;
     }
 
-    private static string Remember(string key, string english, string a, string b)
+    private static string Remember(string english, Line line)
     {
-        if (Known.Count >= MaxRemembered) Known.Clear();
-        Known[english] = (key, a, b);
+        if (Known.TryAdd(english, line)) Order.Enqueue(english);
+        else Known[english] = line;
+        while (Known.Count > MaxRemembered && Order.TryDequeue(out var oldest)) Known.TryRemove(oldest, out _);   // oldest first
         return english;
     }
 }

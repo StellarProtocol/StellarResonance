@@ -151,6 +151,85 @@ public sealed class LocalizationLiveTests : IDisposable
         Assert.Equal("Photo Studio", item.Name);
     }
 
+    private sealed class HeldGuides : HttpMessageHandler
+    {
+        public readonly TaskCompletionSource HoldJa = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)
+        {
+            var url = r.RequestUri!.ToString();
+            if (url.EndsWith("guide.ja.md")) { await HoldJa.Task; return new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent("# ガイド") }; }
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent("# Guide") };
+        }
+    }
+
+    // Two guide requests in flight (ja held, then a switch to ko → English): the NEWEST wins, whatever finishes last.
+    [Fact]
+    public async Task Overlapping_guide_requests_apply_only_the_newest()
+    {
+        var loc = new LauncherLocalization("en", () => "en");
+        Loc.Initialize(loc);
+        var entry = System.Text.Json.JsonSerializer.Deserialize<PluginEntry>(I18nEntryJson, PluginRegistry.JsonOptions)!;
+        var item = new PluginItemViewModel(entry, false, null, "2.8.0", new NoActions());
+        var web = new HeldGuides();
+        await item.EnsureDetailLoadedAsync(new HttpClient(web), _ => { });
+        Assert.Equal("# Guide", item.GuideMarkdown);
+
+        loc.SetLanguage("ja");                      // ja request starts and is held
+        loc.SetLanguage("ko");                      // no ko guide → English request, completes
+        for (var i = 0; i < 50 && item.HasGuideStatus; i++) await Task.Delay(10);
+        Assert.Equal("# Guide", item.GuideMarkdown);
+        web.HoldJa.SetResult();                     // the stale ja response arrives last
+        await Task.Delay(100);
+        Assert.Equal("# Guide", item.GuideMarkdown);
+        Assert.Equal("https://cdn/ps/guide.md", item.GuideBaseUrl);
+        Assert.False(item.HasGuideStatus);
+    }
+
+    // The dependency notice keeps its English protocol text but shows the plugin's localized name.
+    [Fact]
+    public void Review_lines_show_the_plugin_display_name_and_stay_english_internally()
+    {
+        var entry = System.Text.Json.JsonSerializer.Deserialize<PluginEntry>(I18nEntryJson, PluginRegistry.JsonOptions)!;
+        var line = ReviewLines.Added("ReShade", entry.Name, entry);
+        Assert.Equal("Added ReShade for Photo Studio", line);
+        Assert.Equal(line, SessionPresenter.LocalizeReviewText(line));      // en identity
+        Use("ja");
+        Assert.Equal(Loc.TFormat("deps.added", "ReShade", "フォトスタジオ"), SessionPresenter.LocalizeReviewText(line));
+        var prep = ReviewLines.Preparing(entry.Name, "ReShade", entry);
+        Assert.Equal(Loc.TFormat("deps.preparing", "フォトスタジオ", "ReShade"), SessionPresenter.LocalizeReviewText(prep));
+    }
+
+    [Fact]
+    public void Review_line_memory_is_bounded_and_evicts_oldest_first()
+    {
+        Use("ko");
+        var first = ReviewLines.Added("Dep0", "Evict Plugin · 0");
+        for (var i = 1; i <= 600; i++) ReviewLines.Added($"Dep{i}", $"Evict Plugin · {i}");
+        var newest = ReviewLines.Added("DepNew", "Evict Plugin · new");
+        // The newest is still remembered (exact parts); the oldest fell back to template parsing, which splits at " · ".
+        Assert.Equal(Loc.TFormat("deps.added", "DepNew", "Evict Plugin · new"), SessionPresenter.LocalizeReviewText(newest));
+        Assert.NotEqual(Loc.TFormat("deps.added", "Dep0", "Evict Plugin · 0"), SessionPresenter.LocalizeReviewText(first));
+    }
+
+    // Task 4 fix round #1: Avalonia 12.0.4 reuses the previous run's fallback face ignoring weight — every run whose
+    // formatting changed opens with a zero-width space so CJK/Thai bold renders bold.
+    [Fact]
+    public async Task Markdown_runs_open_with_a_boundary_when_formatting_changes()
+    {
+        using var session = Avalonia.Headless.HeadlessUnitTestSession.StartNew(typeof(HeadlessEntry));
+        var texts = await session.Dispatch(() =>
+        {
+            var inl = StellarLauncher.Core.Services.MarkdownParser.ParseInlines("**撮影**タブの**非表示**グループ and **more** text");
+            var tb = StellarLauncher.App.Views.MarkdownView.RenderText(inl, 13, Avalonia.Media.Brushes.White, null);
+            return tb.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Select(r => (r.Text, Bold: r.FontWeight == Avalonia.Media.FontWeight.Bold)).ToList();
+        }, CancellationToken.None);
+        const string Z = StellarLauncher.App.Views.MarkdownView.FormattingBoundary;
+        Assert.Equal(new[]
+        {
+            ("撮影", true), (Z + "タブの", false), (Z + "非表示", true), (Z + "グループ and ", false), (Z + "more", true), (Z + " text", false),
+        }, texts.ToArray());
+    }
+
     [Fact]
     public async Task A_missing_translated_guide_falls_back_to_the_english_one()
     {

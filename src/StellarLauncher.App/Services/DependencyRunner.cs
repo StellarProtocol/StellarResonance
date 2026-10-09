@@ -103,7 +103,7 @@ public static class DependencyRunner
             if (progress is not null)
             {
                 if (PendingNames(svc, c.GameMiniDir, entry.Id, deps, skipped) is { Length: > 0 } names)
-                    progress(ReviewLines.Preparing(entry.Name, names));
+                    progress(ReviewLines.Preparing(entry.Name, names, entry));
                 before = ExistingDependencyIds(svc, c.GameMiniDir, entry.Id);   // snapshot BEFORE the ensure
             }
             var results = await svc.EnsureAsync(c.GameMiniDir, entry.Id, deps, skipped, ct);
@@ -112,7 +112,7 @@ public static class DependencyRunner
                 foreach (var s in results)
                     if (s.State == DependencyState.Installed && !before.Contains(s.DependencyId)
                         && deps.FirstOrDefault(d => d.Id == s.DependencyId) is { Optional: true } d)
-                        progress!(ReviewLines.Added(d.Name, entry.Name));
+                        progress!(ReviewLines.Added(d.Name, entry.Name, entry));
         }
         return lines;
     }

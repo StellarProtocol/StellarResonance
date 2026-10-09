@@ -111,9 +111,9 @@ public sealed partial class DashboardViewModel : ObservableObject, IDisposable
             try
             {
                 if (!await PluginInstallFlow.RunAsync(_svc.Install, _svc.Steps, request, _shell.SaveConfig,
-                        s => Status = Loc.TFormat("dash.pluginStatus", col.Client.Name, entry.Name, s))) return;
+                        s => Status = Loc.TFormat("dash.pluginStatus", col.Client.Name, entry.DisplayName(Loc.Service.ActiveLanguage), s))) return;
             }
-            catch (Exception ex) { Status = Loc.TFormat("dash.pluginFailed", col.Client.Name, entry.Name, ex.Message); }
+            catch (Exception ex) { Status = Loc.TFormat("dash.pluginFailed", col.Client.Name, entry.DisplayName(Loc.Service.ActiveLanguage), ex.Message); }
             await RefreshAsync();
         };
     }
