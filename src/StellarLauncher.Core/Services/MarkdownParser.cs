@@ -93,7 +93,7 @@ public static partial class MarkdownParser
             // Lazy continuation: following plain lines (wrapped source) belong to this item.
             while (i < lines.Length && !string.IsNullOrWhiteSpace(lines[i]) && !StartsBlock(lines[i]))
             {
-                text.Append(' ').Append(lines[i].Trim());
+                AppendWrapped(text, lines[i].Trim());
                 i++;
             }
             items.Add(new MdListItem(ParseInlines(text.ToString()), indent, marker));
@@ -106,12 +106,33 @@ public static partial class MarkdownParser
         var text = new StringBuilder();
         while (i < lines.Length && !string.IsNullOrWhiteSpace(lines[i]) && !StartsBlock(lines[i]))
         {
-            if (text.Length > 0) text.Append(' ');
-            text.Append(lines[i].Trim());
+            AppendWrapped(text, lines[i].Trim());
             i++;
         }
         return new MdParagraph(ParseInlines(text.ToString()));
     }
+
+    /// <summary>Joins a soft-wrapped source line onto the text so far. Latin and Korean separate words with spaces, so
+    /// the line break becomes one; Japanese, Chinese and Thai do NOT, so a break between two such characters joins with
+    /// nothing (a space there would be a visible gap mid-sentence).</summary>
+    public static void AppendWrapped(StringBuilder text, string line)
+    {
+        if (text.Length > 0 && line.Length > 0 && !(IsSpacelessScript(text[^1]) && IsSpacelessScript(line[0])))
+            text.Append(' ');
+        text.Append(line);
+    }
+
+    /// <summary>Scripts written without inter-word spaces: CJK ideographs, kana, CJK/fullwidth punctuation, Thai.
+    /// Hangul is deliberately NOT here — Korean uses spaces.</summary>
+    public static bool IsSpacelessScript(char c) =>
+        c is >= '　' and <= '〿'      // CJK symbols & punctuation (、。「」)
+          or >= '぀' and <= 'ヿ'      // Hiragana + Katakana
+          or >= 'ㇰ' and <= 'ㇿ'      // Katakana phonetic extensions
+          or >= '㐀' and <= '䶿'      // CJK ext A
+          or >= '一' and <= '鿿'      // CJK unified ideographs
+          or >= '豈' and <= '﫿'      // CJK compatibility ideographs
+          or >= '＀' and <= '￯'      // halfwidth/fullwidth forms (！，：ｱ)
+          or >= '฀' and <= '๿';     // Thai
 
     // Inline subset: `code`, **bold**, *italic*, [text](url), ![alt](url) (rendered as a link).
     // An unterminated marker is kept as literal text. No nesting inside bold/italic.
